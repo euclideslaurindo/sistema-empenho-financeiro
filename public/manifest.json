@@ -1,0 +1,10 @@
+{
+  "name": "Sistema de Empenho",
+  "short_name": "SisEmpenho",
+  "description": "Sistema Integrado de Empenhos e Pagamentos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#0f172a",
+  "icons": []
+}
