@@ -10,7 +10,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    const { nome, endereco, cpfCnpj, pis, rg, dataExpedicao, banco, agencia, contaCorrente, tipoChavePix, chavePix } = body;
+    const { nome, endereco, cpfCnpj, pis, rg, dataExpedicao, banco, agencia, contaCorrente, telefone, cidade, uf } = body;
 
     if (!nome || !cpfCnpj || !rg) {
       return NextResponse.json({ error: 'Nome, CPF/CNPJ e RG são obrigatórios.' }, { status: 400 });
@@ -31,9 +31,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const expedicao = dataExpedicao || null;
 
     await query(
-      `UPDATE credores SET nome = ?, endereco = ?, cpf_cnpj = ?, pis = ?, rg = ?, data_expedicao = ?
+      `UPDATE credores SET nome = ?, endereco = ?, cpf_cnpj = ?, pis = ?, rg = ?, data_expedicao = ?,
+                           cidade = ?, uf = ?, telefone = ?, banco = ?, agencia = ?, conta_corrente = ?, usuario_id = ?
        WHERE id = ? AND ativo = 1`,
-      [nome.trim(), endereco?.trim() || '', cpfCnpj.trim(), pis?.trim() || '', rg.trim(), expedicao, id]
+      [nome.trim(), endereco?.trim() || '', cpfCnpj.trim(), pis?.trim() || '', rg.trim(), expedicao,
+       cidade?.trim() || null, uf?.trim() || null, telefone?.trim() || null, 
+       banco?.trim() || null, agencia?.trim() || null, contaCorrente?.trim() || null, user.id, id]
     );
 
     return NextResponse.json({ success: true });

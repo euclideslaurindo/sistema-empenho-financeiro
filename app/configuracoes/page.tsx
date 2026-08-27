@@ -1,6 +1,6 @@
 "use client";
 import { ActionToolbar, ActionButton } from "@/components/action-toolbar";
-import { Save, Shield, Bell, User, Lock } from "lucide-react";
+import { Save, Shield, Bell, User, Lock, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 
@@ -94,7 +94,7 @@ export default function Configuracoes() {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-[#f4f4f5]">
+    <div className="flex flex-col h-full bg-slate-50/80">
       <ActionToolbar>
         <div className="flex-1"></div>
         <ActionButton
@@ -106,29 +106,30 @@ export default function Configuracoes() {
       </ActionToolbar>
 
       <div className="p-8 max-w-[1280px] mx-auto w-full flex-1">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#1e293b]">
+        <div className="mb-8 animate-slide-up">
+          <p className="section-title mb-1.5">Administração &gt; Configurações</p>
+          <h1 className="text-3xl font-bold text-slate-800 mb-1 tracking-tight flex items-center">
             Configurações do Sistema
           </h1>
-          <p className="text-zinc-600 text-sm mt-1">
+          <p className="text-slate-500 text-sm">
             Gerencie preferências e parâmetros do sistema de empenhos.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
           {/* Sidebar Params */}
           <div className="col-span-1 space-y-2">
             {menuItems.map((item) => (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full text-left px-4 py-3 font-medium rounded-lg transition-colors flex items-center ${
+                className={`w-full text-left px-4 py-3.5 font-semibold rounded-xl transition-all flex items-center group ${
                   activeTab === item.id
-                    ? "bg-[#fafafa] border border-[#1e293b] text-[#1e293b] font-bold shadow-sm"
-                    : "text-zinc-600 hover:bg-[#e1e3e4] hover:text-[#1e293b]"
+                    ? "bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-500/20"
+                    : "text-slate-600 hover:bg-white hover:text-slate-800 hover:shadow-sm"
                 }`}
               >
-                <item.icon className="w-5 h-5 mr-3" /> {item.label}
+                <item.icon className={`w-5 h-5 mr-3 transition-colors ${activeTab === item.id ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} /> {item.label}
               </button>
             ))}
           </div>
@@ -136,46 +137,51 @@ export default function Configuracoes() {
           {/* Config Area */}
           <div className="col-span-3">
             {activeTab === "perfil" && (
-              <div className="bg-[#fafafa] rounded-lg border border-[#e4e4e7] shadow-sm p-8">
-                <h3 className="text-xl font-bold text-slate-800 mb-6 border-b border-[#e4e4e7] pb-4">
-                  Dados do Perfil
-                </h3>
+              <div className="enterprise-card p-8 animate-scale-in">
+                <div className="flex items-center mb-8 border-b border-slate-100 pb-5">
+                  <div className="w-1.5 h-6 bg-blue-600 rounded-full mr-3"></div>
+                  <h3 className="text-xl font-bold text-slate-800">
+                    Dados do Perfil
+                  </h3>
+                </div>
 
                 {isLoading ? (
-                  <p className="text-sm text-zinc-500">Carregando dados...</p>
+                  <div className="py-8 text-center text-slate-500">
+                    <span className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin inline-block mr-2 align-middle"></span> Carregando configurações...
+                  </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
                       <div>
-                        <label className="block text-xs font-semibold text-zinc-600 mb-2">
+                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                           Nome Completo
                         </label>
                         <input
                           type="text"
                           value={config.nome_completo}
                           onChange={(e) => setConfig({ ...config, nome_completo: e.target.value })}
-                          className="w-full p-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800"
+                          className="enterprise-input bg-slate-50/50"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-zinc-600 mb-2">
+                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                           E-mail Corporativo
                         </label>
                         <input
                           type="email"
                           value={config.email_corporativo}
                           onChange={(e) => setConfig({ ...config, email_corporativo: e.target.value })}
-                          className="w-full p-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800"
+                          className="enterprise-input bg-slate-50/50"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-zinc-600 mb-2">
+                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                           Unidade Orçamentária Padrão
                         </label>
                         <select 
                           value={config.unidade_padrao}
                           onChange={(e) => setConfig({ ...config, unidade_padrao: e.target.value })}
-                          className="w-full p-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800 bg-[#fafafa]">
+                          className="enterprise-input bg-slate-50/50">
                           <option value="Secretaria de Educação">Secretaria de Educação</option>
                           <option value="Secretaria de Saúde">Secretaria de Saúde</option>
                           <option value="Secretaria da Fazenda">Secretaria da Fazenda</option>
@@ -183,53 +189,56 @@ export default function Configuracoes() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-zinc-600 mb-2">
+                        <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                           Gestão / U.E. Padrão
                         </label>
                         <input
                           type="text"
                           value={config.gestao_padrao}
                           onChange={(e) => setConfig({ ...config, gestao_padrao: e.target.value })}
-                          className="w-full p-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800"
+                          className="enterprise-input bg-slate-50/50"
                         />
                       </div>
                     </div>
 
-                    <h3 className="text-xl font-bold text-slate-800 mb-6 border-b border-[#e4e4e7] pb-4">
-                      Preferências do Sistema
-                    </h3>
+                    <div className="flex items-center mb-6 border-b border-slate-100 pb-5">
+                      <div className="w-1.5 h-6 bg-emerald-500 rounded-full mr-3"></div>
+                      <h3 className="text-xl font-bold text-slate-800">
+                        Preferências do Sistema
+                      </h3>
+                    </div>
 
-                    <div className="space-y-4">
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                    <div className="space-y-4 max-w-2xl">
+                      <label className="flex items-center p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-200">
                         <input
                           type="checkbox"
                           checked={config.auto_preencher_credor}
                           onChange={(e) => setConfig({ ...config, auto_preencher_credor: e.target.checked })}
-                          className="w-4 h-4 text-[#1e293b] rounded border-[#d9dadb]"
+                          className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/20 bg-slate-50"
                         />
-                        <span className="text-sm text-slate-800 font-medium">
+                        <span className="ml-3 text-sm text-slate-700 font-medium">
                           Autopreencher dados do credor com a base estadual
                         </span>
                       </label>
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                      <label className="flex items-center p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-200">
                         <input
                           type="checkbox"
                           checked={config.notifica_email_empenho}
                           onChange={(e) => setConfig({ ...config, notifica_email_empenho: e.target.checked })}
-                          className="w-4 h-4 text-[#1e293b] rounded border-[#d9dadb]"
+                          className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/20 bg-slate-50"
                         />
-                        <span className="text-sm text-slate-800 font-medium">
+                        <span className="ml-3 text-sm text-slate-700 font-medium">
                           Enviar notificações de empenho por e-mail
                         </span>
                       </label>
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                      <label className="flex items-center p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-200">
                         <input
                           type="checkbox"
                           checked={config.exigir_2fa_op}
                           onChange={(e) => setConfig({ ...config, exigir_2fa_op: e.target.checked })}
-                          className="w-4 h-4 text-[#1e293b] rounded border-[#d9dadb]"
+                          className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/20 bg-slate-50"
                         />
-                        <span className="text-sm text-slate-800 font-medium">
+                        <span className="ml-3 text-sm text-slate-700 font-medium">
                           Exigir autenticação em duas etapas (2FA) para emissão de
                           Ordens
                         </span>
@@ -241,52 +250,55 @@ export default function Configuracoes() {
             )}
 
             {activeTab === "permissoes" && (
-              <div className="bg-[#fafafa] rounded-lg border border-[#e4e4e7] shadow-sm p-8">
-                <h3 className="text-xl font-bold text-slate-800 mb-6 border-b border-[#e4e4e7] pb-4">
-                  Permissões de Acesso
-                </h3>
-                <p className="text-sm text-zinc-600 mb-6">
+              <div className="enterprise-card p-8 animate-scale-in">
+                <div className="flex items-center mb-6 border-b border-slate-100 pb-5">
+                  <div className="w-1.5 h-6 bg-blue-600 rounded-full mr-3"></div>
+                  <h3 className="text-xl font-bold text-slate-800">
+                    Permissões de Acesso
+                  </h3>
+                </div>
+                <p className="text-sm text-slate-500 mb-8 font-medium">
                   As permissões do seu perfil (Nível: Administrador) são
                   gerenciadas pela TI da Secretaria da Fazenda.
                 </p>
 
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center p-4 bg-[#f4f4f5] border border-[#e4e4e7] rounded-lg">
+                  <div className="flex justify-between items-center p-5 bg-slate-50/50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
                     <div>
                       <h4 className="font-bold text-slate-800 text-sm">
                         Emitir Ordens de Pagamento
                       </h4>
-                      <p className="text-zinc-500 text-xs mt-1">
+                      <p className="text-slate-500 text-xs mt-1">
                         Permite a criação e edição de OPs.
                       </p>
                     </div>
-                    <span className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">
+                    <span className="bg-emerald-100/80 text-emerald-700 border border-emerald-200/60 text-xs font-bold px-3 py-1 rounded-full">
                       Ativo
                     </span>
                   </div>
-                  <div className="flex justify-between items-center p-4 bg-[#f4f4f5] border border-[#e4e4e7] rounded-lg">
+                  <div className="flex justify-between items-center p-5 bg-slate-50/50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
                     <div>
                       <h4 className="font-bold text-slate-800 text-sm">
                         Estornar Liquidações
                       </h4>
-                      <p className="text-zinc-500 text-xs mt-1">
+                      <p className="text-slate-500 text-xs mt-1">
                         Permite a anulação de processos quitados.
                       </p>
                     </div>
-                    <span className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">
+                    <span className="bg-emerald-100/80 text-emerald-700 border border-emerald-200/60 text-xs font-bold px-3 py-1 rounded-full">
                       Ativo
                     </span>
                   </div>
-                  <div className="flex justify-between items-center p-4 bg-[#f4f4f5] border border-[#e4e4e7] rounded-lg">
+                  <div className="flex justify-between items-center p-5 bg-slate-50/50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">
                     <div>
                       <h4 className="font-bold text-slate-800 text-sm">
                         Gerenciar Cadastros Básicos
                       </h4>
-                      <p className="text-zinc-500 text-xs mt-1">
+                      <p className="text-slate-500 text-xs mt-1">
                         Acesso à inclusão de credores e rubricas.
                       </p>
                     </div>
-                    <span className="bg-gray-100 text-gray-800 text-xs font-bold px-3 py-1 rounded-full">
+                    <span className="bg-slate-200/60 text-slate-700 border border-slate-300 text-xs font-bold px-3 py-1 rounded-full">
                       Restrito
                     </span>
                   </div>
@@ -295,62 +307,65 @@ export default function Configuracoes() {
             )}
 
             {activeTab === "notificacoes" && (
-              <div className="bg-[#fafafa] rounded-lg border border-[#e4e4e7] shadow-sm p-8">
-                <h3 className="text-xl font-bold text-slate-800 mb-6 border-b border-[#e4e4e7] pb-4">
-                  Configurações de Notificações
-                </h3>
+              <div className="enterprise-card p-8 animate-scale-in">
+                <div className="flex items-center mb-6 border-b border-slate-100 pb-5">
+                  <div className="w-1.5 h-6 bg-blue-600 rounded-full mr-3"></div>
+                  <h3 className="text-xl font-bold text-slate-800">
+                    Configurações de Notificações
+                  </h3>
+                </div>
 
-                <div className="space-y-6">
+                <div className="space-y-8">
                   <div>
-                    <h4 className="font-bold text-slate-800 text-sm mb-3">
-                      E-mail
+                    <h4 className="font-bold text-slate-600 uppercase tracking-wider text-xs mb-4">
+                      Alertas por E-mail
                     </h4>
-                    <div className="space-y-3">
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                    <div className="space-y-2">
+                      <label className="flex items-center p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
                         <input
                           type="checkbox"
                           defaultChecked
-                          className="w-4 h-4 text-[#1e293b] rounded border-[#d9dadb]"
+                          className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/20 bg-slate-50"
                         />
-                        <span className="text-sm text-slate-800">
+                        <span className="ml-3 text-sm text-slate-700 font-medium">
                           Avisos sobre aprovação de OP
                         </span>
                       </label>
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                      <label className="flex items-center p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
                         <input
                           type="checkbox"
                           defaultChecked
-                          className="w-4 h-4 text-[#1e293b] rounded border-[#d9dadb]"
+                          className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/20 bg-slate-50"
                         />
-                        <span className="text-sm text-slate-800">
+                        <span className="ml-3 text-sm text-slate-700 font-medium">
                           Cancelamentos e estornos
                         </span>
                       </label>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-[#e4e4e7]">
-                    <h4 className="font-bold text-slate-800 text-sm mb-3">
-                      Sistema (Pop-ups)
+                  <div className="pt-6 border-t border-slate-100">
+                    <h4 className="font-bold text-slate-600 uppercase tracking-wider text-xs mb-4">
+                      Sistema (Pop-ups e Banners)
                     </h4>
-                    <div className="space-y-3">
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                    <div className="space-y-2">
+                      <label className="flex items-center p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
                         <input
                           type="checkbox"
                           defaultChecked
-                          className="w-4 h-4 text-[#1e293b] rounded border-[#d9dadb]"
+                          className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/20 bg-slate-50"
                         />
-                        <span className="text-sm text-slate-800">
+                        <span className="ml-3 text-sm text-slate-700 font-medium">
                           Alertas de integração falha
                         </span>
                       </label>
-                      <label className="flex items-center space-x-3 cursor-pointer">
+                      <label className="flex items-center p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
                         <input
                           type="checkbox"
                           defaultChecked
-                          className="w-4 h-4 text-[#1e293b] rounded border-[#d9dadb]"
+                          className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500/20 bg-slate-50"
                         />
-                        <span className="text-sm text-slate-800">
+                        <span className="ml-3 text-sm text-slate-700 font-medium">
                           Mensagens gerais de suporte e manutenção
                         </span>
                       </label>
@@ -361,38 +376,42 @@ export default function Configuracoes() {
             )}
 
             {activeTab === "seguranca" && (
-              <div className="bg-[#fafafa] rounded-lg border border-[#e4e4e7] shadow-sm p-8">
-                <h3 className="text-xl font-bold text-slate-800 mb-6 border-b border-[#e4e4e7] pb-4">
-                  Segurança e Autenticação
-                </h3>
+              <div className="enterprise-card p-8 animate-scale-in">
+                <div className="flex items-center mb-6 border-b border-slate-100 pb-5">
+                  <div className="w-1.5 h-6 bg-blue-600 rounded-full mr-3"></div>
+                  <h3 className="text-xl font-bold text-slate-800">
+                    Segurança e Autenticação
+                  </h3>
+                </div>
 
-                <div className="space-y-6">
+                <div className="space-y-8">
                   <div>
-                    <h4 className="font-bold text-slate-800 text-sm mb-2">
+                    <h4 className="font-bold text-slate-600 uppercase tracking-wider text-xs mb-3">
                       Alterar Senha
                     </h4>
                     <button
                       onClick={() => setShowPasswordModal(true)}
-                      className="bg-[#fafafa] border border-[#d9dadb] px-4 py-2 text-sm font-bold rounded shadow-sm hover:bg-[#f4f4f5] text-[#1e293b]"
+                      className="bg-white border border-slate-200 px-5 py-2.5 text-sm font-bold rounded-lg shadow-sm hover:bg-slate-50 text-slate-700 hover:border-slate-300 transition-all focus:ring-2 focus:ring-blue-500/20"
                     >
                       Solicitar redefinição de senha
                     </button>
                   </div>
 
-                  <div className="pt-4 border-t border-[#e4e4e7]">
-                    <h4 className="font-bold text-slate-800 text-sm mb-2">
+                  <div className="pt-6 border-t border-slate-100">
+                    <h4 className="font-bold text-slate-600 uppercase tracking-wider text-xs mb-3">
                       Sessões Ativas
                     </h4>
-                    <div className="p-4 bg-[#f4f4f5] border border-[#e4e4e7] rounded-lg">
+                    <div className="p-5 bg-slate-50/50 border border-slate-200/60 rounded-xl">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="font-bold text-sm text-slate-800">
+                        <span className="font-bold text-sm text-slate-800 flex items-center">
+                          <Lock className="w-4 h-4 mr-2 text-slate-400" />
                           Este Computador (Windows / Chrome)
                         </span>
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                        <span className="text-xs bg-emerald-100/80 text-emerald-700 border border-emerald-200/60 px-2.5 py-1 rounded-full font-bold">
                           Ativo Agora
                         </span>
                       </div>
-                      <p className="text-xs text-zinc-500">
+                      <p className="text-xs text-slate-500 font-medium ml-6">
                         Último acesso:{" "}
                         {mounted
                           ? `${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR")}`
@@ -408,17 +427,17 @@ export default function Configuracoes() {
       </div>
 
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-8 animate-scale-in">
             <h2 className="text-2xl font-bold text-slate-800 mb-2">
               Alterar Senha
             </h2>
-            <p className="text-sm text-zinc-500 mb-6">
+            <p className="text-sm text-slate-500 mb-6 font-medium">
               Informe a senha atual e defina uma nova senha forte.
             </p>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-zinc-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                   Senha Atual
                 </label>
                 <input
@@ -426,11 +445,11 @@ export default function Configuracoes() {
                   required
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0f2942]"
+                  className="enterprise-input"
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-zinc-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                   Nova Senha
                 </label>
                 <input
@@ -438,20 +457,20 @@ export default function Configuracoes() {
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-4 py-3 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0f2942]"
+                  className="enterprise-input mb-4"
                 />
               </div>
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowPasswordModal(false)}
-                  className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold py-3 rounded-xl transition-colors"
+                  className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold py-2.5 rounded-lg transition-colors shadow-sm"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-[#1e293b] hover:bg-[#334155] text-white font-semibold py-3 rounded-xl transition-colors"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-all shadow-md shadow-blue-600/20"
                 >
                   Confirmar
                 </button>

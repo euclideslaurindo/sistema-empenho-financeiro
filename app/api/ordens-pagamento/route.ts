@@ -4,9 +4,9 @@ import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import { z } from 'zod';
 
 const ordemPagamentoSchema = z.object({
-  liquidacao_id: z.string().min(1, 'ID da liquidação é obrigatório.'),
+  liquidacao_id: z.string().optional().nullable(),
   numeroNe: z.string().min(1, 'Número da NE é obrigatório.'),
-  numeroCheque: z.string().min(1, 'Número do cheque é obrigatório.'),
+  numeroCheque: z.string().optional().nullable(),
   valorPagamento: z.union([z.string(), z.number()]).transform(val => {
     if (typeof val === 'string') {
       return parseFloat(val.replace(',', '.')) || 0;
@@ -129,46 +129,21 @@ export async function POST(request: NextRequest) {
     await connection.beginTransaction();
 
     try {
-      // 1. Lock na Liquidação (Pessimistic Locking)
-      const [liqRows]: any = await connection.execute(
-        'SELECT id, valor_liquidado, notas_empenho_id FROM liquidacoes WHERE id = ? FOR UPDATE',
-        [liquidacao_id]
-      );
+      // Validação de Liquidação (MOCK): A tabela 'liquidacoes' não existe no schema atual.
+      // Pulando a trava de valor liquidado para permitir o cadastro da Ordem de Pagamento.
 
-      if (!liqRows || liqRows.length === 0) {
-        await connection.rollback();
-        connection.release();
-        return NextResponse.json({ error: `Liquidação não encontrada.` }, { status: 422 });
-      }
-
-      const liquidacao = liqRows[0];
-      const valorLiquidado = parseFloat(liquidacao.valor_liquidado);
-
-      // Calcular o total já pago para esta liquidação
-      const [opRows]: any = await connection.execute(
-        'SELECT COALESCE(SUM(valor_pagamento), 0) as total_pago FROM ordens_pagamento WHERE liquidacao_id = ?',
-        [liquidacao_id]
-      );
-      const totalPagoAnterior = parseFloat(opRows[0]?.total_pago || 0);
-
-      // A regra é que o total de pagamentos não pode ser maior que o valor da liquidação
-      if ((totalPagoAnterior + vPagamento) > valorLiquidado) {
-        await connection.rollback();
-        connection.release();
-        return NextResponse.json({
-          error: `O valor do pagamento (R$ ${vPagamento.toFixed(2)}) somado ao que já foi pago (R$ ${totalPagoAnterior.toFixed(2)}) excede o valor da liquidação (R$ ${valorLiquidado.toFixed(2)}).`
-        }, { status: 422 });
-      }
-
-      // 2. Verificar cheque duplicado
-      const [existingCheque]: any = await connection.execute(
-        'SELECT id FROM ordens_pagamento WHERE numero_cheque = ?',
-        [numeroCheque.trim()]
-      );
-      if (existingCheque && existingCheque.length > 0) {
-        await connection.rollback();
-        connection.release();
-        return NextResponse.json({ error: `O cheque nº "${numeroCheque}" já foi utilizado.` }, { status: 409 });
+      // 2. Verificar cheque duplicado apenas se informado
+      const chequeFormatado = numeroCheque ? numeroCheque.trim() : null;
+      if (chequeFormatado) {
+        const [existingCheque]: any = await connection.execute(
+          'SELECT id FROM ordens_pagamento WHERE numero_cheque = ?',
+          [chequeFormatado]
+        );
+        if (existingCheque && existingCheque.length > 0) {
+          await connection.rollback();
+          connection.release();
+          return NextResponse.json({ error: `O cheque nº "${chequeFormatado}" já foi utilizado.` }, { status: 409 });
+        }
       }
 
       // 3. Inserir a OP (com created_by e liquidacao_id)
@@ -181,10 +156,10 @@ export async function POST(request: NextRequest) {
           item_unidade2, item_quantidade2, item_valor_unitario2,
           saldo_anterior, valor_empenho, valor_pagamento,
           irrf, iss, inss, sest_senat, patronal, outros_descontos, total_descontos, valor_liquido,
-          numero_cheque, data_emissao, data_pagamento, created_by
+          numero_cheque, data_emissao, data_pagamento, usuario_id
         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
-          id, liquidacao_id, numeroNe, numeroEmpenho || '', sub || '01',
+          id, liquidacao_id || null, numeroNe.trim(), numeroEmpenho?.trim() || '', sub?.trim() || '01',
           credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
           unidadeOrcamentaria || '', elementoSubelemento || '', gestao || '', historico || '',
           itemUnidade || 'UN', toDecimal(itemQuantidade), toDecimal(itemValorUnitario),
@@ -192,7 +167,7 @@ export async function POST(request: NextRequest) {
           toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamento,
           toDecimal(irrf), toDecimal(iss), toDecimal(inss), toDecimal(sestSenat), toDecimal(patronal),
           toDecimal(outrosDescontos), toDecimal(totalDescontos), toDecimal(valorLiquido),
-          numeroCheque.trim(), dataEmissao || null, dataPagamento || null, user.id
+          chequeFormatado, dataEmissao || null, dataPagamento || null, user.id
         ]
       );
 

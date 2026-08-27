@@ -103,7 +103,7 @@ const EmpenhoVia = ({
 }: any) => {
   return (
     <div
-      className={`w-full max-w-[210mm] min-h-[297mm] bg-[#fafafa] border border-transparent box-border font-sans text-black relative mx-auto ${!isLast ? "print:break-after-page mb-8" : ""} shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none`}
+      className={`w-full max-w-[210mm] min-h-[297mm] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border border-transparent box-border font-sans text-black relative mx-auto ${!isLast ? "print:break-after-page mb-8" : ""} shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none`}
     >
       <div className="w-full flex flex-col font-sans p-[8px]">
         {/* Header */}
@@ -134,7 +134,7 @@ const EmpenhoVia = ({
         <div className="mt-2 font-sans flex flex-col gap-2">
           {/* Unidade Orçamentária */}
           <div className="border border-black relative h-[32px] w-full">
-            <span className="absolute -top-[8px] left-2 bg-[#fafafa] px-1 text-[10px] uppercase z-10">
+            <span className="absolute -top-[8px] left-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 px-1 text-[10px] uppercase z-10">
               Unidade Orçamentária
             </span>
             <div className="pt-[11px] px-2 font-bold uppercase text-[12px] truncate flex justify-between items-center h-full">
@@ -169,7 +169,7 @@ const EmpenhoVia = ({
 
           {/* Elemento / Subelemento */}
           <div className="border border-black relative h-[32px] w-full">
-            <span className="absolute -top-[8px] left-2 bg-[#fafafa] px-1 text-[10px] uppercase z-10">
+            <span className="absolute -top-[8px] left-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 px-1 text-[10px] uppercase z-10">
               Elemento/Subelemento
             </span>
             <div className="pt-[11px] px-2 font-bold uppercase text-[12px] truncate flex justify-between items-center h-full">
@@ -204,8 +204,8 @@ const EmpenhoVia = ({
         </div>
 
         {/* Nome do Credor */}
-        <div className="border border-black relative mt-2 bg-[#fafafa] flex items-center">
-          <span className="absolute -top-[8px] left-2 bg-[#fafafa] px-2 text-[10px] uppercase leading-none z-10 shrink-0">
+        <div className="border border-black relative mt-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 flex items-center">
+          <span className="absolute -top-[8px] left-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 px-2 text-[10px] uppercase leading-none z-10 shrink-0">
             NOME DO CREDOR
           </span>
           <div className="pt-2 pb-1 px-4 font-bold uppercase text-[12px] truncate w-full h-full flex items-center">
@@ -213,7 +213,7 @@ const EmpenhoVia = ({
               <input
                 value={data.credorNome}
                 onChange={(e) => onChange("credorNome", e.target.value)}
-                className="w-full outline-none bg-[#e3f2fd]/50 border-b border-transparent focus:border-[#1e293b] px-1 font-bold"
+                className="w-full outline-none bg-blue-50/50 backdrop-blur-sm/50 border-b border-transparent focus:border-[#1e293b] px-1 font-bold"
               />
             ) : (
               <span className="inline-block mt-1">{data.credorNome}</span>
@@ -222,8 +222,8 @@ const EmpenhoVia = ({
         </div>
 
         {/* CPF / CNPJ do Credor - Posicionado logo abaixo de Nome do Credor */}
-        <div className="border border-black mt-2 bg-[#fafafa] text-[10px] flex">
-          <div className="w-[80px] border-r border-black flex flex-col justify-center bg-[#f4f4f5] print:bg-transparent shrink-0">
+        <div className="border border-black mt-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 text-[10px] flex">
+          <div className="w-[80px] border-r border-black flex flex-col justify-center bg-slate-50/50 print:bg-transparent shrink-0">
             <div className="flex-1 flex items-center justify-center font-bold border-b border-black text-[11px] py-[3px]">
               CPF
             </div>
@@ -234,7 +234,7 @@ const EmpenhoVia = ({
           <div className="flex flex-col flex-1">
             <div className="flex-1 flex border-b border-black items-center px-3 py-1 relative min-h-[22px]">
               {data.pessoaTipo === "FISICA" && !isEditing && (
-                <span className="absolute inset-y-1 left-2 right-2 bg-[#e0e0e0] print:bg-transparent print:border print:border-black rounded-full shadow-inner print:shadow-none z-0"></span>
+                <span className="absolute inset-y-1 left-2 right-2 bg-slate-200/80 print:bg-transparent print:border print:border-black rounded-full shadow-inner print:shadow-none z-0"></span>
               )}
               {isEditing ? (
                 <input
@@ -243,7 +243,7 @@ const EmpenhoVia = ({
                     onChange("pessoaTipo", "FISICA");
                     onChange("credorCpfCnpj", e.target.value);
                   }}
-                  className="w-full text-center outline-none bg-[#e3f2fd]/50 border-b border-transparent focus:border-[#1e293b] font-bold z-10 relative text-[13px]"
+                  className="w-full text-center outline-none bg-blue-50/50 backdrop-blur-sm/50 border-b border-transparent focus:border-[#1e293b] font-bold z-10 relative text-[13px]"
                   placeholder="CPF do Credor"
                 />
               ) : data.pessoaTipo === "FISICA" ? (
@@ -256,7 +256,7 @@ const EmpenhoVia = ({
             </div>
             <div className="flex-1 flex items-center px-3 py-1 relative min-h-[22px]">
               {data.pessoaTipo === "JURIDICA" && !isEditing && (
-                <span className="absolute inset-y-1 left-2 right-2 bg-[#e0e0e0] print:bg-transparent print:border print:border-black rounded-full shadow-inner print:shadow-none z-0"></span>
+                <span className="absolute inset-y-1 left-2 right-2 bg-slate-200/80 print:bg-transparent print:border print:border-black rounded-full shadow-inner print:shadow-none z-0"></span>
               )}
               {isEditing ? (
                 <input
@@ -265,7 +265,7 @@ const EmpenhoVia = ({
                     onChange("pessoaTipo", "JURIDICA");
                     onChange("credorCpfCnpj", e.target.value);
                   }}
-                  className="w-full text-center outline-none bg-[#e3f2fd]/50 border-b border-transparent focus:border-[#1e293b] font-bold z-10 relative text-[13px]"
+                  className="w-full text-center outline-none bg-blue-50/50 backdrop-blur-sm/50 border-b border-transparent focus:border-[#1e293b] font-bold z-10 relative text-[13px]"
                   placeholder="CNPJ do Credor"
                 />
               ) : data.pessoaTipo === "JURIDICA" ? (
@@ -279,8 +279,8 @@ const EmpenhoVia = ({
           </div>
         </div>
 
-        <div className="border border-black relative mt-3 bg-[#fafafa] flex items-center">
-          <span className="absolute -top-[8px] left-2 bg-[#fafafa] px-2 text-[10px] uppercase leading-none z-10 shrink-0">
+        <div className="border border-black relative mt-3 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 flex items-center">
+          <span className="absolute -top-[8px] left-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 px-2 text-[10px] uppercase leading-none z-10 shrink-0">
             Endereço
           </span>
           <div className="pt-2 pb-1 px-4 font-bold uppercase text-[12px] truncate w-full h-full flex items-center">
@@ -297,8 +297,8 @@ const EmpenhoVia = ({
         </div>
 
         <div className="flex mt-2 gap-2 tracking-wide">
-          <div className="flex-1 border border-black flex flex-col h-[48px] bg-[#fafafa]">
-            <div className="text-[10px] text-center border-b border-black h-[14px] bg-[#f4f4f5] print:bg-transparent leading-tight font-bold flex items-center justify-center pt-[2px]">
+          <div className="flex-1 border border-black flex flex-col h-[48px] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50">
+            <div className="text-[10px] text-center border-b border-black h-[14px] bg-slate-50/50 print:bg-transparent leading-tight font-bold flex items-center justify-center pt-[2px]">
               SALDO ANTERIOR
             </div>
             <div className="flex-1 flex items-center px-4 justify-between font-bold text-[15px] h-full">
@@ -314,8 +314,8 @@ const EmpenhoVia = ({
               )}
             </div>
           </div>
-          <div className="flex-[1.2] border border-black flex flex-col h-[48px] bg-[#fafafa] shadow-[0_0_0_1px_rgba(0,0,0,1)]">
-            <div className="text-[10px] text-center border-b border-black font-bold h-[14px] bg-[#f4f4f5] print:bg-transparent leading-tight flex items-center justify-center pt-[2px]">
+          <div className="flex-[1.2] border border-black flex flex-col h-[48px] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 shadow-[0_0_0_1px_rgba(0,0,0,1)]">
+            <div className="text-[10px] text-center border-b border-black font-bold h-[14px] bg-slate-50/50 print:bg-transparent leading-tight flex items-center justify-center pt-[2px]">
               VALOR EMPENHADO
             </div>
             <div className="flex-1 flex items-center px-4 justify-between font-extrabold text-[15px] h-full">
@@ -331,8 +331,8 @@ const EmpenhoVia = ({
               )}
             </div>
           </div>
-          <div className="flex-1 border border-black flex flex-col h-[48px] bg-[#fafafa]">
-            <div className="text-[10px] text-center border-b border-black h-[14px] bg-[#f4f4f5] print:bg-transparent leading-tight font-bold flex items-center justify-center pt-[2px]">
+          <div className="flex-1 border border-black flex flex-col h-[48px] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50">
+            <div className="text-[10px] text-center border-b border-black h-[14px] bg-slate-50/50 print:bg-transparent leading-tight font-bold flex items-center justify-center pt-[2px]">
               SALDO ATUAL
             </div>
             <div className="flex-1 flex items-center px-4 justify-between font-bold text-[15px] h-full">
@@ -350,8 +350,8 @@ const EmpenhoVia = ({
           </div>
         </div>
 
-        <div className="border border-black relative h-[38px] flex items-center justify-between bg-[#fafafa] w-full mt-2">
-          <span className="absolute -top-[8px] left-2 bg-[#fafafa] px-1 leading-tight text-[10px] uppercase z-10">
+        <div className="border border-black relative h-[38px] flex items-center justify-between bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 w-full mt-2">
+          <span className="absolute -top-[8px] left-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 px-1 leading-tight text-[10px] uppercase z-10">
             PROVISÃO CONCEDIDA
           </span>
           <div className="flex items-center px-2 text-[10px] flex-1">
@@ -381,7 +381,7 @@ const EmpenhoVia = ({
             </div>
           </div>
 
-          <div className="border-l border-black h-full flex items-center px-3 text-[10px] bg-[#fafafa]">
+          <div className="border-l border-black h-full flex items-center px-3 text-[10px] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50">
             <span className="font-bold uppercase mr-2">PAGO EM</span>
             <div className="border border-black w-[95px] h-[22px] flex items-center justify-center font-bold">
               {isEditing ? (
@@ -403,8 +403,8 @@ const EmpenhoVia = ({
           </div>
         </div>
 
-        <div className="border border-black mt-2 bg-[#fafafa] flex flex-col z-10 w-full overflow-hidden">
-          <div className="flex border-b border-black text-[10px] text-center bg-[#f4f4f5] print:bg-transparent uppercase tracking-tight h-[36px]">
+        <div className="border border-black mt-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 flex flex-col z-10 w-full overflow-hidden">
+          <div className="flex border-b border-black text-[10px] text-center bg-slate-50/50 print:bg-transparent uppercase tracking-tight h-[36px]">
             <div className="flex-1 border-r border-black flex items-center justify-center font-[600] pt-[2px]">
               ESPECIFICAÇÃO OU HISTÓRICO
             </div>
@@ -429,7 +429,7 @@ const EmpenhoVia = ({
             </div>
           </div>
 
-          <div className="flex min-h-[120px] text-[12px] bg-[#fafafa]">
+          <div className="flex min-h-[120px] text-[12px] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50">
             <div className="flex-1 border-r border-black p-[10px] flex flex-col relative overflow-hidden">
               {isEditing ? (
                 <textarea
@@ -443,7 +443,7 @@ const EmpenhoVia = ({
                 </div>
               )}
             </div>
-            <div className="w-[65px] border-r border-black px-1 pt-3 flex flex-col items-center text-[12px] font-[500] shrink-0 bg-[#fafafa]">
+            <div className="w-[65px] border-r border-black px-1 pt-3 flex flex-col items-center text-[12px] font-[500] shrink-0 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50">
               {isEditing ? (
                 <textarea
                   value={data.unidade}
@@ -456,7 +456,7 @@ const EmpenhoVia = ({
                 </div>
               )}
             </div>
-            <div className="w-[65px] border-r border-black px-1 pt-3 flex flex-col items-center text-[12px] font-[500] shrink-0 bg-[#fafafa]">
+            <div className="w-[65px] border-r border-black px-1 pt-3 flex flex-col items-center text-[12px] font-[500] shrink-0 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50">
               {isEditing ? (
                 <textarea
                   value={data.quantidade}
@@ -469,7 +469,7 @@ const EmpenhoVia = ({
                 </div>
               )}
             </div>
-            <div className="w-[190px] flex text-[12px] font-[500] text-right tracking-wide shrink-0 bg-[#fafafa]">
+            <div className="w-[190px] flex text-[12px] font-[500] text-right tracking-wide shrink-0 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50">
               <div className="w-[95px] border-r border-black px-2 pt-3 flex flex-col items-end">
                 {isEditing ? (
                   <textarea
@@ -478,7 +478,7 @@ const EmpenhoVia = ({
                     className="w-full outline-none bg-yellow-50 resize-none text-right h-full pt-[2px]"
                   />
                 ) : (
-                  <div className="w-full text-right whitespace-pre-wrap bg-[#fafafa] pt-[2px]">
+                  <div className="w-full text-right whitespace-pre-wrap bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 pt-[2px]">
                     {data.valorUnitario}
                   </div>
                 )}
@@ -491,7 +491,7 @@ const EmpenhoVia = ({
                     className="w-full outline-none bg-yellow-50 resize-none text-right h-full pt-[2px]"
                   />
                 ) : (
-                  <div className="w-full text-right whitespace-pre-wrap bg-[#fafafa] pt-[2px]">
+                  <div className="w-full text-right whitespace-pre-wrap bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 pt-[2px]">
                     {data.valorTotal}
                   </div>
                 )}
@@ -499,8 +499,8 @@ const EmpenhoVia = ({
             </div>
           </div>
 
-          <div className="flex border-t border-black text-[11px] h-[32px] items-center bg-[#fafafa] justify-end">
-            <div className="flex w-[190px] h-full items-center bg-[#f4f4f5] print:bg-transparent border-l border-black">
+          <div className="flex border-t border-black text-[11px] h-[32px] items-center bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 justify-end">
+            <div className="flex w-[190px] h-full items-center bg-slate-50/50 print:bg-transparent border-l border-black">
               <div className="w-[60px] px-2 flex items-center justify-start text-[11px] font-bold pt-[1px]">
                 TOTAL:
               </div>
@@ -520,7 +520,7 @@ const EmpenhoVia = ({
             </div>
           </div>
 
-          <div className="flex border-t border-black text-[11px] h-[30px] items-center bg-[#fafafa] w-full justify-between">
+          <div className="flex border-t border-black text-[11px] h-[30px] items-center bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 w-full justify-between">
             <div className="flex-1 px-2 font-bold uppercase truncate text-[11px] tracking-tight flex items-center h-full">
               {isEditing ? (
                 <input
@@ -538,7 +538,7 @@ const EmpenhoVia = ({
                 </span>
               )}
             </div>
-            <div className="border-l border-black h-full flex items-center px-3 font-bold text-[11px] shrink-0 bg-[#f4f4f5] print:bg-transparent">
+            <div className="border-l border-black h-full flex items-center px-3 font-bold text-[11px] shrink-0 bg-slate-50/50 print:bg-transparent">
               {isEditing ? (
                 <div className="flex items-center gap-1">
                   <span>CNPJ:</span>
@@ -556,7 +556,7 @@ const EmpenhoVia = ({
         </div>
 
         {/* PARTE 1: AUTORIZADO / PAGUE-SE */}
-        <div className="border border-black p-2 bg-[#fafafa] flex flex-col justify-between relative mt-2 w-full min-h-[92px]">
+        <div className="border border-black p-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 flex flex-col justify-between relative mt-2 w-full min-h-[92px]">
           <div className="flex items-center justify-between border-b border-black/20 pb-1.5 px-2">
             <span className="uppercase tracking-wider font-bold text-[11px]">
               AUTORIZADO / PAGUE-SE
@@ -591,7 +591,7 @@ const EmpenhoVia = ({
         </div>
 
         {/* PARTE 2: DEDUZIDO DA DOTAÇÃO PRÓPRIA / LIQUIDADO / PAGO */}
-        <div className="border border-black p-2 bg-[#fafafa] flex flex-col justify-between relative mt-2 w-full min-h-[92px]">
+        <div className="border border-black p-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 flex flex-col justify-between relative mt-2 w-full min-h-[92px]">
           <div className="flex items-center justify-between border-b border-black/20 pb-1.5 px-2">
             <span className="uppercase tracking-wider font-bold text-[11px]">
               DEDUZIDO DA DOTAÇÃO PRÓPRIA / LIQUIDADO / PAGO
@@ -641,7 +641,7 @@ const EmpenhoVia = ({
         </div>
 
         {/* PARTE 3: MATERIAL RECEBIDO OU SERVIÇO PRESTADO */}
-        <div className="border border-black p-2 bg-[#fafafa] flex flex-col justify-between relative mt-2 mb-2 w-full min-h-[92px]">
+        <div className="border border-black p-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 flex flex-col justify-between relative mt-2 mb-2 w-full min-h-[92px]">
           <div className="flex items-center justify-between border-b border-black/20 pb-1.5 px-2">
             <div className="flex items-center gap-6 text-[10px] font-bold uppercase">
               <div
@@ -696,7 +696,7 @@ const EmpenhoVia = ({
 const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
   return (
     <div
-      className={`w-full max-w-[210mm] min-h-[297mm] bg-[#fafafa] border border-transparent box-border font-sans text-black relative mx-auto shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none p-[16mm]`}
+      className={`w-full max-w-[210mm] min-h-[297mm] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border border-transparent box-border font-sans text-black relative mx-auto shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none p-[16mm]`}
     >
       {/* Layout do Recibo/Verso */}
       <div className="border border-black p-6 flex flex-col relative w-full h-[265mm]">
@@ -706,7 +706,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
 
         <div className="flex gap-4 mb-6">
           <div className="flex-1 border border-black p-3 relative">
-            <div className="text-[10px] font-bold uppercase mb-1 absolute -top-2 left-2 bg-[#fafafa] px-1">
+            <div className="text-[10px] font-bold uppercase mb-1 absolute -top-2 left-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 px-1">
               Número do Cheque
             </div>
             <div className="font-bold text-lg text-center mt-2">
@@ -714,15 +714,15 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                 <input
                   value={data.numeroCheque}
                   onChange={(e) => onChange("numeroCheque", e.target.value)}
-                  className="w-full text-center outline-none bg-[#e3f2fd]/50 border-b-2 border-transparent focus:border-[#1e293b] font-bold transition-all"
+                  className="w-full text-center outline-none bg-blue-50/50 backdrop-blur-sm/50 border-b-2 border-transparent focus:border-[#1e293b] font-bold transition-all"
                 />
               ) : (
                 data.numeroCheque || "______"
               )}
             </div>
           </div>
-          <div className="flex-1 border border-black p-3 bg-[#f4f4f5] print:bg-transparent relative">
-            <div className="text-[10px] font-bold uppercase mb-1 absolute -top-2 left-2 bg-[#fafafa] px-1">
+          <div className="flex-1 border border-black p-3 bg-slate-50/50 print:bg-transparent relative">
+            <div className="text-[10px] font-bold uppercase mb-1 absolute -top-2 left-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 px-1">
               Valor Bruto
             </div>
             <div className="font-bold text-lg text-center mt-2 flex justify-center items-center">
@@ -731,15 +731,15 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                 <input
                   value={data.valorBase}
                   onChange={(e) => onChange("valorBase", e.target.value)}
-                  className="w-[100px] text-center outline-none bg-[#e3f2fd]/50 border-b-2 border-transparent focus:border-[#1e293b] font-bold transition-all ml-1"
+                  className="w-[100px] text-center outline-none bg-blue-50/50 backdrop-blur-sm/50 border-b-2 border-transparent focus:border-[#1e293b] font-bold transition-all ml-1"
                 />
               ) : (
                 data.valorBase || "0,00"
               )}
             </div>
           </div>
-          <div className="flex-1 border border-black p-3 bg-[#e3f2fd] print:bg-transparent relative">
-            <div className="text-[10px] font-bold uppercase mb-1 absolute -top-2 left-2 bg-[#e3f2fd] print:bg-[#fafafa] px-1">
+          <div className="flex-1 border border-black p-3 bg-blue-50/50 backdrop-blur-sm print:bg-transparent relative">
+            <div className="text-[10px] font-bold uppercase mb-1 absolute -top-2 left-2 bg-blue-50/50 backdrop-blur-sm print:bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 px-1">
               Valor Líquido
             </div>
             <div className="font-extrabold text-lg text-center mt-2 flex justify-center items-center">
@@ -748,7 +748,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                 <input
                   value={data.valorRecibo}
                   onChange={(e) => onChange("valorRecibo", e.target.value)}
-                  className="w-[100px] text-center outline-none bg-[#fafafa]/50 border-b-2 border-transparent focus:border-[#1e293b] font-bold transition-all ml-1"
+                  className="w-[100px] text-center outline-none bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50/50 border-b-2 border-transparent focus:border-[#1e293b] font-bold transition-all ml-1"
                 />
               ) : (
                 data.valorRecibo || "0,00"
@@ -758,7 +758,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
         </div>
 
         <div className="border border-black mb-6 mt-2">
-          <div className="border-b border-black text-center font-bold text-[11px] uppercase py-1.5 bg-[#f4f4f5] print:bg-transparent tracking-widest">
+          <div className="border-b border-black text-center font-bold text-[11px] uppercase py-1.5 bg-slate-50/50 print:bg-transparent tracking-widest">
             Discriminação dos Descontos
           </div>
           <div className="grid grid-cols-6 text-[11px] border-b border-black">
@@ -773,7 +773,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                   <input
                     value={data.irrf}
                     onChange={(e) => onChange("irrf", e.target.value)}
-                    className="w-full text-right outline-none bg-[#e3f2fd]/50 font-bold px-1"
+                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
                   />
                 ) : (
                   <span>{data.irrf || "0,00"}</span>
@@ -792,7 +792,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                   <input
                     value={data.iss}
                     onChange={(e) => onChange("iss", e.target.value)}
-                    className="w-full text-right outline-none bg-[#e3f2fd]/50 font-bold px-1"
+                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
                   />
                 ) : (
                   <span>{data.iss || "0,00"}</span>
@@ -811,7 +811,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                   <input
                     value={data.inss}
                     onChange={(e) => onChange("inss", e.target.value)}
-                    className="w-full text-right outline-none bg-[#e3f2fd]/50 font-bold px-1"
+                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
                   />
                 ) : (
                   <span>{data.inss || "0,00"}</span>
@@ -830,7 +830,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                   <input
                     value={data.patronal}
                     onChange={(e) => onChange("patronal", e.target.value)}
-                    className="w-full text-right outline-none bg-[#e3f2fd]/50 font-bold px-1"
+                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
                   />
                 ) : (
                   <span>{data.patronal || "0,00"}</span>
@@ -849,7 +849,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                   <input
                     value={data.sestSenat}
                     onChange={(e) => onChange("sestSenat", e.target.value)}
-                    className="w-full text-right outline-none bg-[#e3f2fd]/50 font-bold px-1"
+                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
                   />
                 ) : (
                   <span>{data.sestSenat || "0,00"}</span>
@@ -868,7 +868,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                   <input
                     value={data.outrosDescontos}
                     onChange={(e) => onChange("outrosDescontos", e.target.value)}
-                    className="w-full text-right outline-none bg-[#e3f2fd]/50 font-bold px-1"
+                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
                   />
                 ) : (
                   <span>{data.outrosDescontos || "0,00"}</span>
@@ -877,7 +877,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
             </div>
           </div>
 
-          <div className="border-t border-black text-right p-2.5 font-bold text-[13px] bg-[#f4f4f5] print:bg-transparent flex justify-end items-center">
+          <div className="border-t border-black text-right p-2.5 font-bold text-[13px] bg-slate-50/50 print:bg-transparent flex justify-end items-center">
             <span className="mr-4 uppercase tracking-wider text-[11px]">
               Total de Descontos:
             </span>
@@ -887,7 +887,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                 <input
                   value={data.totalDescontos}
                   onChange={(e) => onChange("totalDescontos", e.target.value)}
-                  className="w-[85px] text-right outline-none bg-[#e3f2fd]/50 border-b border-[#1e293b] px-1 ml-1 font-bold"
+                  className="w-[85px] text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 border-b border-[#1e293b] px-1 ml-1 font-bold"
                 />
               ) : (
                 data.totalDescontos || "0,00"
@@ -909,7 +909,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                     "GERÊNCIA REGIONAL DE EDUCAÇÃO DO AGRESTE MERIDIONAL"
                   }
                   onChange={(e) => onChange("gerenciaEducacao", e.target.value)}
-                  className="outline-none bg-[#e3f2fd]/50 px-1 font-bold border-b border-[#1e293b]"
+                  className="outline-none bg-blue-50/50 backdrop-blur-sm/50 px-1 font-bold border-b border-[#1e293b]"
                 />
               ) : (
                 data.gerenciaEducacao ||
@@ -927,7 +927,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                     "10.572.071/0002-01"
                   }
                   onChange={(e) => onChange("cnpjGerencia", e.target.value)}
-                  className="outline-none bg-[#e3f2fd]/50 px-1 font-bold border-b border-[#1e293b]"
+                  className="outline-none bg-blue-50/50 backdrop-blur-sm/50 px-1 font-bold border-b border-[#1e293b]"
                 />
               ) : (
                 data.cnpjGerencia ||
@@ -944,7 +944,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
               <input
                 value={data.valorExtenso || ""}
                 onChange={(e) => onChange("valorExtenso", e.target.value)}
-                className="w-[380px] outline-none bg-[#e3f2fd]/50 px-1 font-bold border-b border-[#1e293b] uppercase"
+                className="w-[380px] outline-none bg-blue-50/50 backdrop-blur-sm/50 px-1 font-bold border-b border-[#1e293b] uppercase"
               />
             ) : (
               <span className="font-bold border-b border-black px-1 uppercase">
@@ -956,7 +956,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
           </p>
 
           {/* DESCRIÇÃO DO SERVIÇO (HISTÓRICO DA ORDEM DE PAGAMENTO / FRENTE DO EMPENHO) */}
-          <div className="p-2.5 border border-black bg-[#f8fafc] print:bg-transparent text-black font-semibold text-[13px] leading-snug my-1">
+          <div className="p-2.5 border border-black bg-transparent print:bg-transparent text-black font-semibold text-[13px] leading-snug my-1">
             {isEditing ? (
               <textarea
                 value={
@@ -966,7 +966,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                 }
                 onChange={(e) => onChange("referenteA", e.target.value)}
                 rows={2}
-                className="w-full outline-none bg-[#e3f2fd]/50 p-1 font-semibold text-[13px] resize-none"
+                className="w-full outline-none bg-blue-50/50 backdrop-blur-sm/50 p-1 font-semibold text-[13px] resize-none"
                 placeholder="Descrição do serviço prestado..."
               />
             ) : (
@@ -988,7 +988,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
               <input
                 value={data.descontosExtenso || ""}
                 onChange={(e) => onChange("descontosExtenso", e.target.value)}
-                className="w-[380px] outline-none bg-[#e3f2fd]/50 px-1 font-bold border-b border-[#1e293b] uppercase"
+                className="w-[380px] outline-none bg-blue-50/50 backdrop-blur-sm/50 px-1 font-bold border-b border-[#1e293b] uppercase"
               />
             ) : (
               <span className="font-bold border-b border-black px-1 uppercase">
@@ -1009,7 +1009,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
             <input
               value={data.localData}
               onChange={(e) => onChange("localData", e.target.value)}
-              className="w-[450px] outline-none bg-[#e3f2fd]/50 px-2 border-b-2 border-transparent focus:border-[#1e293b] text-right font-bold transition-all"
+              className="w-[450px] outline-none bg-blue-50/50 backdrop-blur-sm/50 px-2 border-b-2 border-transparent focus:border-[#1e293b] text-right font-bold transition-all"
             />
           ) : (
             <span>{data.localData}</span>
@@ -1022,7 +1022,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
               <input
                 value={data.nomeRecebedor}
                 onChange={(e) => onChange("nomeRecebedor", e.target.value)}
-                className="w-full outline-none bg-[#e3f2fd]/50 px-2 border-b border-transparent focus:border-[#1e293b] text-center font-bold"
+                className="w-full outline-none bg-blue-50/50 backdrop-blur-sm/50 px-2 border-b border-transparent focus:border-[#1e293b] text-center font-bold"
               />
             ) : (
               data.nomeRecebedor
@@ -1035,7 +1035,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                 <input
                   value={data.cpfCnpj}
                   onChange={(e) => onChange("cpfCnpj", e.target.value)}
-                  className="w-[150px] outline-none bg-[#e3f2fd]/50 px-2 border-b border-transparent focus:border-[#1e293b] text-center font-bold"
+                  className="w-[150px] outline-none bg-blue-50/50 backdrop-blur-sm/50 px-2 border-b border-transparent focus:border-[#1e293b] text-center font-bold"
                 />
               ) : (
                 data.cpfCnpj
@@ -1047,7 +1047,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                 <input
                   value={data.rg}
                   onChange={(e) => onChange("rg", e.target.value)}
-                  className="w-[150px] outline-none bg-[#e3f2fd]/50 px-2 border-b border-transparent focus:border-[#1e293b] text-center font-bold"
+                  className="w-[150px] outline-none bg-blue-50/50 backdrop-blur-sm/50 px-2 border-b border-transparent focus:border-[#1e293b] text-center font-bold"
                 />
               ) : (
                 data.rg
@@ -1323,7 +1323,17 @@ export default function ConsultaImpressao() {
     } else {
       const quantity = parseInt(batchQuantity, 10) || 1;
       const baseNE = batchInput.trim() || "2026NE000123";
-      nes = Array(quantity).fill(baseNE);
+      const match = baseNE.match(/^(.*?)(\d+)$/);
+      if (match) {
+        const prefix = match[1];
+        const initNum = parseInt(match[2], 10);
+        const padding = match[2].length;
+        for (let i = 0; i < quantity; i++) {
+          nes.push(`${prefix}${String(initNum + i).padStart(padding, "0")}`);
+        }
+      } else {
+        nes = Array(quantity).fill(baseNE);
+      }
     }
 
     toast.info("Consultando banco de dados...");
@@ -1466,139 +1476,9 @@ export default function ConsultaImpressao() {
   if (!mounted) return null;
 
   return (
-    <div className="flex flex-col h-full bg-[#f4f4f5] print:bg-[#fafafa] overflow-y-auto overflow-x-hidden min-h-screen relative">
-      <div className="print:hidden sticky top-0 z-50 w-full shadow-sm bg-[#fafafa] border-b border-gray-200">
-        <ActionToolbar>
-          {view === "search" ? (
-            <>
-              <ActionButton
-                icon={Plus}
-                label="Incluir Novo"
-                onClick={() => handleAction("Incluir")}
-              />
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => {
-                  setView("search");
-                  setIsEditing(false);
-                }}
-                className="text-sm font-semibold mr-4 text-zinc-600 hover:text-[#1e293b] bg-[#fafafa] border border-[#d9dadb] px-4 py-2 rounded transition hover:bg-gray-50 flex items-center"
-              >
-                Nova Consulta
-              </button>
-              {isEditing ? (
-                <div className="flex gap-2 print:hidden items-center ml-2">
-                  <ActionButton
-                    icon={Save}
-                    label="Salvar Documentos"
-                    primary
-                    onClick={() => handleAction("Salvar Documento")}
-                  />
-                  <span className="w-[1px] h-6 bg-gray-200 mx-2"></span>
-                  <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-300 text-xs font-bold gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setDocumentType("frente")}
-                      className={`px-3 py-1.5 rounded transition-all ${
-                        documentType === "frente"
-                          ? "bg-[#1e293b] text-white shadow-sm"
-                          : "text-zinc-600 hover:text-black hover:bg-gray-200"
-                      }`}
-                    >
-                      Apenas Frente
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDocumentType("ambos")}
-                      className={`px-3 py-1.5 rounded transition-all ${
-                        documentType === "ambos"
-                          ? "bg-[#1e293b] text-white shadow-sm"
-                          : "text-zinc-600 hover:text-black hover:bg-gray-200"
-                      }`}
-                    >
-                      Frente e Verso
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDocumentType("verso")}
-                      className={`px-3 py-1.5 rounded transition-all ${
-                        documentType === "verso"
-                          ? "bg-[#1e293b] text-white shadow-sm"
-                          : "text-zinc-600 hover:text-black hover:bg-gray-200"
-                      }`}
-                    >
-                      Apenas Verso
-                    </button>
-                  </div>
-                  <span className="w-[1px] h-6 bg-gray-200 mx-2"></span>
-                  <ActionButton
-                    icon={PrinterIcon}
-                    label="Imprimir"
-                    onClick={() => handleAction("Imprimir")}
-                  />
-                </div>
-              ) : (
-                <div className="flex gap-2 print:hidden items-center ml-2">
-                  <ActionButton
-                    icon={Edit}
-                    label="Editar Documentos"
-                    onClick={() => setIsEditing(true)}
-                  />
-                  <span className="w-[1px] h-6 bg-gray-200 mx-2"></span>
-                  <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-300 text-xs font-bold gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setDocumentType("frente")}
-                      className={`px-3 py-1.5 rounded transition-all ${
-                        documentType === "frente"
-                          ? "bg-[#1e293b] text-white shadow-sm"
-                          : "text-zinc-600 hover:text-black hover:bg-gray-200"
-                      }`}
-                    >
-                      Apenas Frente
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDocumentType("ambos")}
-                      className={`px-3 py-1.5 rounded transition-all ${
-                        documentType === "ambos"
-                          ? "bg-[#1e293b] text-white shadow-sm"
-                          : "text-zinc-600 hover:text-black hover:bg-gray-200"
-                      }`}
-                    >
-                      Frente e Verso
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDocumentType("verso")}
-                      className={`px-3 py-1.5 rounded transition-all ${
-                        documentType === "verso"
-                          ? "bg-[#1e293b] text-white shadow-sm"
-                          : "text-zinc-600 hover:text-black hover:bg-gray-200"
-                      }`}
-                    >
-                      Apenas Verso
-                    </button>
-                  </div>
-                  <span className="w-[1px] h-6 bg-gray-200 mx-2"></span>
-                  <ActionButton
-                    icon={PrinterIcon}
-                    label="Imprimir"
-                    onClick={() => handleAction("Imprimir")}
-                  />
-                </div>
-              )}
-              <div className="flex-1"></div>
-              {isEditing && (
-                <span className="text-white font-bold bg-[#ba1a1a] px-3 py-1 rounded text-sm px-4 shadow animate-pulse">
-                  Modo de Edição Sincronizado
-                </span>
-              )}
-            </>
-          )}
-        </ActionToolbar>
+    <div className="flex flex-col h-full bg-slate-50/50 print:bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 overflow-y-auto overflow-x-hidden min-h-screen relative">
+      <div className="print:hidden sticky top-0 z-50 w-full shadow-sm bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border-b border-gray-200">
+        
       </div>
 
       <div className="p-4 sm:p-8 max-w-[1280px] mx-auto w-full flex-1 print:p-0 print:m-0 flex flex-col items-center">
@@ -1617,7 +1497,7 @@ export default function ConsultaImpressao() {
               </p>
             </div>
 
-            <div className="bg-[#fafafa] rounded-xl border border-[#d9dadb] shadow-sm p-8 w-full max-w-4xl hover:shadow-md transition-shadow">
+            <div className="bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 rounded-xl border border-slate-200/80 shadow-sm p-8 w-full max-w-4xl hover:shadow-md transition-shadow">
               <div className="flex gap-4 mb-6 border-b border-gray-200 pb-2">
                 <button
                   onClick={() => setSearchMode("single")}
@@ -1646,11 +1526,11 @@ export default function ConsultaImpressao() {
                           value={batchInput}
                           onChange={(e) => setBatchInput(e.target.value)}
                           placeholder="Ex: 2026NE000123"
-                          className="w-full p-4 rounded-l-lg border border-r-0 border-[#e4e4e7] bg-gray-50 text-sm focus:bg-[#fafafa] focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/20 font-bold tracking-wide transition-all"
+                          className="w-full p-4 rounded-l-lg border border-r-0 border-slate-200/80 bg-gray-50 text-sm focus:bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/20 font-bold tracking-wide transition-all"
                         />
                         <button
                           onClick={() => setShowNeModal(true)}
-                          className="bg-gray-200 px-4 border border-[#e4e4e7] rounded-r-lg border-l-0 text-zinc-600 hover:bg-gray-300 transition-colors"
+                          className="bg-gray-200 px-4 border border-slate-200/80 rounded-r-lg border-l-0 text-zinc-600 hover:bg-gray-300 transition-colors"
                         >
                           <Search className="w-5 h-5" />
                         </button>
@@ -1658,7 +1538,7 @@ export default function ConsultaImpressao() {
                     </div>
                     <button
                       onClick={gerarLote}
-                      className="bg-[#1e293b] text-white font-bold py-4 px-8 rounded-lg text-sm hover:bg-[#003366] transition-all flex justify-center items-center h-[54px] shadow-sm hover:shadow-md active:scale-[0.98]"
+                      className="bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 text-white font-bold py-4 px-8 rounded-lg text-sm hover:bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-lg shadow-blue-900/30 ring-1 ring-white/20 transition-all flex justify-center items-center h-[54px] shadow-sm hover:shadow-md active:scale-[0.98]"
                     >
                       <Search className="w-4 h-4 mr-2" /> CONSULTAR
                     </button>
@@ -1677,11 +1557,11 @@ export default function ConsultaImpressao() {
                           value={batchInput}
                           onChange={(e) => setBatchInput(e.target.value)}
                           placeholder="Ex: 2026NE000123"
-                          className="w-full p-4 rounded-l-lg border border-r-0 border-[#e4e4e7] bg-gray-50 text-sm focus:bg-[#fafafa] focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/20 font-bold tracking-wide transition-all"
+                          className="w-full p-4 rounded-l-lg border border-r-0 border-slate-200/80 bg-gray-50 text-sm focus:bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/20 font-bold tracking-wide transition-all"
                         />
                         <button
                           onClick={() => setShowNeModal(true)}
-                          className="bg-gray-200 px-4 border border-[#e4e4e7] rounded-r-lg border-l-0 text-zinc-600 hover:bg-gray-300 transition-colors"
+                          className="bg-gray-200 px-4 border border-slate-200/80 rounded-r-lg border-l-0 text-zinc-600 hover:bg-gray-300 transition-colors"
                         >
                           <Search className="w-5 h-5" />
                         </button>
@@ -1698,14 +1578,14 @@ export default function ConsultaImpressao() {
                         value={batchQuantity}
                         onChange={(e) => setBatchQuantity(e.target.value)}
                         placeholder="Ex: 100"
-                        className="w-full p-4 border border-[#e4e4e7] bg-gray-50 rounded-lg text-sm focus:bg-[#fafafa] focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/20 font-bold tracking-wide transition-all text-center"
+                        className="w-full p-4 border border-slate-200/80 bg-gray-50 rounded-lg text-sm focus:bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/20 font-bold tracking-wide transition-all text-center"
                       />
                     </div>
                   </div>
                   <div className="flex justify-end mt-2">
                     <button
                       onClick={gerarLote}
-                      className="bg-[#1e293b] text-white font-bold py-4 px-8 rounded-lg text-sm hover:bg-[#003366] transition-all flex justify-center items-center shadow-sm hover:shadow-md active:scale-[0.98]"
+                      className="bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 text-white font-bold py-4 px-8 rounded-lg text-sm hover:bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-lg shadow-blue-900/30 ring-1 ring-white/20 transition-all flex justify-center items-center shadow-sm hover:shadow-md active:scale-[0.98]"
                     >
                       <FileText className="w-4 h-4 mr-2" /> GERAR LOTE (
                       {batchQuantity} docs)
@@ -1725,8 +1605,8 @@ export default function ConsultaImpressao() {
                     onClick={() => setDocumentType("frente")}
                     className={`p-3 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                       documentType === "frente"
-                        ? "bg-[#1e293b] text-white border-[#1e293b] shadow-sm"
-                        : "bg-gray-50 text-zinc-700 border-[#e4e4e7] hover:bg-gray-100"
+                        ? "bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 text-white border-[#1e293b] shadow-sm"
+                        : "bg-gray-50 text-zinc-700 border-slate-200/80 hover:bg-gray-100"
                     }`}
                   >
                     <FileText className="w-4 h-4" />
@@ -1737,8 +1617,8 @@ export default function ConsultaImpressao() {
                     onClick={() => setDocumentType("ambos")}
                     className={`p-3 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                       documentType === "ambos"
-                        ? "bg-[#1e293b] text-white border-[#1e293b] shadow-sm"
-                        : "bg-gray-50 text-zinc-700 border-[#e4e4e7] hover:bg-gray-100"
+                        ? "bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 text-white border-[#1e293b] shadow-sm"
+                        : "bg-gray-50 text-zinc-700 border-slate-200/80 hover:bg-gray-100"
                     }`}
                   >
                     <PrinterIcon className="w-4 h-4" />
@@ -1749,8 +1629,8 @@ export default function ConsultaImpressao() {
                     onClick={() => setDocumentType("verso")}
                     className={`p-3 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
                       documentType === "verso"
-                        ? "bg-[#1e293b] text-white border-[#1e293b] shadow-sm"
-                        : "bg-gray-50 text-zinc-700 border-[#e4e4e7] hover:bg-gray-100"
+                        ? "bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 text-white border-[#1e293b] shadow-sm"
+                        : "bg-gray-50 text-zinc-700 border-slate-200/80 hover:bg-gray-100"
                     }`}
                   >
                     <FileText className="w-4 h-4" />
@@ -1789,7 +1669,7 @@ export default function ConsultaImpressao() {
                       : "hidden print:hidden"
                   } ${documentType === "ambos" ? "print:break-after-page" : ""}`}
                 >
-                  <div className="print:hidden absolute -left-[54px] -right-[54px] -top-[40px] -bottom-[40px] bg-[#e1e3e4] z-[-1] rounded-lg opacity-20 transition-opacity"></div>
+                  <div className="print:hidden absolute -left-[54px] -right-[54px] -top-[40px] -bottom-[40px] bg-slate-100 z-[-1] rounded-lg opacity-20 transition-opacity"></div>
                   <EmpenhoVia
                     data={doc.frente}
                     isEditing={
@@ -1811,7 +1691,7 @@ export default function ConsultaImpressao() {
                       : "hidden print:hidden"
                   } ${index !== documentList.length - 1 ? "print:break-after-page" : ""}`}
                 >
-                  <div className="print:hidden absolute -left-[54px] -right-[54px] -top-[40px] -bottom-[40px] bg-[#e1e3e4] z-[-1] rounded-lg opacity-20 transition-opacity"></div>
+                  <div className="print:hidden absolute -left-[54px] -right-[54px] -top-[40px] -bottom-[40px] bg-slate-100 z-[-1] rounded-lg opacity-20 transition-opacity"></div>
                   <ReciboVia
                     data={doc.verso}
                     frente={doc.frente}
@@ -1855,7 +1735,7 @@ export default function ConsultaImpressao() {
                 />
                 <button
                   type="button"
-                  className="bg-[#e1e3e4] px-4 border border-[#d9dadb] border-l-0 rounded-r-md text-zinc-600 hover:bg-[#d9dadb] transition-colors flex items-center justify-center"
+                  className="bg-slate-100 px-4 border border-slate-200/80 border-l-0 rounded-r-md text-zinc-600 hover:bg-slate-200 transition-colors flex items-center justify-center"
                 >
                   <Search className="w-5 h-5" />
                 </button>

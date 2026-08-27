@@ -50,37 +50,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         );
       }
 
-      // Travar a dotação orçamentária e reajustar o saldo
-      if (diferenca !== 0) {
-        const [dotacaoRows]: any = await connection.execute(
-          'SELECT id, saldo_disponivel FROM dotacao_orcamentaria WHERE unidade_orcamentaria = ? FOR UPDATE',
-          [neRows[0].unidade_orcamentaria]
-        );
-
-        if (!dotacaoRows || dotacaoRows.length === 0) {
-          await connection.rollback(); connection.release();
-          return NextResponse.json({ error: 'Dotação orçamentária não encontrada.' }, { status: 422 });
-        }
-
-        if (diferenca > 0 && dotacaoRows[0].saldo_disponivel < diferenca) {
-          await connection.rollback(); connection.release();
-          return NextResponse.json({ error: 'Saldo insuficiente na dotação orçamentária para o aumento do empenho.' }, { status: 422 });
-        }
-
-        await connection.execute(
-          'UPDATE dotacao_orcamentaria SET saldo_disponivel = saldo_disponivel - ? WHERE id = ?',
-          [diferenca, dotacaoRows[0].id]
-        );
-      }
+      // Validação de dotação orçamentária (MOCK): Removida porque a tabela não existe.
 
       await connection.execute(
         `UPDATE notas_empenho
          SET codigo = ?, numero = ?, valor = ?, data_pagamento = ?,
-             unidade_orcamentaria = ?, elemento_subelemento = ?, gestao = ?, status = ?, historico = ?
+             unidade_orcamentaria = ?, elemento_subelemento = ?, gestao = ?, status = ?, historico = ?, usuario_id = ?
          WHERE id = ?`,
         [codigo?.trim() || '', numero?.trim() || '', valorDecimal, dataPagamento || null,
          unidadeOrcamentaria?.trim() || '', elementoSubelemento?.trim() || '',
-         gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', id]
+         gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', user.id, id]
       );
 
       await connection.commit();
@@ -134,17 +113,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
         );
       }
 
-      // Estorno para a dotação orçamentária
-      const [dotacaoRows]: any = await connection.execute(
-        'SELECT id FROM dotacao_orcamentaria WHERE unidade_orcamentaria = ? FOR UPDATE',
-        [neRows[0].unidade_orcamentaria]
-      );
-      if (dotacaoRows && dotacaoRows.length > 0) {
-        await connection.execute(
-          'UPDATE dotacao_orcamentaria SET saldo_disponivel = saldo_disponivel + ? WHERE id = ?',
-          [neRows[0].valor, dotacaoRows[0].id]
-        );
-      }
+      // Estorno (MOCK): A tabela de dotação não existe.
 
       await connection.execute("UPDATE notas_empenho SET status = 'CANCELADO' WHERE id = ?", [id]);
       

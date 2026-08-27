@@ -16,7 +16,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${space.variable}`}>
-      <body className="flex h-screen bg-[#f4f6f8] text-[#1e293b] overflow-hidden antialiased font-sans" suppressHydrationWarning>
+      <body className="flex h-screen w-full bg-slate-100 text-slate-800 overflow-hidden antialiased font-sans" suppressHydrationWarning>
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] mix-blend-overlay pointer-events-none z-[-1]"></div>
         <Shell>
           {children}
         </Shell>

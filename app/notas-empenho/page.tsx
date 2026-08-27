@@ -1,19 +1,17 @@
+"use client";
 import { useState, useEffect, useCallback } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ActionToolbar, ActionButton } from "@/components/action-toolbar";
 import {
   Plus,
   Save,
-  Edit2,
   Search,
   Trash2,
   Eye,
   Pencil,
   FileText,
   AlertTriangle,
-  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -67,6 +65,10 @@ export default function NotasEmpenho() {
     }
   });
 
+  const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
+  const [formEnabled, setFormEnabled] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const filterItems = () => notas;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -88,11 +90,11 @@ export default function NotasEmpenho() {
             numero: "8421/2024",
             valor: 12450.0,
             dataPagamento: "2024-03-10",
-            unidadeOrcamentaria: "Secretaria de Educação",
+            unidadeOrcamentaria: "Secretaria de Saúde",
             elementoSubelemento: "3.3.90.30",
             gestao: "140101",
-            historico: "Referente à aquisição de materiais de escritório.",
-            status: "ATIVO"
+            historico: "Referente à aquisição de materiais.",
+            status: "EMITIDO"
           },
           {
             id: "mock-2",
@@ -104,26 +106,13 @@ export default function NotasEmpenho() {
             elementoSubelemento: "3.3.90.32",
             gestao: "140102",
             historico: "Aquisição de medicamentos hospitalares.",
-            status: "ATIVO"
+            status: "LIQUIDADO"
           }
         ]);
       }
     } catch {
       toast.error("Erro de conexão. Carregando dados de teste (Mock)...");
-      setNotas([
-        {
-          id: "mock-1",
-          codigo: "2024NE00142",
-          numero: "8421/2024",
-          valor: 12450.0,
-          dataPagamento: "2024-03-10",
-          unidadeOrcamentaria: "Secretaria de Educação",
-          elementoSubelemento: "3.3.90.30",
-          gestao: "140101",
-          historico: "Referente à aquisição de materiais de escritório.",
-          status: "ATIVO"
-        }
-      ]);
+      setNotas([]);
     } finally {
       setIsLoading(false);
     }
@@ -261,26 +250,10 @@ export default function NotasEmpenho() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "LIQUIDADO":
-        return (
-          <span className="inline-block px-2.5 py-1 rounded border border-[#bbf7d0] bg-[#f0fdf4] text-xs font-semibold text-[#166534]">
-            Efetivado
-          </span>
-        );
-      case "CANCELADO":
-        return (
-          <span className="inline-block px-2.5 py-1 rounded border border-indigo-200 bg-indigo-50 text-xs font-semibold text-indigo-700">
-            Cancelado
-          </span>
-        );
-      default:
-        return (
-          <span className="inline-block px-2.5 py-1 rounded border border-[#a7c8ff] bg-[#f0f4ff] text-xs font-semibold text-[#1e293b]">
-            Processando
-          </span>
-        );
-    }
+    if (status === 'LIQUIDADO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-emerald-50 text-emerald-600">LIQUIDADO</span>;
+    if (status === 'CANCELADO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-slate-100 text-slate-500">CANCELADO</span>;
+    if (status === 'Processando') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-amber-50 text-amber-600">Processando</span>;
+    return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-blue-50 text-blue-900">EMITIDO</span>;
   };
 
   const formatCurrency = (value: number) =>
@@ -291,7 +264,7 @@ export default function NotasEmpenho() {
     const [y, m, d] = dateStr.split("-");
     return `${d}/${m}/${y}`;
   };
-
+  
   const onError = (errors: any) => {
     toast.error("Preencha os campos obrigatórios corretamente.");
   };
@@ -299,40 +272,49 @@ export default function NotasEmpenho() {
   const handleSalvar = handleSubmit(onSubmit, onError);
 
   return (
-    <div className="flex flex-col h-full bg-[#f4f4f5]">
-      <ActionToolbar>
-        <ActionButton icon={Plus} label="Incluir" onClick={handleIncluir} />
-        <ActionButton icon={Save} label="Salvar" onClick={handleSalvar} />
-        <ActionButton
-          icon={Edit2}
-          label="Editar"
-          onClick={() => {
-            if (!editingId) toast.info("Clique em uma NE da tabela para editar.");
-            else toast.success("Modo edição ativado.");
-          }}
-        />
-        <ActionButton
-          icon={Trash2}
-          label="Cancelar NE"
-          warning
-          onClick={handleExcluir}
-        />
-        <ActionButton
-          icon={RefreshCw}
-          label="Atualizar"
-          onClick={() => fetchNotas()}
-        />
-      </ActionToolbar>
-
-      <div className="p-8 max-w-[1280px] mx-auto w-full flex-1">
-        <div className="mb-8">
-          <p className="text-xs font-medium text-zinc-500 mb-2 tracking-wider">
-            Início &gt; Notas de Empenho &gt; Cadastro de NE
-          </p>
+    <div className="flex flex-col h-full bg-transparent">
+      <div className="p-8 max-w-[1400px] mx-auto w-full flex-1 space-y-8 animate-fade-in">
+        
+        {/* HEADER & ACTION BUTTONS */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between">
+          <div>
+            <div className="flex items-center text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">
+              Início &gt; Gestão Financeira &gt; <span className="text-blue-900 ml-1">Notas de Empenho</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
+              Emissão de Notas de Empenho
+            </h1>
+          </div>
+          <div className="mt-6 md:mt-0 flex items-center gap-3">
+            <button 
+              onClick={handleIncluir}
+              className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Incluir
+            </button>
+            <button 
+              onClick={handleSalvar}
+              className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" /> Salvar
+            </button>
+            <button 
+              onClick={() => { document.getElementById('search-notas')?.focus(); }}
+              className="bg-white hover:bg-slate-50 text-blue-900 text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm border border-slate-200 transition-all flex items-center gap-2"
+            >
+              <Search className="w-4 h-4" /> Localizar
+            </button>
+            <button 
+              onClick={handleExcluir}
+              className="bg-white hover:bg-red-50 text-red-500 text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm border border-slate-200 hover:border-red-200 transition-all flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" /> Excluir
+            </button>
+          </div>
         </div>
 
         {showAlerta && (
-          <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md flex items-start gap-3 shadow-sm">
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl flex items-start gap-3 shadow-sm">
             <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
             <div>
               <h3 className="text-red-800 font-bold text-sm">
@@ -346,17 +328,17 @@ export default function NotasEmpenho() {
           </div>
         )}
 
-        {/* Formulário */}
-        <div className="bg-[#fafafa] rounded-lg border border-[#e4e4e7] shadow-sm p-8 mb-8 relative w-full">
-          <div className="flex items-center mb-6 border-b border-[#e4e4e7] pb-4">
-            <div className="w-8 h-8 rounded-md bg-[#e3f2fd] flex items-center justify-center text-[#003366] mr-3">
-              <FileText className="w-5 h-5" />
+        {/* FORM SECTION (Glass Panel) */}
+        <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
+          <div className="flex items-center mb-8 pb-4 border-b border-slate-100">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-900 mr-3">
+              <FileText className="w-4 h-4" />
             </div>
-            <h2 className="text-xl font-bold text-[#1e293b]">
-              {editingId ? "Editando NE" : "Cadastro de Número de Empenho (NE)"}
+            <h2 className="text-lg font-bold text-slate-800">
+              {editingId ? "Editando Dados da Nota" : "Dados da Nota"}
             </h2>
             {editingId && (
-              <span className="ml-3 text-xs font-semibold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+              <span className="ml-4 text-xs font-black uppercase tracking-widest bg-amber-50 border border-amber-200 text-amber-700 px-2.5 py-1 rounded-full">
                 Modo Edição
               </span>
             )}
@@ -364,114 +346,99 @@ export default function NotasEmpenho() {
 
           <form className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div>
-              <label className="block text-sm font-semibold text-slate-800 mb-1">
-                Código <span className="text-[#ba1a1a]">*</span>
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Código NE
               </label>
               <input
                 type="text"
-                placeholder="NE-2024-001"
+                placeholder="Ex: 001/2024"
                 {...register("codigoNE")}
-                className={`w-full p-2.5 border rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800 ${errors.codigoNE ? 'border-red-500 bg-red-50' : 'border-[#d9dadb] bg-[#f4f4f5]'}`}
+                className={`w-full px-4 py-3 rounded-xl border text-sm font-bold focus:outline-none focus:ring-4 transition-all duration-300 ${errors.codigoNE ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700'}`}
               />
-              {errors.codigoNE && <p className="text-red-500 text-xs mt-1">{errors.codigoNE.message as string}</p>}
+              {errors.codigoNE && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.codigoNE.message as string}</p>}
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-800 mb-1">
-                Número da NE <span className="text-[#ba1a1a]">*</span>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Número da NE
               </label>
               <input
                 type="text"
                 placeholder="Ex: 2024NE000123"
                 {...register("numeroNE")}
-                className={`w-full p-2.5 border rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800 ${errors.numeroNE ? 'border-red-500 bg-red-50' : 'border-[#d9dadb]'}`}
+                className={`w-full px-4 py-3 rounded-xl border text-sm font-bold focus:outline-none focus:ring-4 transition-all duration-300 ${errors.numeroNE ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700'}`}
               />
-              {errors.numeroNE && <p className="text-red-500 text-xs mt-1">{errors.numeroNE.message as string}</p>}
+              {errors.numeroNE && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.numeroNE.message as string}</p>}
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-800 mb-1">
-                Valor (R$) <span className="text-[#ba1a1a]">*</span>
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Valor R$
               </label>
               <input
                 type="text"
-                placeholder="R$ 0,00"
+                placeholder="0,00"
                 {...register("valorNE")}
-                className={`w-full p-2.5 border rounded text-sm focus:outline-none text-slate-800 ${
-                  errors.valorNE
-                    ? 'border-red-500 bg-red-50 focus:border-red-600'
-                    : duplicatedNe
-                    ? "border-amber-500 bg-amber-50 focus:border-amber-600"
-                    : "border-[#d9dadb] focus:border-[#1e293b]"
-                }`}
+                className={`w-full px-4 py-3 rounded-xl border text-sm font-black focus:outline-none focus:ring-4 transition-all duration-300 ${errors.valorNE ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20 text-red-700' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-800'}`}
               />
-              {errors.valorNE && <p className="text-red-500 text-xs mt-1">{errors.valorNE.message as string}</p>}
+              {errors.valorNE && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.valorNE.message as string}</p>}
             </div>
+            
             <div>
-              <label className="block text-sm font-semibold text-slate-800 mb-1">
-                Data de Pagamento <span className="text-[#ba1a1a]">*</span>
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Data de Pagamento
               </label>
               <input
                 type="date"
                 {...register("dataPagamento")}
-                className={`w-full p-2.5 border rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800 ${errors.dataPagamento ? 'border-red-500 bg-red-50' : 'border-[#d9dadb]'}`}
+                className={`w-full px-4 py-3 rounded-xl border text-sm font-bold text-slate-500 focus:outline-none focus:ring-4 transition-all duration-300 ${errors.dataPagamento ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10'}`}
               />
-              {errors.dataPagamento && <p className="text-red-500 text-xs mt-1">{errors.dataPagamento.message as string}</p>}
+              {errors.dataPagamento && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataPagamento.message as string}</p>}
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Unidade Orçamentária</label>
+              <select
+                {...register("unidadeOrcamentaria")}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
+              >
+                <option value="">Selecione a Unidade</option>
+                <option value="Sec. Saúde">Sec. Saúde</option>
+                <option value="Sec. Educação">Sec. Educação</option>
+              </select>
+            </div>
+            <div className="md:col-span-1">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Gestão</label>
+              <select
+                {...register("gestao")}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
+              >
+                <option value="">Selecione a Gestão</option>
+                <option value="140101">140101</option>
+                <option value="140102">140102</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-4">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Histórico</label>
+              <textarea
+                rows={3}
+                placeholder="Descreva o histórico do empenho..."
+                {...register("historico")}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-medium focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300 resize-none text-slate-700"
+              ></textarea>
             </div>
           </form>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-            <div>
-              <label className="block text-sm font-semibold text-slate-800 mb-1">
-                Unidade Orçamentária
-              </label>
-              <input
-                type="text"
-                {...register("unidadeOrcamentaria")}
-                className="w-full p-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-800 mb-1">
-                Gestão
-              </label>
-              <input
-                type="text"
-                {...register("gestao")}
-                className="w-full p-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-800 mb-1">
-                Elemento/Subelemento
-              </label>
-              <input
-                type="text"
-                {...register("elementoSubelemento")}
-                className="w-full p-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800"
-              />
-            </div>
-          </div>
-          <div className="mt-6">
-            <label className="block text-sm font-semibold text-slate-800 mb-1">
-              Histórico / Especificação
-            </label>
-            <textarea
-              rows={3}
-              {...register("historico")}
-              className="w-full p-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800"
-            />
-          </div>
 
           {duplicatedNe && (
-            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-md flex items-start gap-3 shadow-sm">
-              <span className="text-xl">⚠️</span>
+            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl flex items-start gap-3 shadow-sm">
+              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
               <div className="flex-1">
                 <h3 className="font-bold text-sm">Possível Duplicação de Valores</h3>
-                <p className="text-xs mt-1">
+                <p className="text-xs mt-1 text-amber-700">
                   Encontramos a NE <strong>{duplicatedNe.numero}</strong> com valor similar.
                 </p>
                 <button
                   type="button"
                   onClick={() => handleLoadDuplicate(duplicatedNe)}
-                  className="mt-2 text-xs font-semibold px-3 py-1.5 bg-amber-200 hover:bg-amber-300 rounded transition-colors text-amber-900 border border-amber-300"
+                  className="mt-3 text-xs font-black uppercase tracking-widest px-4 py-2 bg-amber-200 hover:bg-amber-300 rounded-lg transition-colors text-amber-900 shadow-sm"
                 >
                   Carregar dados da NE {duplicatedNe.numero}
                 </button>
@@ -480,108 +447,104 @@ export default function NotasEmpenho() {
           )}
         </div>
 
-        {/* Tabela */}
-        <div className="mb-4 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
-          <div>
-            <h3 className="text-lg font-bold text-[#1e293b]">
-              Notas de Empenho
+        {/* DATA TABLE (Borderless) */}
+        <div>
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-bold text-slate-800 text-xl tracking-tight">
+              Notas Recentes
             </h3>
-            <p className="text-zinc-600 text-sm">
-              {isLoading ? "Carregando..." : `${notas.length} nota(s) encontrada(s)`}
-            </p>
+            <div className="relative w-64 group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+              <input
+                id="search-notas"
+                type="text"
+                placeholder="Buscar nota..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  fetchNotas(e.target.value);
+                }}
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm font-medium focus:outline-none focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
+              />
+            </div>
           </div>
-          <div className="relative w-full md:w-72">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
-            <input
-              type="text"
-              placeholder="Buscar por número ou código..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                fetchNotas(e.target.value);
-              }}
-              className="w-full pl-9 pr-3 py-2 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b]"
-            />
-          </div>
-        </div>
 
-        <div className="bg-[#fafafa] rounded-lg border border-[#e4e4e7] shadow-sm overflow-hidden mb-8">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-[#f4f4f5] text-zinc-600 font-semibold border-b border-[#e4e4e7]">
-                <tr>
-                  <th className="px-6 py-4">Número da NE</th>
-                  <th className="px-6 py-4">Data</th>
-                  <th className="px-6 py-4">Unidade / Gestão</th>
-                  <th className="px-6 py-4">Histórico</th>
-                  <th className="px-6 py-4">Valor</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Ações</th>
+             <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="pb-4 pl-2 text-sm font-black text-slate-500 uppercase tracking-widest">Número</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Data</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Unidade/Gestão</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Histórico</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Valor</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-center">Status</th>
+                  <th className="pb-4 pr-2 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-50">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-zinc-500">
-                      Carregando...
+                    <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
+                       Carregando...
                     </td>
                   </tr>
                 ) : notas.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-zinc-500">
-                      Nenhuma nota de empenho cadastrada.
+                    <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
+                      Nenhuma nota encontrada.
                     </td>
                   </tr>
                 ) : (
-                  notas.map((ne) => (
+                  notas.map((ne, index) => (
                     <tr
                       key={ne.id}
-                      className={`border-b border-[#e4e4e7] hover:bg-[#f4f4f5] cursor-pointer ${
-                        editingId === ne.id ? "bg-amber-50" : ""
-                      }`}
-                      onClick={() => {
-                        setCodigoNE(ne.codigo || "");
-                        setNumeroNE(ne.numero);
-                        setValorNE(String(ne.valor));
-                        setDataPagamento(ne.dataPagamento || "");
-                        setUnidadeOrcamentaria(ne.unidadeOrcamentaria || "");
-                        setElementoSubelemento(ne.elementoSubelemento || "");
-                        setGestao(ne.gestao || "");
-                        setHistorico(ne.historico || "");
-                        setEditingId(ne.id);
-                      }}
+                      onClick={() => setSelecionadoId(ne.id)}
+                      className={`group hover:bg-blue-50/50 transition-colors cursor-pointer ${selecionadoId === ne.id ? 'bg-blue-50/50' : ''}`}
                     >
-                      <td className="px-6 py-4 font-medium">{ne.numero}</td>
-                      <td className="px-6 py-4 text-zinc-600">{formatDate(ne.dataPagamento)}</td>
-                      <td className="px-6 py-4 text-zinc-600 max-w-[150px] truncate" title={`${ne.unidadeOrcamentaria || "-"} / ${ne.gestao || "-"}`}>
-                        {ne.unidadeOrcamentaria || "-"} / {ne.gestao || "-"}
+                      <td className="py-5 font-bold text-slate-800 rounded-l-lg pl-2">
+                        {ne.numero}
                       </td>
-                      <td className="px-6 py-4 text-zinc-600 max-w-[200px] truncate" title={ne.historico}>
+                      <td className="py-5 font-semibold text-slate-500">
+                        {formatDate(ne.dataPagamento)}
+                      </td>
+                      <td className="py-5 font-semibold text-slate-600">
+                        {ne.unidadeOrcamentaria || "-"}
+                      </td>
+                      <td className="py-5 font-medium text-slate-500 truncate max-w-[200px]">
                         {ne.historico || "-"}
                       </td>
-                      <td className="px-6 py-4 font-medium">{formatCurrency(ne.valor)}</td>
-                      <td className="px-6 py-4">{getStatusBadge(ne.status)}</td>
-                      <td className="px-6 py-4 flex gap-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toast.info(`NE ${ne.numero} — ${ne.status}`);
-                          }}
-                          className="text-zinc-600 hover:text-[#1e293b]"
-                          title="Visualizar"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/ordem-pagamento?ne=${ne.numero}`);
-                          }}
-                          className="text-zinc-600 hover:text-[#1e293b]"
-                          title="Gerar Ordem de Pagamento"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
+                      <td className="py-5 font-black text-slate-700 text-right">
+                        {Number(ne.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </td>
+                      <td className="py-5 text-center">
+                        {getStatusBadge(ne.status)}
+                      </td>
+                      <td className="py-5 text-right rounded-r-lg pr-2">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            title="Editar"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelecionadoId(ne.id);
+                              setEditingId(ne.id);
+                              reset({
+                                codigoNE: ne.codigo,
+                                numeroNE: ne.numero,
+                                valorNE: String(ne.valor),
+                                dataPagamento: ne.dataPagamento,
+                                unidadeOrcamentaria: ne.unidadeOrcamentaria,
+                                elementoSubelemento: ne.elementoSubelemento,
+                                gestao: ne.gestao,
+                                historico: ne.historico,
+                              });
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-blue-900 hover:bg-white rounded-md transition-all"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -591,11 +554,13 @@ export default function NotasEmpenho() {
           </div>
         </div>
 
-        <div className="mt-8 pt-4 flex justify-center text-xs text-zinc-500">
-          <p>
-            © 2024 Sistema de Empenho - Gestão de Pagamentos. Todos os direitos
-            reservados.
-          </p>
+        <div className="mt-8 pt-4 flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest pb-8">
+          <p>© 2026 Gestão de Empenho. Todos os direitos reservados.</p>
+          <div className="flex gap-4">
+            <span className="hover:text-slate-600 cursor-pointer">Privacidade</span>
+            <span className="hover:text-slate-600 cursor-pointer">Termos de Uso</span>
+            <span className="hover:text-slate-600 cursor-pointer">Suporte Técnico</span>
+          </div>
         </div>
       </div>
     </div>

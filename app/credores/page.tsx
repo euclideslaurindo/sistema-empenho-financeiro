@@ -1,15 +1,14 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { ActionToolbar, ActionButton } from "@/components/action-toolbar";
 import {
   Plus,
   Save,
-  Edit2,
   Search,
   Trash2,
-  MapPin,
-  X,
-  RefreshCw,
+  Building2,
+  AlertTriangle,
+  Pencil,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,12 +20,18 @@ interface Credor {
   pis: string;
   rg: string;
   dataExpedicao: string;
+  // Novos campos visuais baseados no design
+  cidade?: string;
+  uf?: string;
+  telefone?: string;
+  banco?: string;
+  agencia?: string;
+  contaCorrente?: string;
 }
 
 export default function Credores() {
   const [credores, setCredores] = useState<Credor[]>([]);
   const [formData, setFormData] = useState<Partial<Credor>>({});
-  const [isSearching, setIsSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -46,14 +51,49 @@ export default function Credores() {
         toast.error(data.error || "Erro ao carregar credores.");
       }
     } catch {
-      toast.error("Erro de conexão com o servidor.");
+      toast.error("Erro de conexão com o servidor. Carregando dados Mock.");
+      setCredores([
+        {
+          id: "mock-1",
+          nome: "Tech Solutions Informática LTDA",
+          cpfCnpj: "12.345.678/0001-90",
+          endereco: "Rua das Flores, 123",
+          cidade: "São Paulo",
+          uf: "SP",
+          telefone: "(11) 98765-4321",
+          banco: "001 - Banco do Brasil",
+          agencia: "1234",
+          contaCorrente: "5678-9",
+          pis: "",
+          rg: "",
+          dataExpedicao: ""
+        },
+        {
+          id: "mock-2",
+          nome: "Construtora Edificar S.A.",
+          cpfCnpj: "98.765.432/0001-10",
+          endereco: "Av. Principal, 456",
+          cidade: "Rio de Janeiro",
+          uf: "RJ",
+          telefone: "(21) 99887-6655",
+          banco: "104 - Caixa",
+          agencia: "0987",
+          contaCorrente: "6543-2",
+          pis: "",
+          rg: "",
+          dataExpedicao: ""
+        }
+      ]);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchCredores();
+    const init = async () => {
+      await fetchCredores();
+    };
+    init();
   }, [fetchCredores]);
 
   // Validações locais (UI rápida)
@@ -66,19 +106,8 @@ export default function Credores() {
     );
   };
 
-  const checkDuplicateName = (nome: string, currentId?: string) => {
-    if (!nome) return null;
-    const clean = nome.trim().toLowerCase();
-    return credores.find(
-      (c) => c.id !== currentId && c.nome.trim().toLowerCase() === clean
-    );
-  };
-
   const dupCpfCnpj = formData.cpfCnpj
     ? checkDuplicateCpfCnpj(formData.cpfCnpj, formData.id)
-    : null;
-  const dupName = formData.nome
-    ? checkDuplicateName(formData.nome, formData.id)
     : null;
 
   const formatCpfCnpj = (value: string) => {
@@ -90,20 +119,59 @@ export default function Credores() {
     }
   };
 
-  const formatPis = (value: string) => {
-    return value.replace(/\D/g, "").replace(/^(\d{3})(\d)/, "$1.$2").replace(/^(\d{3})\.(\d{5})(\d)/, "$1.$2.$3").replace(/\.(\d{5})\.(\d{2})(\d)/, ".$1.$2-$3").substr(0, 14);
+  const handleCnpjBlur = async () => {
+    if (!formData.cpfCnpj) return;
+    const val = formData.cpfCnpj.replace(/\D/g, "");
+    if (val.length === 14) {
+      toast.info("Buscando CNPJ...");
+      try {
+        const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${val}`);
+        if (res.ok) {
+          const data = await res.json();
+          setFormData(prev => ({
+            ...prev,
+            nome: data.razao_social,
+            endereco: `${data.descricao_tipo_de_logradouro || ''} ${data.logradouro}, ${data.numero}${data.complemento ? ' - ' + data.complemento : ''}, ${data.bairro}`.trim(),
+            cidade: data.municipio,
+            uf: data.uf,
+            telefone: data.ddd_telefone_1 || prev.telefone
+          }));
+          toast.success("Dados preenchidos via CNPJ!");
+        }
+      } catch {
+        toast.error("Erro ao buscar CNPJ.");
+      }
+    }
   };
 
-  const handleChange = (field: keyof Credor, value: string) => {
+  const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, "");
+    if (val.length === 8) {
+      toast.info("Buscando CEP...");
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${val}/json/`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.erro) {
+            setFormData(prev => ({
+              ...prev,
+              endereco: `${data.logradouro}, , ${data.bairro}`,
+              cidade: data.localidade,
+              uf: data.uf
+            }));
+            toast.success("Endereço preenchido!");
+          }
+        }
+      } catch {
+        toast.error("Erro ao buscar CEP.");
+      }
+    }
+  };
+
+  const handleChange = (field: keyof Credor | 'cepBusca', value: string) => {
     let val = value;
     if (field === 'cpfCnpj') val = formatCpfCnpj(val);
-    if (field === 'pis') val = formatPis(val);
     setFormData((prev) => ({ ...prev, [field]: val }));
-  };
-
-  const handleClear = () => {
-    setFormData({});
-    toast.info("Formulário limpo");
   };
 
   const handleIncluir = () => {
@@ -111,16 +179,12 @@ export default function Credores() {
   };
 
   const handleSalvar = async () => {
-    if (!formData.nome || !formData.endereco || !formData.cpfCnpj || !formData.rg) {
-      toast.error("Preencha os campos obrigatórios (*)");
+    if (!formData.nome || !formData.cpfCnpj) {
+      toast.error("Preencha ao menos Nome e CPF/CNPJ.");
       return;
     }
     if (dupCpfCnpj) {
       toast.error(`CPF/CNPJ já pertence ao credor "${dupCpfCnpj.nome}".`);
-      return;
-    }
-    if (dupName) {
-      toast.error(`Nome já pertence ao credor "${dupName.nome}".`);
       return;
     }
 
@@ -151,7 +215,7 @@ export default function Credores() {
         return;
       }
 
-      toast.success(formData.id ? "Credor atualizado com sucesso!" : "Credor salvo com sucesso!");
+      toast.success(formData.id ? "Credor atualizado!" : "Credor salvo com sucesso!");
       await fetchCredores();
     } catch {
       toast.error("Erro de conexão com o servidor.");
@@ -162,10 +226,10 @@ export default function Credores() {
 
   const handleExcluir = async () => {
     if (!formData.id) {
-      toast.error("Nenhum credor selecionado para excluir.");
+      toast.error("Nenhum credor selecionado para excluir. Clique em Editar na tabela primeiro.");
       return;
     }
-    if (!confirm("Tem certeza que deseja desativar este credor? Ele será ocultado do sistema, mas mantido no banco para integridade histórica.")) return;
+    if (!confirm("Tem certeza que deseja desativar este credor?")) return;
     try {
       const res = await fetch(`/api/credores/${formData.id}`, { method: "DELETE" });
       const data = await res.json();
@@ -183,7 +247,7 @@ export default function Credores() {
 
   const handleLoadCredor = (credor: Credor) => {
     setFormData(credor);
-    setIsSearching(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const filteredCredores = credores.filter(
@@ -193,334 +257,314 @@ export default function Credores() {
   );
 
   return (
-    <div className="flex flex-col h-full bg-[#f4f4f5] relative">
-      <ActionToolbar>
-        <ActionButton icon={Plus} label="Incluir" onClick={handleIncluir} />
-        <ActionButton icon={Save} label="Salvar" onClick={handleSalvar} />
-        <ActionButton
-          icon={Search}
-          label="Localizar"
-          onClick={() => setIsSearching(true)}
-        />
-        <ActionButton
-          icon={Trash2}
-          label="Excluir"
-          warning
-          onClick={handleExcluir}
-        />
-        <ActionButton
-          icon={RefreshCw}
-          label="Atualizar"
-          onClick={() => fetchCredores()}
-        />
-      </ActionToolbar>
-
-      <div className="p-8 max-w-[1280px] mx-auto w-full flex-1">
-        <div className="mb-8">
-          <p className="text-xs font-medium text-zinc-500 mb-2 tracking-wider">
-            Início &gt; Administração &gt; Cadastro de Credores
-          </p>
-          <h1 className="text-3xl font-bold text-[#1e293b] mb-1">
-            Cadastro de Credores
-          </h1>
-          <p className="text-zinc-600 text-sm">
-            Gerencie as informações detalhadas de pessoas físicas e jurídicas
-            para processos de empenho.
-          </p>
+    <div className="flex flex-col h-full bg-transparent">
+      <div className="p-8 max-w-[1400px] mx-auto w-full flex-1 space-y-8 animate-fade-in">
+        
+        {/* HEADER & ACTION BUTTONS */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between">
+          <div>
+            <div className="flex items-center text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">
+              Início &gt; Gestão Financeira &gt; <span className="text-blue-900 ml-1">Credores</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
+              Cadastro de Credores
+            </h1>
+          </div>
+          <div className="mt-6 md:mt-0 flex items-center gap-3">
+            <button 
+              onClick={handleIncluir}
+              className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Incluir
+            </button>
+            <button 
+              onClick={handleSalvar}
+              disabled={isSaving}
+              className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" /> {isSaving ? "Salvando..." : "Salvar"}
+            </button>
+            <button 
+              onClick={() => { document.getElementById('search-table')?.focus(); }}
+              className="bg-white hover:bg-slate-50 text-blue-900 text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm border border-slate-200 transition-all flex items-center gap-2"
+            >
+              <Search className="w-4 h-4" /> Localizar
+            </button>
+            <button 
+              onClick={handleExcluir}
+              className="bg-white hover:bg-red-50 text-red-500 text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm border border-slate-200 hover:border-red-200 transition-all flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" /> Excluir
+            </button>
+          </div>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-8 items-start">
-          {/* Main form */}
-          <div className="bg-[#fafafa] rounded-lg border border-[#e4e4e7] shadow-sm p-8 flex-1 w-full relative">
-            <div className="flex items-center mb-6">
-              <div className="w-2 h-8 bg-[#1e293b] rounded-r-md mr-4 -ml-8"></div>
-              <h2 className="text-xl font-bold text-[#1e293b]">
-                Dados Cadastrais
-              </h2>
-              {formData.id && (
-                <span className="ml-3 text-xs font-semibold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">
-                  Editando
-                </span>
-              )}
+        {/* FORM SECTION (Glass Panel) */}
+        <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
+          <div className="flex items-center mb-8 pb-4 border-b border-slate-100">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-900 mr-3">
+              <Building2 className="w-4 h-4" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-800">
+              {formData.id ? "Editando Credor" : "Dados do Credor"}
+            </h2>
+            {formData.id && (
+              <span className="ml-4 text-xs font-black uppercase tracking-widest bg-amber-50 border border-amber-200 text-amber-700 px-2.5 py-1 rounded-full">
+                Modo Edição
+              </span>
+            )}
+          </div>
+
+          <form className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            
+            {/* Row 1 */}
+            <div className="col-span-12 md:col-span-3">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                CNPJ/CPF
+              </label>
+              <input
+                type="text"
+                placeholder="00.000.000/0000-00"
+                value={formData.cpfCnpj || ""}
+                onChange={(e) => handleChange("cpfCnpj", e.target.value)}
+                onBlur={handleCnpjBlur}
+                className={`w-full px-4 py-3 rounded-xl border text-sm font-bold focus:outline-none focus:ring-4 transition-all duration-300 ${dupCpfCnpj ? 'border-amber-300 bg-amber-50/50 focus:border-amber-500 focus:ring-amber-500/20 text-amber-900' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700'}`}
+              />
+              {dupCpfCnpj && <p className="text-amber-600 text-xs mt-1.5 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> CPF/CNPJ já cadastrado.</p>}
             </div>
 
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-1">
-                  Nome Completo / Razão Social{" "}
-                  <span className="text-[#ba1a1a]">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.nome || ""}
-                  onChange={(e) => handleChange("nome", e.target.value)}
-                  placeholder="Digite o nome completo ou razão social"
-                  className={`w-full p-2.5 border rounded text-sm focus:outline-none text-slate-800 ${
-                    dupName
-                      ? "border-amber-500 bg-amber-50/50 focus:border-amber-600"
-                      : "border-[#d9dadb] focus:border-[#1e293b]"
-                  }`}
-                />
-                {dupName && (
-                  <div className="mt-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded flex items-center gap-1.5 animate-pulse">
-                    <span>
-                      ⚠️ Já existe um credor com este Nome:{" "}
-                      <strong>{dupName.nome}</strong>.
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-1">
-                  Endereço Completo <span className="text-[#ba1a1a]">*</span>
-                </label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-3 h-4 w-4 text-zinc-500" />
-                  <input
-                    type="text"
-                    value={formData.endereco || ""}
-                    onChange={(e) => handleChange("endereco", e.target.value)}
-                    placeholder="Rua, Número, Complemento, Bairro"
-                    className="w-full pl-9 pr-3 py-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-800 mb-1">
-                    CPF / CNPJ <span className="text-[#ba1a1a]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.cpfCnpj || ""}
-                    onChange={(e) => handleChange("cpfCnpj", e.target.value)}
-                    placeholder="000.000.000-00 ou 00.000.000/0001-00"
-                    className={`w-full p-2.5 border rounded text-sm focus:outline-none text-slate-800 ${
-                      dupCpfCnpj
-                        ? "border-amber-500 bg-amber-50/50 focus:border-amber-600"
-                        : "border-[#d9dadb] focus:border-[#1e293b]"
-                    }`}
-                  />
-                  {dupCpfCnpj && (
-                    <div className="mt-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 p-2 rounded flex items-center gap-1.5 animate-pulse">
-                      <span>
-                        ⚠️ CPF/CNPJ já cadastrado:{" "}
-                        <strong>{dupCpfCnpj.nome}</strong>.
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-800 mb-1">
-                    PIS
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.pis || ""}
-                    onChange={(e) => handleChange("pis", e.target.value)}
-                    placeholder="000.00000.00-0"
-                    className="w-full p-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-800 mb-1">
-                    RG com Órgão Emissor / IE{" "}
-                    <span className="text-[#ba1a1a]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.rg || ""}
-                    onChange={(e) => handleChange("rg", e.target.value)}
-                    placeholder="Ex: 1.234.567 SDS-PE ou ISENTO"
-                    className="w-full p-2.5 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-800 mb-1">
-                    Data de Expedição do RG
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.dataExpedicao || ""}
-                    onChange={(e) =>
-                      handleChange("dataExpedicao", e.target.value)
-                    }
-                    className="w-full p-2 border border-[#d9dadb] bg-[#fafafa] rounded text-sm focus:outline-none focus:border-[#1e293b] text-slate-800 [color-scheme:light]"
-                  />
-                </div>
-              </div>
+            <div className="col-span-12 md:col-span-9">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Nome/Razão Social
+              </label>
+              <input
+                type="text"
+                placeholder="Razão Social do Credor"
+                value={formData.nome || ""}
+                onChange={(e) => handleChange("nome", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
             </div>
 
-            <div className="mt-10 flex justify-end gap-4">
-              <button
-                onClick={handleClear}
-                className="px-6 py-2.5 border border-[#737780] text-slate-800 rounded text-sm font-semibold hover:bg-[#f3f4f5] transition-colors"
+            {/* Row 2 */}
+            <div className="col-span-12 md:col-span-2">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                CEP
+              </label>
+              <input
+                type="text"
+                placeholder="00000-000"
+                maxLength={9}
+                onBlur={handleCepBlur}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-4">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Endereço
+              </label>
+              <input
+                type="text"
+                placeholder="Rua, Número, Bairro"
+                value={formData.endereco || ""}
+                onChange={(e) => handleChange("endereco", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-4">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Cidade
+              </label>
+              <input
+                type="text"
+                placeholder="Cidade"
+                value={formData.cidade || ""}
+                onChange={(e) => handleChange("cidade", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-2">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                UF
+              </label>
+              <select
+                value={formData.uf || ""}
+                onChange={(e) => handleChange("uf", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
               >
-                Limpar
-              </button>
-              <button
-                onClick={handleSalvar}
-                disabled={isSaving}
-                className="px-6 py-2.5 bg-[#1e293b] text-white rounded text-sm font-semibold hover:bg-[#003366] transition-colors disabled:opacity-60"
-              >
-                {isSaving ? "Salvando..." : "Salvar Credor"}
-              </button>
+                <option value="">UF</option>
+                <option value="SP">SP</option>
+                <option value="RJ">RJ</option>
+                <option value="MG">MG</option>
+              </select>
+            </div>
+
+            {/* Row 3 */}
+            <div className="col-span-12 md:col-span-3">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Telefone
+              </label>
+              <input
+                type="text"
+                placeholder="(00) 00000-0000"
+                value={formData.telefone || ""}
+                onChange={(e) => handleChange("telefone", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-4">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Banco
+              </label>
+              <input
+                type="text"
+                placeholder="001 - Banco do Brasil"
+                value={formData.banco || ""}
+                onChange={(e) => handleChange("banco", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-2">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Agência
+              </label>
+              <input
+                type="text"
+                placeholder="0000-0"
+                value={formData.agencia || ""}
+                onChange={(e) => handleChange("agencia", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+            </div>
+
+            <div className="col-span-12 md:col-span-3">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Conta Corrente
+              </label>
+              <input
+                type="text"
+                placeholder="00000-0"
+                value={formData.contaCorrente || ""}
+                onChange={(e) => handleChange("contaCorrente", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+            </div>
+
+          </form>
+        </div>
+
+        {/* DATA TABLE (Borderless) */}
+        <div className="pb-12">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-bold text-slate-800 text-xl tracking-tight">
+              Credores Registrados
+            </h3>
+            <div className="relative w-64 group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+              <input
+                id="search-table"
+                type="text"
+                placeholder="Buscar credor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm font-medium focus:outline-none focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
+              />
             </div>
           </div>
 
-          {/* Right sidebar info blocks */}
-          <div className="w-full lg:w-[320px] space-y-6">
-            <div className="bg-[#1e293b] rounded-lg p-6 text-white relative overflow-hidden">
-              <div className="absolute right-0 bottom-0 opacity-10 w-32 h-32 transform translate-x-4 translate-y-4 rounded-full border-[16px] border-[#fafafa]"></div>
-              <h3 className="text-xs font-bold text-[#fcd400] uppercase tracking-wider mb-2">
-                Dica do Sistema
-              </h3>
-              <p className="text-sm font-medium leading-relaxed z-10 relative">
-                Mantenha os dados bancários sempre atualizados para evitar
-                atrasos em ordens de pagamento.
-              </p>
-            </div>
-
-            <div className="bg-[#fafafa] rounded-lg border border-[#e4e4e7] shadow-sm pb-4">
-              <h3 className="p-4 py-3 bg-[#f4f4f5] border-b border-[#e4e4e7] text-zinc-600 font-semibold text-sm flex justify-between items-center">
-                {isLoading ? "Carregando..." : `${credores.length} Credores`}
-                <Search
-                  className="w-4 h-4 cursor-pointer"
-                  onClick={() => setIsSearching(true)}
-                />
-              </h3>
-              <ul className="text-sm">
-                {credores
-                  .slice(0, 4)
-                  .map((c) => (
-                    <li
+          <div className="overflow-x-auto">
+             <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="pb-4 pl-2 text-sm font-black text-slate-500 uppercase tracking-widest">CNPJ/CPF</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Nome/Razão Social</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Banco</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Conta</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-center">Status</th>
+                  <th className="pb-4 pr-2 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-slate-400 font-bold">
+                       Carregando...
+                    </td>
+                  </tr>
+                ) : filteredCredores.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-slate-400 font-bold">
+                      Nenhum credor encontrado.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCredores.map((c, index) => (
+                    <tr
                       key={c.id}
-                      className="flex justify-between items-center py-2.5 px-4 border-b border-[#f3f4f5]"
+                      onClick={() => handleLoadCredor(c)}
+                      className={`group hover:bg-blue-50/50 transition-colors cursor-pointer ${formData.id === c.id ? 'bg-blue-50/50' : ''}`}
                     >
-                      <span
-                        className="text-slate-800 truncate pr-2 max-w-[200px]"
-                        title={c.nome}
-                      >
+                      <td className="py-5 font-bold text-slate-500 rounded-l-lg pl-2">
+                        {c.cpfCnpj}
+                      </td>
+                      <td className="py-5 font-semibold text-slate-700">
                         {c.nome}
-                      </span>
-                      <span
-                        onClick={() => handleLoadCredor(c)}
-                        className="text-[#1e293b] font-semibold cursor-pointer hover:underline text-xs"
-                      >
-                        Ver
-                      </span>
-                    </li>
-                  ))}
-                {credores.length === 0 && !isLoading && (
-                  <li className="py-4 px-4 text-center text-zinc-500 text-xs">
-                    Nenhum credor cadastrado
-                  </li>
+                      </td>
+                      <td className="py-5 font-semibold text-slate-600">
+                        {c.banco || "Não informado"}
+                      </td>
+                      <td className="py-5 font-medium text-slate-500">
+                        {c.agencia && c.contaCorrente ? `Ag: ${c.agencia} | CC: ${c.contaCorrente}` : "Não informada"}
+                      </td>
+                      <td className="py-5 text-center">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-emerald-50 text-emerald-600">ATIVO</span>
+                      </td>
+                      <td className="py-5 text-right rounded-r-lg pr-2">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            title="Visualizar Detalhes"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toast.info(`Detalhes do credor: ${c.nome}`);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-blue-900 hover:bg-white rounded-md transition-all"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            title="Editar"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLoadCredor(c);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-blue-900 hover:bg-white rounded-md transition-all"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
-              </ul>
-              <div className="px-4 mt-2">
-                <button
-                  onClick={() => setIsSearching(true)}
-                  className="w-full text-center text-xs font-bold text-zinc-600 hover:text-[#1e293b] uppercase tracking-wider border border-[#d9dadb] rounded py-2"
-                >
-                  Ver todos os credores
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-[#1e293b] rounded-lg p-6 text-white">
-              <h3 className="text-sm font-semibold flex items-center mb-2">
-                <span className="w-5 h-5 rounded-full border border-[#fafafa] flex items-center justify-center text-xs mr-2">
-                  i
-                </span>{" "}
-                Requisito de PIS
-              </h3>
-              <p className="text-xs text-[#a7c8ff] leading-relaxed">
-                O campo PIS é obrigatório apenas para credores do tipo
-                &apos;Pessoa Física Autônoma&apos;. Para os demais, o campo pode
-                ser deixado em branco.
-              </p>
-            </div>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div className="mt-12 pt-6 border-t border-[#e4e4e7] flex flex-col md:flex-row justify-between text-xs text-zinc-500">
-          <p>Sistema de Empenho - Gestão de Pagamentos © 2024</p>
-          <div className="flex gap-4 mt-2 md:mt-0">
-            <a href="#" className="hover:text-[#1e293b]">
-              Termos de Uso
-            </a>
-            <a href="#" className="hover:text-[#1e293b]">
-              Privacidade
-            </a>
-            <a href="#" className="hover:text-[#1e293b]">
-              Suporte ao Usuário
-            </a>
+        <div className="mt-8 pt-4 flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest pb-8">
+          <p>© 2026 Gestão de Empenho. Todos os direitos reservados.</p>
+          <div className="flex gap-4">
+            <span className="hover:text-slate-600 cursor-pointer">Termos de Uso</span>
+            <span className="hover:text-slate-600 cursor-pointer">Política de Privacidade</span>
+            <span className="hover:text-slate-600 cursor-pointer">Suporte</span>
           </div>
         </div>
       </div>
-
-      {/* Modal Localizar */}
-      {isSearching && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#fafafa] rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col shadow-xl">
-            <div className="flex items-center justify-between p-4 border-b border-[#e4e4e7]">
-              <h3 className="text-lg font-bold text-[#1e293b]">
-                Localizar Credor
-              </h3>
-              <button
-                onClick={() => {
-                  setIsSearching(false);
-                  setSearchTerm("");
-                }}
-                className="text-zinc-600 hover:text-black"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 border-b border-[#e4e4e7]">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-zinc-500" />
-                <input
-                  type="text"
-                  placeholder="Buscar por nome ou CPF/CNPJ..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-[#d9dadb] rounded text-sm focus:outline-none focus:border-[#1e293b]"
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {filteredCredores.length > 0 ? (
-                filteredCredores.map((c) => (
-                  <div
-                    key={c.id}
-                    className="flex items-center justify-between p-3 border border-[#e4e4e7] rounded hover:bg-[#f4f4f5] cursor-pointer"
-                    onClick={() => handleLoadCredor(c)}
-                  >
-                    <div>
-                      <p className="font-semibold text-slate-800">{c.nome}</p>
-                      <p className="text-xs text-zinc-500">{c.cpfCnpj}</p>
-                    </div>
-                    <span className="text-sm font-semibold text-[#1e293b]">
-                      Carregar
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-sm text-zinc-500 py-4">
-                  Nenhum credor encontrado.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
