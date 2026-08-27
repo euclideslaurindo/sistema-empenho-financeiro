@@ -99,7 +99,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           item_unidade2 = ?, item_quantidade2 = ?, item_valor_unitario2 = ?,
           saldo_anterior = ?, valor_empenho = ?, valor_pagamento = ?,
           irrf = ?, iss = ?, inss = ?, sest_senat = ?, patronal = ?, outros_descontos = ?,
-          total_descontos = ?, valor_liquido = ?, numero_cheque = ?, data_emissao = ?, data_pagamento = ?, historico = ?
+          total_descontos = ?, valor_liquido = ?, numero_cheque = ?, data_emissao = ?, data_pagamento = ?, historico = ?, usuario_id = ?
          WHERE id = ?`,
         [
           sub || '01', credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
@@ -108,7 +108,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamento,
           toDecimal(irrf), toDecimal(iss), toDecimal(inss), toDecimal(sestSenat), toDecimal(patronal),
           toDecimal(outrosDescontos), toDecimal(totalDescontos), toDecimal(valorLiquido),
-          numeroCheque.trim(), dataEmissao || null, dataPagamento || null, historico || '', id
+          numeroCheque.trim(), dataEmissao || null, dataPagamento || null, historico || '', user.id, id
         ]
       );
 

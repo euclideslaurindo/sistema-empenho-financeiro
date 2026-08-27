@@ -5,3 +5,14 @@ coverage/
 *.log
 .env*
 !.env.example
+*.exe
+*.tsbuildinfo
+*.txt
+*.html
+test-output.css
+output.css
+fix_*.js
+refactor_*.js
+premium_design.js
+update-db.ts
+

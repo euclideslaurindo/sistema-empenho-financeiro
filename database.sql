@@ -33,10 +33,12 @@ CREATE TABLE IF NOT EXISTS credores (
   pis VARCHAR(20),
   rg VARCHAR(80),
   data_expedicao DATE,
+  usuario_id INT,
   ativo TINYINT(1) DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_cpf_cnpj (cpf_cnpj)
+  UNIQUE KEY uq_cpf_cnpj (cpf_cnpj),
+  CONSTRAINT fk_credor_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
 );
 
 -- ============================================================
@@ -54,9 +56,11 @@ CREATE TABLE IF NOT EXISTS notas_empenho (
   gestao VARCHAR(20),
   status VARCHAR(30) DEFAULT 'EMITIDO' COMMENT 'EMITIDO, LIQUIDADO, CANCELADO',
   historico TEXT,
+  usuario_id INT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_numero (numero)
+  UNIQUE KEY uq_numero (numero),
+  CONSTRAINT fk_ne_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
 );
 
 -- ============================================================
@@ -96,8 +100,10 @@ CREATE TABLE IF NOT EXISTS ordens_pagamento (
   numero_cheque VARCHAR(30),
   data_emissao DATE,
   data_pagamento DATE,
+  usuario_id INT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_cheque (numero_cheque)
+  UNIQUE KEY uq_cheque (numero_cheque),
+  CONSTRAINT fk_op_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
 );
 
 -- ============================================================

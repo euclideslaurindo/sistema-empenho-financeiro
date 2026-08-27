@@ -28,11 +28,11 @@ export default function PerfilGestor() {
         const res = await fetch('/api/perfil');
         const data = await res.json();
         if (res.ok && data.usuario) {
-          setPerfil({
-            ...perfil,
+          setPerfil((prev) => ({
+            ...prev,
             ...data.usuario,
             ultimoAcesso: new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})
-          });
+          }));
         }
       } catch (e) {
         console.error("Erro ao buscar perfil", e);
@@ -84,7 +84,7 @@ export default function PerfilGestor() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#f4f4f5]">
+    <div className="flex flex-col h-full bg-slate-50/50">
       <ActionToolbar>
         <ActionButton
           icon={Settings}
@@ -111,7 +111,7 @@ export default function PerfilGestor() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
-            <div className="bg-[#1e293b] p-6 rounded-lg shadow-xl flex flex-col items-center">
+            <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 p-6 rounded-lg shadow-xl flex flex-col items-center">
               <div className="w-32 h-32 bg-gradient-to-br from-indigo-400 to-indigo-500 rounded-full flex items-center justify-center text-[#1e293b] mb-4 shadow-lg">
                 <UserCircle className="w-20 h-20" />
               </div>
@@ -147,7 +147,7 @@ export default function PerfilGestor() {
           </div>
 
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-[#fafafa] p-6 rounded-lg border border-[#e4e4e7] shadow-sm">
+            <div className="bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 p-6 rounded-lg border border-slate-200/80 shadow-sm">
               <h3 className="text-lg font-bold text-[#1e293b] mb-6 flex items-center">
                 <Settings className="w-5 h-5 mr-2 text-indigo-600" />
                 Informações Pessoais
@@ -163,7 +163,7 @@ export default function PerfilGestor() {
                     value={perfil.nome}
                     onChange={(e) => setPerfil({...perfil, nome: e.target.value})}
                     disabled={!isEditing}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${!isEditing ? "bg-[#f4f4f5] border-transparent text-[#1e293b]/60 cursor-not-allowed" : "bg-[#fafafa] border-[#e4e4e7] text-[#1e293b]"}`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${!isEditing ? "bg-slate-50/50 border-transparent text-[#1e293b]/60 cursor-not-allowed" : "bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border-slate-200/80 text-[#1e293b]"}`}
                   />
                 </div>
                 <div>
@@ -175,7 +175,7 @@ export default function PerfilGestor() {
                     value={perfil.email}
                     onChange={(e) => setPerfil({...perfil, email: e.target.value})}
                     disabled={!isEditing}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${!isEditing ? "bg-[#f4f4f5] border-transparent text-[#1e293b]/60 cursor-not-allowed" : "bg-[#fafafa] border-[#e4e4e7] text-[#1e293b]"}`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${!isEditing ? "bg-slate-50/50 border-transparent text-[#1e293b]/60 cursor-not-allowed" : "bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border-slate-200/80 text-[#1e293b]"}`}
                   />
                 </div>
                 <div>
@@ -186,7 +186,7 @@ export default function PerfilGestor() {
                     type="text"
                     defaultValue="(00) 0000-0000"
                     disabled={!isEditing}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${!isEditing ? "bg-[#f4f4f5] border-transparent text-[#1e293b]/60 cursor-not-allowed" : "bg-[#fafafa] border-[#e4e4e7] text-[#1e293b]"}`}
+                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${!isEditing ? "bg-slate-50/50 border-transparent text-[#1e293b]/60 cursor-not-allowed" : "bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border-slate-200/80 text-[#1e293b]"}`}
                   />
                 </div>
                 <div>
@@ -197,7 +197,7 @@ export default function PerfilGestor() {
                     type="text"
                     defaultValue="Órgão de Lotação"
                     disabled
-                    className="w-full px-4 py-2.5 bg-[#f4f4f5] border-transparent rounded-lg text-[#1e293b]/60 cursor-not-allowed"
+                    className="w-full px-4 py-2.5 bg-slate-50/50 border-transparent rounded-lg text-[#1e293b]/60 cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -206,13 +206,13 @@ export default function PerfilGestor() {
                 <div className="mt-8 flex justify-end gap-3">
                   <button
                     onClick={() => setIsEditing(false)}
-                    className="bg-[#fafafa] border border-[#e4e4e7] hover:bg-[#f4f4f5] text-[#1e293b] font-semibold py-2.5 px-6 rounded-lg transition-colors"
+                    className="bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border border-slate-200/80 hover:bg-slate-50/50 text-[#1e293b] font-semibold py-2.5 px-6 rounded-lg transition-colors"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={handleSave}
-                    className="bg-[#1e293b] hover:bg-[#334155] text-white font-semibold py-2.5 px-6 rounded-lg transition-colors"
+                    className="bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 hover:bg-slate-700 text-white text-white font-semibold py-2.5 px-6 rounded-lg transition-colors"
                   >
                     Salvar Alterações
                   </button>
@@ -220,14 +220,14 @@ export default function PerfilGestor() {
               )}
             </div>
 
-            <div className="bg-[#fafafa] p-6 rounded-lg border border-[#e4e4e7] shadow-sm">
+            <div className="bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 p-6 rounded-lg border border-slate-200/80 shadow-sm">
               <h3 className="text-lg font-bold text-[#1e293b] mb-6 flex items-center">
                 <Bell className="w-5 h-5 mr-2 text-indigo-600" />
                 Preferências de Notificação
               </h3>
 
               <div className="space-y-4">
-                <label className="flex items-center justify-between p-4 bg-[#f4f4f5] rounded-lg cursor-pointer hover:bg-[#e4e4e7] transition-colors">
+                <label className="flex items-center justify-between p-4 bg-slate-50/50 rounded-lg cursor-pointer hover:bg-[#e4e4e7] transition-colors">
                   <div>
                     <p className="font-semibold text-[#1e293b]">
                       Novas Ordens de Pagamento
@@ -242,7 +242,7 @@ export default function PerfilGestor() {
                     className="w-5 h-5 text-[#1e293b] rounded focus:ring-indigo-500 accent-indigo-600"
                   />
                 </label>
-                <label className="flex items-center justify-between p-4 bg-[#f4f4f5] rounded-lg cursor-pointer hover:bg-[#e4e4e7] transition-colors">
+                <label className="flex items-center justify-between p-4 bg-slate-50/50 rounded-lg cursor-pointer hover:bg-[#e4e4e7] transition-colors">
                   <div>
                     <p className="font-semibold text-[#1e293b]">
                       Atrasos de Execução
@@ -307,7 +307,7 @@ export default function PerfilGestor() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-[#1e293b] hover:bg-[#334155] text-white font-semibold py-3 rounded-xl transition-colors"
+                  className="flex-1 bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 hover:bg-slate-700 text-white text-white font-semibold py-3 rounded-xl transition-colors"
                 >
                   Confirmar
                 </button>

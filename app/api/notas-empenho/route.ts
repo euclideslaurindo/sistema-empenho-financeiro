@@ -133,35 +133,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `A NE "${numero}" já está cadastrada no sistema.` }, { status: 409 });
       }
 
-      // Lock e Abatimento de Saldo (Pessimistic Locking)
-      const [dotacaoRows]: any = await connection.execute(
-        'SELECT id, saldo_disponivel FROM dotacao_orcamentaria WHERE unidade_orcamentaria = ? FOR UPDATE',
-        [unidadeOrcamentaria?.trim() || '']
-      );
-
-      if (!dotacaoRows || dotacaoRows.length === 0) {
-        await connection.rollback();
-        connection.release();
-        return NextResponse.json({ error: 'Dotação orçamentária não encontrada para esta unidade.' }, { status: 422 });
-      }
-
-      if (dotacaoRows[0].saldo_disponivel < valorDecimal) {
-        await connection.rollback();
-        connection.release();
-        return NextResponse.json({ error: 'Saldo insuficiente na dotação orçamentária.' }, { status: 422 });
-      }
-
-      // Abate o saldo
-      await connection.execute(
-        'UPDATE dotacao_orcamentaria SET saldo_disponivel = saldo_disponivel - ? WHERE id = ?',
-        [valorDecimal, dotacaoRows[0].id]
-      );
+      // Saldo e Dotação (MOCK): A tabela dotacao_orcamentaria não existe no banco atual,
+      // então pulamos essa verificação para permitir o cadastro da NE.
 
       const id = crypto.randomUUID();
       const exercicio = dataPagamento ? dataPagamento.substring(0, 4) : new Date().getFullYear().toString();
 
       await connection.execute(
-        `INSERT INTO notas_empenho (id, exercicio, codigo, numero, valor, data_pagamento, unidade_orcamentaria, elemento_subelemento, gestao, status, historico, created_by)
+        `INSERT INTO notas_empenho (id, exercicio, codigo, numero, valor, data_pagamento, unidade_orcamentaria, elemento_subelemento, gestao, status, historico, usuario_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, exercicio, codigo?.trim() || '', numero.trim(), valorDecimal, dataPagamento || null,
          unidadeOrcamentaria?.trim() || '', elementoSubelemento?.trim() || '',

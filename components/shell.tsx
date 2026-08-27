@@ -1,5 +1,4 @@
 'use client';
-import { Sidebar } from '@/components/sidebar';
 import { Header } from '@/components/header';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
@@ -11,10 +10,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(err => {
-          console.error('Falha ao registrar o Service Worker:', err);
-        });
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          registration.unregister();
+        }
       });
     }
   }, []);
@@ -29,19 +28,27 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <>
-      <div className="print:hidden">
-        <OfflineIndicator />
-        <Sidebar />
+    <div className="flex flex-col w-full min-h-screen relative z-10 overflow-x-hidden" style={{ backgroundColor: '#E2E8F0' }}>
+      {/* Noise Texture Background */}
+      <div className="fixed inset-0 z-0 opacity-20 pointer-events-none mix-blend-multiply" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
+
+      {/* Offline Indicator floating at the top */}
+      <OfflineIndicator />
+      
+      {/* Top Navigation Bar */}
+      <div className="print:hidden z-30 sticky top-0 w-full">
+        <Header />
       </div>
-      <div className="flex-1 flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible">
-        <div className="print:hidden">
-          <Header />
+
+      {/* The Main Stage */}
+      <main className="flex-1 w-full max-w-[1440px] mx-auto flex flex-col relative z-20 print:bg-white print:rounded-none print:shadow-none print:border-none">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 w-full relative custom-scrollbar print:overflow-visible">
+           <div key={pathname} className="animate-fade-in min-h-full w-full relative z-10 pb-12 pt-6">
+             {children}
+           </div>
         </div>
-        <main className="flex-1 overflow-y-auto w-full bg-[#f4f6f8] print:overflow-visible print:bg-white">
-           {children}
-        </main>
-      </div>
-    </>
+      </main>
+    </div>
   );
 }
