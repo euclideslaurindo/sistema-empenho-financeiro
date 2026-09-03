@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, pool } from '@/lib/db';
+import { query, withTransaction } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import { z } from 'zod';
 
@@ -43,7 +43,7 @@ const ordemPagamentoSchema = z.object({
   dataPagamento: z.string().optional().nullable(),
 });
 
-// GET /api/ordens-pagamento - lista ordens com paginacao
+// GET - lista as ordens de pagamento
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorizedResponse();
@@ -84,12 +84,12 @@ export async function GET(request: NextRequest) {
               credor_nome as credorNome, credor_cpf_cnpj as credorCpfCnpj,
               valor_pagamento as valorPagamento, valor_liquido as valorLiquido,
               numero_cheque as numeroCheque,
+              DATE_FORMAT(data_emissao, '%Y-%m-%d') as dataEmissao,
               DATE_FORMAT(data_pagamento, '%Y-%m-%d') as dataPagamento,
               created_at
        FROM ordens_pagamento
        ORDER BY created_at DESC
-       LIMIT ? OFFSET ?`,
-      [limit, offset]
+       LIMIT ${limit} OFFSET ${offset}`
     );
     return NextResponse.json({
       ordens: rows,
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/ordens-pagamento - salva nova ordem com validacao de saldo e transacao ACID
+// POST - salva uma nova ordem de pagamento e valida o saldo da NE antes de inserir
 export async function POST(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorizedResponse();
@@ -125,14 +125,8 @@ export async function POST(request: NextRequest) {
 
     const toDecimal = (v: any) => parseFloat(String(v || 0).replace(',', '.')) || 0;
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
-      // Validação de Liquidação (MOCK): A tabela 'liquidacoes' não existe no schema atual.
-      // Pulando a trava de valor liquidado para permitir o cadastro da Ordem de Pagamento.
-
-      // 2. Verificar cheque duplicado apenas se informado
+    const result = await withTransaction(async (connection) => {
+      // checa se esse numero de cheque ja foi usado
       const chequeFormatado = numeroCheque ? numeroCheque.trim() : null;
       if (chequeFormatado) {
         const [existingCheque]: any = await connection.execute(
@@ -140,13 +134,37 @@ export async function POST(request: NextRequest) {
           [chequeFormatado]
         );
         if (existingCheque && existingCheque.length > 0) {
-          await connection.rollback();
-          connection.release();
-          return NextResponse.json({ error: `O cheque nº "${chequeFormatado}" já foi utilizado.` }, { status: 409 });
+          return { error: `O cheque nº "${chequeFormatado}" já foi utilizado.`, status: 409 };
         }
       }
 
-      // 3. Inserir a OP (com created_by e liquidacao_id)
+      // busca a NE pra saber quanto de saldo sobrou
+      const [neRows]: any = await connection.execute(
+        'SELECT id, valor FROM notas_empenho WHERE numero = ?',
+        [numeroNe.trim()]
+      );
+      if (!neRows || neRows.length === 0) {
+        return { error: `NE "${numeroNe}" não encontrada.`, status: 404 };
+      }
+      const valorNe = parseFloat(neRows[0].valor) || 0;
+
+      // soma tudo que ja foi pago nessa NE
+      const [paidRows]: any = await connection.execute(
+        'SELECT COALESCE(SUM(valor_pagamento), 0) as total_pago FROM ordens_pagamento WHERE numero_ne = ?',
+        [numeroNe.trim()]
+      );
+      const totalJaPago = parseFloat(paidRows[0]?.total_pago) || 0;
+      const saldoDisponivel = valorNe - totalJaPago;
+
+      // nao deixa pagar mais do que tem de saldo
+      if (vPagamento > saldoDisponivel + 0.01) {
+        return {
+          error: `Saldo insuficiente. Saldo disponível da NE: R$ ${saldoDisponivel.toFixed(2).replace('.', ',')}. Valor solicitado: R$ ${vPagamento.toFixed(2).replace('.', ',')}`,
+          status: 422
+        };
+      }
+
+      // tudo ok, insere a OP
       const id = crypto.randomUUID();
       await connection.execute(
         `INSERT INTO ordens_pagamento (
@@ -171,24 +189,26 @@ export async function POST(request: NextRequest) {
         ]
       );
 
-      // 4. Atualizar status do empenho original se necessário
+      // muda o status da NE: se zerou vira LIQUIDADO, se ainda tem saldo fica EMITIDO
+      const saldoRestante = saldoDisponivel - vPagamento;
+      const novoStatus = saldoRestante <= 0.01 ? 'LIQUIDADO' : 'EMITIDO';
       await connection.execute(
         'UPDATE notas_empenho SET status = ? WHERE numero = ?',
-        ['PAGO', numeroNe]
+        [novoStatus, numeroNe.trim()]
       );
 
-      await connection.commit();
-      connection.release();
+      return { success: true, id, saldoRestante, status: 201 };
+    });
 
-      return NextResponse.json({ success: true, id }, { status: 201 });
-    } catch (err: any) {
-      await connection.rollback();
-      connection.release();
-      throw err;
+    if (result.error) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
+    return NextResponse.json({ success: result.success, id: result.id, saldoRestante: result.saldoRestante }, { status: result.status });
 
   } catch (error: any) {
     console.error('[API POST /ordens-pagamento] Erro:', error);
     return NextResponse.json({ error: 'Erro ao salvar ordem de pagamento.' }, { status: 500 });
   }
 }
+
+

@@ -11,15 +11,13 @@ USE empenho;
 -- TABELA: usuarios
 -- ============================================================
 CREATE TABLE IF NOT EXISTS usuarios (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  nome VARCHAR(100) NOT NULL,
-  matricula VARCHAR(30) UNIQUE NOT NULL,
-  email VARCHAR(100),
-  senha VARCHAR(255) NOT NULL,
-  nivel_acesso INT DEFAULT 1 COMMENT '1=Admin, 2=Gestor, 3=Consulta',
-  ativo TINYINT(1) DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  id VARCHAR(36) PRIMARY KEY,
+  nome VARCHAR(255) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  senha_hash VARCHAR(255) NOT NULL,
+  perfil VARCHAR(50) DEFAULT 'ADMIN',
+  ativo BOOLEAN DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================================
@@ -33,7 +31,13 @@ CREATE TABLE IF NOT EXISTS credores (
   pis VARCHAR(20),
   rg VARCHAR(80),
   data_expedicao DATE,
-  usuario_id INT,
+  cidade VARCHAR(100),
+  uf VARCHAR(2),
+  telefone VARCHAR(20),
+  banco VARCHAR(100),
+  agencia VARCHAR(20),
+  conta_corrente VARCHAR(50),
+  usuario_id VARCHAR(36),
   ativo TINYINT(1) DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -51,12 +55,14 @@ CREATE TABLE IF NOT EXISTS notas_empenho (
   numero VARCHAR(60) NOT NULL,
   valor DECIMAL(15,2) DEFAULT 0,
   data_pagamento DATE,
+  data_provisao_concedida DATE,
+  data_emissao DATE,
   unidade_orcamentaria VARCHAR(200),
   elemento_subelemento VARCHAR(50),
   gestao VARCHAR(20),
   status VARCHAR(30) DEFAULT 'EMITIDO' COMMENT 'EMITIDO, LIQUIDADO, CANCELADO',
   historico TEXT,
-  usuario_id INT,
+  usuario_id VARCHAR(36),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_numero (numero),
@@ -100,7 +106,7 @@ CREATE TABLE IF NOT EXISTS ordens_pagamento (
   numero_cheque VARCHAR(30),
   data_emissao DATE,
   data_pagamento DATE,
-  usuario_id INT,
+  usuario_id VARCHAR(36),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_cheque (numero_cheque),
   CONSTRAINT fk_op_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
@@ -111,10 +117,7 @@ CREATE TABLE IF NOT EXISTS ordens_pagamento (
 -- ============================================================
 
 -- Usuário administrador padrão (senha: admin123)
-INSERT IGNORE INTO usuarios (nome, matricula, email, senha, nivel_acesso) VALUES
-('Gestor Financeiro', 'admin', 'admin@sistema.gov.br', 'admin123', 1),
-('Maria Silva', '102938-4', 'maria.silva@sistema.gov.br', 'senha123', 2);
-
+-- Os usuários já foram inseridos pelo setup_db.js, então pulamos esta etapa aqui.
 -- Credores de exemplo
 INSERT IGNORE INTO credores (id, nome, endereco, cpf_cnpj, pis, rg, data_expedicao) VALUES
 ('1', 'Jose Silva Oliveira', 'Rua A, 123, Recife - PE', '111.111.111-11', '', '123456 SDS-PE', '2020-01-01'),

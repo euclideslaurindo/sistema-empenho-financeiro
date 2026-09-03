@@ -28,9 +28,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex flex-col w-full min-h-screen relative z-10 overflow-x-hidden" style={{ backgroundColor: '#E2E8F0' }}>
+    <div className="flex flex-col w-full min-h-screen relative z-10 overflow-x-hidden bg-[#E2E8F0] print:block print:min-h-auto print:overflow-visible print:bg-white">
       {/* Noise Texture Background */}
-      <div className="fixed inset-0 z-0 opacity-20 pointer-events-none mix-blend-multiply" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
+      <div className="print:hidden fixed inset-0 z-0 opacity-20 pointer-events-none mix-blend-multiply" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
 
       {/* Offline Indicator floating at the top */}
       <OfflineIndicator />
@@ -41,10 +41,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* The Main Stage */}
-      <main className="flex-1 w-full max-w-[1440px] mx-auto flex flex-col relative z-20 print:bg-white print:rounded-none print:shadow-none print:border-none">
+      <main className="flex-1 w-full max-w-[1440px] mx-auto flex flex-col relative z-20 print:block print:max-w-none print:m-0 print:p-0 print:bg-white print:shadow-none print:border-none">
         {/* Scrollable Content Area */}
-        <div className="flex-1 w-full relative custom-scrollbar print:overflow-visible">
-           <div key={pathname} className="animate-fade-in min-h-full w-full relative z-10 pb-12 pt-6">
+        <div className="flex-1 w-full relative custom-scrollbar print:block print:overflow-visible print:m-0 print:p-0">
+           <div key={pathname} className="animate-fade-in min-h-full w-full relative z-10 pb-12 pt-6 print:block print:m-0 print:p-0">
              {children}
            </div>
         </div>

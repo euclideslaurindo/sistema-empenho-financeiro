@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 
@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   if (!user) return unauthorizedResponse();
 
   try {
-    // Retorna apenas os dados do usuario autenticado (por email do token)
+    // busca os dados do usuario logado pelo email que veio do token
     const rows = await query<any[]>(
       'SELECT id, nome, email, perfil, ativo, created_at FROM usuarios WHERE email = ? LIMIT 1',
       [user.email]
@@ -34,7 +34,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 });
     }
 
-    // Apenas o proprio usuario pode atualizar seu perfil
+    // cada usuario so pode editar o proprio perfil
     await query(
       'UPDATE usuarios SET nome = ?, email = ? WHERE id = ?',
       [nome.trim(), email.trim(), user.id]

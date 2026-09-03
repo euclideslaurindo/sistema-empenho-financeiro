@@ -11,7 +11,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const { id } = await params;
 
     await withTransaction(async (conn: PoolConnection) => {
-      // 1. Obter a OP para saber qual NE está atrelada
+      // pega qual NE essa OP pertence antes de deletar
       const [ordens] = await conn.execute<any[]>('SELECT numero_ne FROM ordens_pagamento WHERE id = ?', [id]);
 
       if (!ordens || (ordens as any[]).length === 0) {
@@ -19,10 +19,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       }
       const numeroNe = (ordens as any[])[0].numero_ne;
 
-      // 2. Deletar a OP
+      // deleta a OP
       await conn.execute('DELETE FROM ordens_pagamento WHERE id = ?', [id]);
 
-      // 3. Recalcular o status da NE após remoção
+      // recalcula o status da NE depois de remover
       const [neData] = await conn.execute<any[]>(
         `SELECT ne.valor,
                 (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel
@@ -74,7 +74,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const vPagamento = toDecimal(valorPagamento);
 
     await withTransaction(async (conn: PoolConnection) => {
-      // Validar saldo da NE antes de atualizar
+      // verifica se o novo valor cabe no saldo antes de atualizar
       const [neRows] = await conn.execute<any[]>(
         `SELECT ne.valor,
                 (ne.valor - COALESCE(op_sum.total_pago, 0) + (SELECT valor_pagamento FROM ordens_pagamento WHERE id = ?)) as saldoDisponivel
@@ -112,7 +112,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         ]
       );
 
-      // Recalcular status da NE
+      // atualiza status da NE conforme saldo restante
       const [neData] = await conn.execute<any[]>(
         `SELECT ne.valor,
                 (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel

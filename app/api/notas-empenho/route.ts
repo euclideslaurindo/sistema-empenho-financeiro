@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, pool } from '@/lib/db';
+import { query, withTransaction } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import { z } from 'zod';
+import { withErrorHandler } from '@/lib/api-handler';
 
 const notaEmpenhoSchema = z.object({
   codigo: z.string().optional(),
@@ -17,15 +18,16 @@ const notaEmpenhoSchema = z.object({
   elementoSubelemento: z.string().optional(),
   gestao: z.string().optional(),
   historico: z.string().optional(),
-  status: z.string().optional().default('EMITIDO')
+  status: z.string().optional().default('EMITIDO'),
+  dataProvisaoConcedida: z.string().optional().nullable(),
+  dataEmissao: z.string().optional().nullable()
 });
 
-// GET /api/notas-empenho — lista NEs (com paginacao e fix de N+1)
+// lista as NEs, se passar ?numero= busca uma especifica (usado na OP)
 export async function GET(request: NextRequest) {
-  const user = await getAuthUser(request);
-  if (!user) return unauthorizedResponse();
-
-  try {
+  return withErrorHandler(async () => {
+    const user = await getAuthUser(request);
+    if (!user) return unauthorizedResponse();
     const { searchParams } = new URL(request.url);
     const busca = searchParams.get('busca') || '';
     const numero = searchParams.get('numero') || '';
@@ -33,12 +35,14 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(100, parseInt(searchParams.get('limit') || '50', 10));
     const offset = (page - 1) * limit;
 
-    // Busca por numero exato (para Ordem de Pagamento)
+    // se passou ?numero= eh pra buscar uma NE especifica (chamada da tela de OP)
     if (numero) {
       const rows = await query<any[]>(
         `SELECT
            ne.id, ne.codigo, ne.numero, ne.valor,
            DATE_FORMAT(ne.data_pagamento, '%Y-%m-%d') as dataPagamento,
+           DATE_FORMAT(ne.data_provisao_concedida, '%Y-%m-%d') as dataProvisaoConcedida,
+           DATE_FORMAT(ne.data_emissao, '%Y-%m-%d') as dataEmissao,
            ne.unidade_orcamentaria as unidadeOrcamentaria,
            ne.elemento_subelemento as elementoSubelemento,
            ne.gestao, ne.status, ne.historico,
@@ -58,12 +62,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ne: rows[0] });
     }
 
-    // Listagem geral com busca opcional e paginacao
-    // FIX N+1: usa LEFT JOIN com subquery agrupada em vez de subconsulta correlacionada
+    // listagem geral - usei LEFT JOIN pra nao fazer N queries pra cada NE
+    // aprendi esse padrao no YouTube, evita o problema N+1
     let sql = `
       SELECT
         ne.id, ne.codigo, ne.numero, ne.valor,
         DATE_FORMAT(ne.data_pagamento, '%Y-%m-%d') as dataPagamento,
+        DATE_FORMAT(ne.data_provisao_concedida, '%Y-%m-%d') as dataProvisaoConcedida,
+        DATE_FORMAT(ne.data_emissao, '%Y-%m-%d') as dataEmissao,
         ne.unidade_orcamentaria as unidadeOrcamentaria,
         ne.elemento_subelemento as elementoSubelemento,
         ne.gestao, ne.status, ne.historico, ne.created_at,
@@ -83,7 +89,7 @@ export async function GET(request: NextRequest) {
       params.push(`%${busca}%`, `%${busca}%`);
     }
 
-    // Contar total para paginacao
+    // contagem separada pra montar paginacao
     let countSql = `SELECT COUNT(*) as total FROM notas_empenho ne WHERE 1=1`;
     if (busca) {
       countSql += ' AND (ne.numero LIKE ? OR ne.codigo LIKE ?)';
@@ -92,76 +98,62 @@ export async function GET(request: NextRequest) {
     const countResult = await query<any[]>(countSql, countParams);
     const total = countResult[0]?.total || 0;
 
-    sql += ' ORDER BY ne.created_at DESC LIMIT ? OFFSET ?';
-    params.push(limit, offset);
+    sql += ` ORDER BY ne.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
+    // nao usei params.push aqui por causa de um bug estranho no driver mysql2 com LIMIT
 
     const rows = await query<any[]>(sql, params);
     return NextResponse.json({
       notas: rows,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
     });
-  } catch (error: any) {
-    console.error('[API GET /notas-empenho] Erro:', error);
-    return NextResponse.json({ error: 'Erro ao buscar notas de empenho.' }, { status: 500 });
-  }
+  });
 }
 
-// POST /api/notas-empenho — cria nova NE
+// cria uma NE nova no banco
 export async function POST(request: NextRequest) {
-  const user = await getAuthUser(request);
-  if (!user) return unauthorizedResponse();
-
-  try {
+  return withErrorHandler(async () => {
+    const user = await getAuthUser(request);
+    if (!user) return unauthorizedResponse();
     const body = await request.json();
     
-    const parsed = notaEmpenhoSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
-    }
+    // uso parse() em vez de safeParse() pra o zod jogar o erro direto pro withErrorHandler
+    const parsed = notaEmpenhoSchema.parse(body);
 
-    const { codigo, numero, valor: valorDecimal, dataPagamento, unidadeOrcamentaria, elementoSubelemento, gestao, historico, status } = parsed.data;
+    const { codigo, numero, valor: valorDecimal, dataPagamento, unidadeOrcamentaria, elementoSubelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao } = parsed;
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
-      // Verificar duplicidade
+    const result = await withTransaction(async (connection) => {
+    // checar se ja existe uma NE com esse numero antes de inserir
       const [existing]: any = await connection.execute('SELECT id FROM notas_empenho WHERE numero = ?', [numero.trim()]);
       if (existing && existing.length > 0) {
-        await connection.rollback();
-        connection.release();
-        return NextResponse.json({ error: `A NE "${numero}" já está cadastrada no sistema.` }, { status: 409 });
+        return { error: `A NE "${numero}" já está cadastrada no sistema.`, status: 409 };
       }
-
-      // Saldo e Dotação (MOCK): A tabela dotacao_orcamentaria não existe no banco atual,
-      // então pulamos essa verificação para permitir o cadastro da NE.
 
       const id = crypto.randomUUID();
       const exercicio = dataPagamento ? dataPagamento.substring(0, 4) : new Date().getFullYear().toString();
 
+      let usuarioId: string | null = user.id;
+      try {
+        const userCheck: any = await connection.execute('SELECT id FROM usuarios WHERE id = ?', [usuarioId]);
+        if (!userCheck || !userCheck[0] || userCheck[0].length === 0) usuarioId = null;
+      } catch {
+        usuarioId = null;
+      }
+
       await connection.execute(
-        `INSERT INTO notas_empenho (id, exercicio, codigo, numero, valor, data_pagamento, unidade_orcamentaria, elemento_subelemento, gestao, status, historico, usuario_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, exercicio, codigo?.trim() || '', numero.trim(), valorDecimal, dataPagamento || null,
+        `INSERT INTO notas_empenho (id, exercicio, codigo, numero, valor, data_pagamento, data_provisao_concedida, data_emissao, unidade_orcamentaria, elemento_subelemento, gestao, status, historico, usuario_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, exercicio, codigo?.trim() || '', numero.trim(), valorDecimal, dataPagamento || null, dataProvisaoConcedida || null, dataEmissao || null,
          unidadeOrcamentaria?.trim() || '', elementoSubelemento?.trim() || '',
-         gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', user.id]
+         gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', usuarioId]
       );
 
-      await connection.commit();
-      connection.release();
+      return { success: true, id, status: 201 };
+    });
 
-      return NextResponse.json({ success: true, id }, { status: 201 });
-    } catch (err: any) {
-      await connection.rollback();
-      connection.release();
-      throw err;
+    if (result.error) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
-  } catch (error: any) {
-    console.error('[API POST /notas-empenho] Erro:', error);
-    if (error.code === 'ER_DUP_ENTRY') {
-      return NextResponse.json({ error: 'Número de NE já cadastrado.' }, { status: 409 });
-    }
-    return NextResponse.json({ error: 'Erro ao criar nota de empenho.' }, { status: 500 });
-  }
+    return NextResponse.json({ success: result.success, id: result.id }, { status: result.status });
+  });
 }
 

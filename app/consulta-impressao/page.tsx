@@ -12,86 +12,11 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { numeroPorExtenso } from "@/lib/utils";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import * as htmlToImage from "html-to-image";
+import { apiClient } from "@/lib/api-client";
 
-// Mock DB for NEs
-const mockNEDatabase: Record<string, any> = {
-  "2024NE00142": {
-    empenho: "8421/2024",
-    gestao: "140101",
-    unidade: "Secretaria de Educação",
-    elementoSubelemento: "3.3.90.30",
-    sub: "01",
-    nomeCredor: "Papelaria e Distribuidora Nordeste LTDA",
-    cpfCnpj: "12.345.678/0001-90",
-    rgIe: "987.654.321",
-    endereco: "Av. Agamenon Magalhães, 1200 - Santo Amaro, Recife - PE",
-    saldoAnterior: 45000.0,
-    valorEmpenho: 12450.0,
-    historico:
-      "Referente à aquisição de materiais de escritório para suprimento das Unidades Escolares da Rede Estadual, conforme Processo Licitatório nº 042/2024 e Ata de Registro de Preços vigente.",
-    dataPagamento: "2024-03-10",
-  },
-  "2024NE00143": {
-    empenho: "8422/2024",
-    gestao: "140102",
-    unidade: "Secretaria de Saúde",
-    elementoSubelemento: "3.3.90.32",
-    sub: "02",
-    nomeCredor: "Farma Vida Distribuidora S/A",
-    cpfCnpj: "99.888.777/0002-11",
-    rgIe: "123.456.789",
-    endereco: "Rua do Sol, 500 - Centro, Recife - PE",
-    saldoAnterior: 150000.0,
-    valorEmpenho: 25000.0,
-    historico: "Aquisição de medicamentos para a rede hospitalar estadual.",
-    dataPagamento: "2024-05-20",
-  },
-  "2024NE000982": {
-    empenho: "9500/2024",
-    gestao: "140101",
-    unidade: "Secretaria de Educação",
-    elementoSubelemento: "3.3.90.36",
-    sub: "01",
-    nomeCredor: "João da Silva ME",
-    cpfCnpj: "11.222.333/0001-44",
-    rgIe: "123.456.789",
-    endereco: "Av. Boa Viagem, 10 - Recife - PE",
-    saldoAnterior: 30000.0,
-    valorEmpenho: 15420.0,
-    historico: "Pagamento de RPA",
-    dataPagamento: "2024-05-22",
-  },
-  "2024NE000981": {
-    empenho: "9499/2024",
-    gestao: "140102",
-    unidade: "Secretaria de Saúde",
-    elementoSubelemento: "3.3.90.30",
-    sub: "01",
-    nomeCredor: "Distribuidora Saúde e Cia",
-    cpfCnpj: "55.666.777/0001-88",
-    rgIe: "ISENTO",
-    endereco: "Rua da Aurora, 150 - Recife - PE",
-    saldoAnterior: 2850.5,
-    valorEmpenho: 2850.5,
-    historico: "Pagamento ref aquisição de insumos",
-    dataPagamento: "2024-05-21",
-  },
-  "2024NE000979": {
-    empenho: "9498/2024",
-    gestao: "140101",
-    unidade: "Secretaria de Educação",
-    elementoSubelemento: "4.4.90.52",
-    sub: "01",
-    nomeCredor: "Tecnologia BR Equipamentos",
-    cpfCnpj: "88.999.000/0001-22",
-    rgIe: "ISENTO",
-    endereco: "Distrito Industrial, 50 - Jaboatão - PE",
-    saldoAnterior: 100000.0,
-    valorEmpenho: 48000.0,
-    historico: "Aquisição de computadores",
-    dataPagamento: "2024-05-21",
-  },
-};
+// dados de exemplo removidos, agora carrega do banco mesmo
 
 const EmpenhoVia = ({
   data,
@@ -103,7 +28,7 @@ const EmpenhoVia = ({
 }: any) => {
   return (
     <div
-      className={`w-full max-w-[210mm] min-h-[297mm] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border border-transparent box-border font-sans text-black relative mx-auto ${!isLast ? "print:break-after-page mb-8" : ""} shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none`}
+      className={`w-full max-w-[210mm] min-h-[297mm] print:min-h-0 print:h-screen bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 box-border font-sans text-black relative mx-auto mb-8 print:mb-0 shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none`}
     >
       <div className="w-full flex flex-col font-sans p-[8px]">
         {/* Header */}
@@ -126,7 +51,7 @@ const EmpenhoVia = ({
           </div>
           <div className="text-right flex items-end justify-end pb-2 pt-2 min-w-[140px]">
             <span className="text-[17px] font-bold uppercase tracking-wider text-slate-900 leading-none">
-              EMPENHO Nº {typeof empenhoIndex === "number" ? empenhoIndex + 1 : 1}
+              EMPENHO Nº {data.numeroEmpenho ? (data.sub ? `${data.numeroEmpenho}/${data.sub}` : data.numeroEmpenho) : (typeof empenhoIndex === "number" ? empenhoIndex + 1 : 1)}
             </span>
           </div>
         </div>
@@ -386,17 +311,13 @@ const EmpenhoVia = ({
             <div className="border border-black w-[95px] h-[22px] flex items-center justify-center font-bold">
               {isEditing ? (
                 <input
-                  value={
-                    data.pagamentoData ||
-                    `${data.pagamentoDia || "30"}/${data.pagamentoMes || "04"}/${data.pagamentoAno || "2026"}`
-                  }
+                  value={data.pagamentoData || ""}
                   onChange={(e) => onChange("pagamentoData", e.target.value)}
                   className="w-full h-full text-center outline-none bg-yellow-50 font-bold"
                 />
               ) : (
                 <span className="tracking-widest">
-                  {data.pagamentoData ||
-                    `${data.pagamentoDia || "30"}/${data.pagamentoMes || "04"}/${data.pagamentoAno || "2026"}`}
+                  {data.pagamentoData || ""}
                 </span>
               )}
             </div>
@@ -696,7 +617,7 @@ const EmpenhoVia = ({
 const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
   return (
     <div
-      className={`w-full max-w-[210mm] min-h-[297mm] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border border-transparent box-border font-sans text-black relative mx-auto shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none p-[16mm]`}
+      className={`w-full max-w-[210mm] min-h-[297mm] print:min-h-0 print:h-screen bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 box-border font-sans text-black relative mx-auto shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none p-[16mm]`}
     >
       {/* Layout do Recibo/Verso */}
       <div className="border border-black p-6 flex flex-col relative w-full h-[265mm]">
@@ -1066,97 +987,131 @@ export default function ConsultaImpressao() {
     "frente" | "verso" | "ambos"
   >("ambos");
   const [isEditing, setIsEditing] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [searchMode, setSearchMode] = useState<"single" | "batch">("single");
 
   const [batchInput, setBatchInput] = useState("");
-  const [batchQuantity, setBatchQuantity] = useState("10");
+  
+  const [opList, setOpList] = useState<any[]>([]);
+  const [selectedOps, setSelectedOps] = useState<Record<string, boolean>>({});
+
+
 
   const [showNeModal, setShowNeModal] = useState(false);
   const [searchNeQuery, setSearchNeQuery] = useState("");
   const [nesDB, setNesDB] = useState<any[]>([]);
 
+  const fetchNesForModal = async (busca = "") => {
+    try {
+      const url = busca ? `/api/notas-empenho?busca=${encodeURIComponent(busca)}` : '/api/notas-empenho';
+      const r = await fetch(url);
+      const d = await r.json();
+      if (d.notas) {
+        setNesDB(d.notas.map((n: any) => ({
+          numero: n.numero, valor: n.valor, historico: n.historico || '', status: n.status,
+          empenho: n.numero, gestao: n.gestao, unidade: n.unidadeOrcamentaria,
+          elementoSubelemento: n.elementoSubelemento, nomeCredor: '', cpfCnpj: ''
+        })));
+      }
+    } catch (e) {}
+  };
+
   useEffect(() => {
     if (showNeModal && nesDB.length === 0) {
-      fetch('/api/notas-empenho')
-        .then(r => r.json())
-        .then(d => {
-          if (d.notas) setNesDB(d.notas.map((n: any) => ({
-            numero: n.numero, valor: n.valor, historico: n.historico || '', status: n.status,
-            empenho: n.numero, gestao: n.gestao, unidade: n.unidadeOrcamentaria,
-            elementoSubelemento: n.elementoSubelemento, nomeCredor: '', cpfCnpj: ''
-          })));
-        }).catch(() => {});
+      fetchNesForModal("");
     }
   }, [showNeModal]);
 
+  const handleDownloadPDF = async () => {
+    setIsGeneratingPdf(true);
+    const wasEditing = isEditing;
+    
+    if (wasEditing) {
+      setIsEditing(false);
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+
+    try {
+      toast.info("Preparando documento...");
+      // pequeno delay pra garantir que os elementos renderizaram antes de imprimir
+      await new Promise(resolve => setTimeout(resolve, 300));
+      window.print();
+    } catch (error) {
+      console.error("Erro ao preparar documento:", error);
+      toast.error("Erro ao preparar o documento.");
+    } finally {
+      if (wasEditing) {
+        setIsEditing(true);
+      }
+      setIsGeneratingPdf(false);
+    }
+  };
+
   const [versoData, setVersoData] = useState({
-    numeroCheque: "040496",
-    valorBase: "12.450,00",
-    irrf: "186,75",
-    iss: "622,50",
-    inss: "1.369,50",
+    numeroCheque: "",
+    valorBase: "0,00",
+    irrf: "0,00",
+    iss: "0,00",
+    inss: "0,00",
     sestSenat: "0,00",
     patronal: "0,00",
     outrosDescontos: "0,00",
-    totalDescontos: "2.178,75",
-    descontosExtenso:
-      "dois mil cento e setenta e oito reais e setenta e cinco centavos",
-    valorRecibo: "10.271,25",
-    valorExtenso:
-      "dez mil duzentos e setenta e um reais e vinte cinco centavos",
+    totalDescontos: "0,00",
+    descontosExtenso: "zero",
+    valorRecibo: "0,00",
+    valorExtenso: "zero",
     referenteA: "",
-    localData: "Garanhuns/PE, 30 de abril de 2026",
-    nomeRecebedor: "NOME FICTÍCIO DO CREDOR",
-    cpfCnpj: "12345678900",
-    rg: "1234567 SSP/PE",
-    endereco: "Rua Fictícia, 123 - Bairro Fictício",
+    localData: "",
+    nomeRecebedor: "",
+    cpfCnpj: "",
+    rg: "",
+    endereco: "",
   });
 
   const [frenteData, setFrenteData] = useState({
-    unidadeOrcamentaria: "SECRETARIA DE EDUCAÇÃO",
+    unidadeOrcamentaria: "",
     atividadeProjeto: "",
-    elementoSubelemento: "DIÁRIA/BOLSA",
-    numeroEmpenho: "1",
-    gestaoUE: "140101",
-    codigoElemento: "339014",
-    emissaoDia: "30",
-    emissaoMes: "04",
-    emissaoAno: "2026",
-    pagamentoDia: "30",
-    pagamentoMes: "04",
-    pagamentoAno: "2026",
-    pagamentoData: "30/04/2026",
+    elementoSubelemento: "",
+    numeroEmpenho: "",
+    gestaoUE: "",
+    codigoElemento: "",
+    emissaoDia: "",
+    emissaoMes: "",
+    emissaoAno: new Date().getFullYear().toString(),
+    pagamentoDia: "",
+    pagamentoMes: "",
+    pagamentoAno: "",
+    pagamentoData: "",
     pessoaTipo: "FISICA",
-    credorCpfCnpj: "12345678900",
-    credorNome: "NOME Fictício DO CREDOR",
-    credorEndereco: "Rua Fictícia, 123 - Bairro Fictício - Cidade/UF",
-    saldoAnterior: "28,00",
-    valorEmpenho: "28,00",
+    credorCpfCnpj: "",
+    credorNome: "",
+    credorEndereco: "",
+    saldoAnterior: "0,00",
+    valorEmpenho: "0,00",
     saldoAtual: "0,00",
-    provisaoNo: "7176",
-    provisaoData: "09/03/2026",
+    provisaoNo: "",
+    provisaoData: "",
     processoLicitacaoNo: "0",
     processoLicitacaoData: "",
     licitacaoTipo: "",
-    especificacao:
-      "Valor empenhado para despesa com Bolsa\nreferente a Formação Continuada.",
+    especificacao: "",
     unidade: "UN",
     quantidade: "1",
-    valorUnitario: "55,00",
-    valorTotal: "55,00",
+    valorUnitario: "0,00",
+    valorTotal: "0,00",
     pedidoNo: "",
     processoNo: "",
-    totalEspecificacao: "28,00",
+    totalEspecificacao: "0,00",
     gerenciaEducacao: "GERÊNCIA REGIONAL DE EDUCAÇÃO DO AGRESTE MERIDIONAL",
     cnpjGerencia: "10.572.071/0002-01",
-    autorizadoData: "30/04/2026",
-    deduzidoData: "30/04/2026",
+    autorizadoData: "",
+    deduzidoData: "",
     recebimentoTipo: "SERVICO",
-    recebimentoData: "30/04/2026",
-    liquidadoData: "30/04/2026",
-    pagueseData: "30/04/2026",
-    pagoData: "30/04/2026",
-    chequeNo: "040496",
+    recebimentoData: "",
+    liquidadoData: "",
+    pagueseData: "",
+    pagoData: "",
+    chequeNo: "",
     ordCredito: "",
     ordSaqueNo: "",
   });
@@ -1316,115 +1271,107 @@ export default function ConsultaImpressao() {
     );
   };
 
-  const gerarLote = async () => {
-    let nes: string[] = [];
-    if (searchMode === "single") {
-      nes = batchInput.trim() ? [batchInput.trim()] : ["2026NE000123"];
-    } else {
-      const quantity = parseInt(batchQuantity, 10) || 1;
-      const baseNE = batchInput.trim() || "2026NE000123";
-      const match = baseNE.match(/^(.*?)(\d+)$/);
-      if (match) {
-        const prefix = match[1];
-        const initNum = parseInt(match[2], 10);
-        const padding = match[2].length;
-        for (let i = 0; i < quantity; i++) {
-          nes.push(`${prefix}${String(initNum + i).padStart(padding, "0")}`);
-        }
-      } else {
-        nes = Array(quantity).fill(baseNE);
-      }
+  const buscarOrdensParaLote = async () => {
+    if (!batchInput.trim()) {
+      toast.error("Informe o número do Empenho base.");
+      return;
     }
+    toast.info("Buscando ordens vinculadas...");
+    try {
+      const formattedNe = batchInput.trim().toUpperCase();
+      const data = await apiClient.get(`/api/ordens-pagamento?numeroNe=${encodeURIComponent(formattedNe)}`);
+      
+      if (data && data.ordens && data.ordens.length > 0) {
+        setOpList(data.ordens);
+        const newSelected: Record<string, boolean> = {};
+        data.ordens.forEach((op: any) => newSelected[op.id] = true);
+        setSelectedOps(newSelected);
+        toast.success(`${data.ordens.length} ordem(ns) encontrada(s).`);
+      } else {
+        setOpList([]);
+        toast.error("Nenhuma ordem encontrada para esta NE no banco de dados.");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao buscar parcelas.");
+    }
+  };
 
-    toast.info("Consultando banco de dados...");
+  const gerarDocFormatado = (op: any, formattedNe: string, ano: string, i: number) => {
+    const valorF = Number(op.valorPagamento || op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+    const liquidoF = Number(op.valorLiquido || op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+    return {
+      frente: {
+        ...frenteData,
+        numeroEmpenho: formattedNe,
+        sub: op.sub || "",
+        emissaoAno: ano,
+        credorNome: op.credorNome || "",
+        credorCpfCnpj: op.credorCpfCnpj || "",
+        credorEndereco: op.credorEndereco || "",
+        valorEmpenho: Number(op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
+        saldoAnterior: Number(op.saldoAnterior).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
+        saldoAtual: Number((op.saldoAnterior || 0) - (op.valorPagamento || 0)).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
+        gestaoUE: op.gestao || "",
+        unidadeOrcamentaria: op.unidadeOrcamentaria || "",
+        elementoSubelemento: op.elementoSubelemento || "",
+        especificacao: op.historico || "",
+        chequeNo: op.numeroCheque || "",
+        unidade: op.itemUnidade2 ? `${op.itemUnidade}\n\n${op.itemUnidade2}` : op.itemUnidade,
+        quantidade: op.itemQuantidade2 ? `${op.itemQuantidade}\n\n${op.itemQuantidade2}` : op.itemQuantidade,
+        valorUnitario: op.itemValorUnitario2 ? `${op.itemValorUnitario}\n\n${op.itemValorUnitario2}` : op.itemValorUnitario,
+        valorTotal: op.itemValorUnitario2 && op.itemQuantidade2 ? `${Number(op.itemValorUnitario * op.itemQuantidade).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n\n${Number(op.itemValorUnitario2 * op.itemQuantidade2).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : valorF,
+        totalEspecificacao: valorF,
+        deduzidoData: op.dataPagamento ? new Date(op.dataPagamento).toLocaleDateString("pt-BR") : "",
+        provisaoData: op.dataEmissao ? new Date(op.dataEmissao).toLocaleDateString("pt-BR") : "",
+        pagamentoData: op.dataPagamento ? new Date(op.dataPagamento).toLocaleDateString("pt-BR") : "",
+      },
+      verso: {
+        ...versoData,
+        numeroCheque: op.numeroCheque || String(40496 + i).padStart(6, "0"),
+        referenteA: op.historico || "",
+        valorBase: valorF,
+        cpfCnpj: op.credorCpfCnpj || "",
+        endereco: op.credorEndereco || "",
+        rg: op.credorRg || "",
+        nomeRecebedor: op.credorNome || "",
+        valorExtenso: numeroPorExtenso(Number(op.valorLiquido || op.valorEmpenho)),
+        descontosExtenso: numeroPorExtenso(Number(op.totalDescontos || 0)),
+        irrf: op.irrf !== undefined ? String(op.irrf).replace('.', ',') : "0,00",
+        iss: op.iss !== undefined ? String(op.iss).replace('.', ',') : "0,00",
+        inss: op.inss !== undefined ? String(op.inss).replace('.', ',') : "0,00",
+        sestSenat: op.sestSenat !== undefined ? String(op.sestSenat).replace('.', ',') : "0,00",
+        patronal: op.patronal !== undefined ? String(op.patronal).replace('.', ',') : "0,00",
+        outrosDescontos: op.outrosDescontos !== undefined ? String(op.outrosDescontos).replace('.', ',') : "0,00",
+        totalDescontos: Number(op.totalDescontos || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
+        valorRecibo: liquidoF,
+      }
+    };
+  };
 
+  const gerarLote = async () => {
+    toast.info("Processando impressões...");
     let allDocs: any[] = [];
     
-    for (let i = 0; i < nes.length; i++) {
-      const formattedNe = nes[i].trim().toUpperCase();
+    if (searchMode === "single") {
+      const formattedNe = (batchInput.trim() || "2026NE000123").toUpperCase();
       const match = formattedNe.match(/^(\d{4})NE/i);
       const ano = match ? match[1] : frenteData.emissaoAno;
-      
-      let opsDB: any[] = [];
       let neDB: any = null;
-      const mockData = mockNEDatabase[formattedNe] || null;
-
       try {
-        const resOps = await fetch(`/api/ordens-pagamento?numeroNe=${encodeURIComponent(formattedNe)}`);
-        const opData = await resOps.json();
-        if (resOps.ok && opData.ordens && opData.ordens.length > 0) {
-          opsDB = opData.ordens;
-        } else {
-          // Fallback to fetching NE if no OP exists yet
-          const resNe = await fetch(`/api/notas-empenho?numero=${encodeURIComponent(formattedNe)}`);
-          const neData = await resNe.json();
-          if (resNe.ok && neData.ne) neDB = neData.ne;
-        }
+        const neData = await apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(formattedNe)}`);
+        if (neData && neData.ne) neDB = neData.ne;
       } catch (e) {
-        console.error("Erro na busca", e);
+        console.error("Erro na busca da NE", e);
       }
 
-      if (opsDB.length > 0) {
-        // Se achou OPs, cria um documento para cada OP desta NE
-        opsDB.forEach((op, opIndex) => {
-          const valorF = Number(op.valorPagamento).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-          const liquidoF = Number(op.valorLiquido).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-          
-          allDocs.push({
-            frente: {
-              ...frenteData,
-              numeroEmpenho: formattedNe,
-              emissaoAno: ano,
-              credorNome: op.credorNome || "",
-              credorCpfCnpj: op.credorCpfCnpj || "",
-              credorEndereco: op.credorEndereco || "",
-              valorEmpenho: Number(op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
-              saldoAnterior: Number(op.saldoAnterior).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
-              saldoAtual: Number(op.saldoAnterior - op.valorPagamento).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
-              gestaoUE: op.gestao || "",
-              unidadeOrcamentaria: op.unidadeOrcamentaria || "",
-              elementoSubelemento: op.elementoSubelemento || "",
-              especificacao: op.historico || "",
-              chequeNo: op.numeroCheque || "",
-              unidade: op.itemUnidade2 ? `${op.itemUnidade}\n\n${op.itemUnidade2}` : op.itemUnidade,
-              quantidade: op.itemQuantidade2 ? `${op.itemQuantidade}\n\n${op.itemQuantidade2}` : op.itemQuantidade,
-              valorUnitario: op.itemValorUnitario2 ? `${op.itemValorUnitario}\n\n${op.itemValorUnitario2}` : op.itemValorUnitario,
-              valorTotal: op.itemValorUnitario2 && op.itemQuantidade2 ? `${Number(op.itemValorUnitario * op.itemQuantidade).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n\n${Number(op.itemValorUnitario2 * op.itemQuantidade2).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : valorF,
-              totalEspecificacao: valorF,
-              deduzidoData: op.dataPagamento || "",
-            },
-            verso: {
-              ...versoData,
-              numeroCheque: op.numeroCheque || String(40496 + i).padStart(6, "0"),
-              referenteA: op.historico || "",
-              valorBase: valorF,
-              cpfCnpj: op.credorCpfCnpj || "",
-              endereco: op.credorEndereco || "",
-              rg: op.credorRg || "",
-              nomeRecebedor: op.credorNome || "",
-              valorExtenso: numeroPorExtenso(Number(op.valorLiquido)),
-              descontosExtenso: numeroPorExtenso(Number(op.totalDescontos)),
-              irrf: op.irrf !== undefined ? String(op.irrf).replace('.', ',') : "0,00",
-              iss: op.iss !== undefined ? String(op.iss).replace('.', ',') : "0,00",
-              inss: op.inss !== undefined ? String(op.inss).replace('.', ',') : "0,00",
-              sestSenat: op.sestSenat !== undefined ? String(op.sestSenat).replace('.', ',') : "0,00",
-              patronal: op.patronal !== undefined ? String(op.patronal).replace('.', ',') : "0,00",
-              outrosDescontos: op.outrosDescontos !== undefined ? String(op.outrosDescontos).replace('.', ',') : "0,00",
-              totalDescontos: Number(op.totalDescontos).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
-              valorRecibo: liquidoF,
-            }
-          });
-        });
-      } else {
-        // Fallback p/ NE ou mock
-        const finalNome = mockData ? mockData.nomeCredor : (neDB ? "" : frenteData.credorNome);
-        const finalCpf = mockData ? mockData.cpfCnpj : (neDB ? "" : frenteData.credorCpfCnpj);
-        const finalEndereco = mockData ? mockData.endereco : (neDB ? "" : frenteData.credorEndereco);
-        const finalValor = mockData ? mockData.valorEmpenho : (neDB ? neDB.valor : parseFloat(frenteData.valorEmpenho.replace(',','.')));
-        const finalGestao = mockData ? mockData.gestao : (neDB ? neDB.gestao : frenteData.gestaoUE);
-        const finalUnidade = mockData ? mockData.unidade : (neDB ? neDB.unidadeOrcamentaria : frenteData.unidadeOrcamentaria);
-        const finalElemento = mockData ? mockData.elementoSubelemento : (neDB ? neDB.elementoSubelemento : frenteData.elementoSubelemento);
-        const finalHistorico = mockData ? mockData.historico || mockData.especificacao : (neDB ? neDB.historico : frenteData.especificacao);
+      const finalNome = frenteData.credorNome;
+      const finalCpf = frenteData.credorCpfCnpj;
+      const finalEndereco = frenteData.credorEndereco;
+      const finalValor = neDB ? neDB.valor : parseFloat(frenteData.valorEmpenho.replace(',','.'));
+      const finalGestao = neDB ? neDB.gestao : frenteData.gestaoUE;
+      const finalUnidade = neDB ? neDB.unidadeOrcamentaria : frenteData.unidadeOrcamentaria;
+      const finalElemento = neDB ? neDB.elementoSubelemento : frenteData.elementoSubelemento;
+      const finalHistorico = neDB ? neDB.historico : frenteData.especificacao;
 
         const valorFormatado = Number(finalValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
         const vExtenso = numeroPorExtenso(Number(finalValor));
@@ -1447,29 +1394,44 @@ export default function ConsultaImpressao() {
           },
           verso: {
             ...versoData,
-            numeroCheque: String(40496 + i).padStart(6, "0"),
+            numeroCheque: String(40496).padStart(6, "0"),
             referenteA: finalHistorico || "",
             valorBase: valorFormatado,
             cpfCnpj: finalCpf,
             endereco: finalEndereco,
-            rg: mockData ? mockData.rgIe : versoData.rg,
+            rg: versoData.rg,
             nomeRecebedor: finalNome,
             valorExtenso: vExtenso,
             descontosExtenso: dExtenso,
           },
         });
+    } else {
+      // modo lote: pega apenas as ops selecionadas na lista
+      const selectedOpData = opList.filter(op => selectedOps[op.id]);
+      if (selectedOpData.length === 0) {
+        toast.error("Nenhuma parcela selecionada.");
+        return;
       }
+      
+      const formattedNe = batchInput.trim().toUpperCase();
+      const match = formattedNe.match(/^(\d{4})NE/i);
+      const ano = match ? match[1] : frenteData.emissaoAno;
+
+      selectedOpData.forEach((op, opIndex) => {
+        allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex));
+      });
     }
 
     setDocumentList(allDocs);
     if (allDocs.length > 1) {
-      toast.success(`${allDocs.length} impressões prontas (Pagamentos parciais)`);
+      toast.success(`${allDocs.length} impressões prontas.`);
     } else {
       toast.success("Documento pronto para impressão!");
     }
 
     setTimeout(() => {
       setView("document");
+      setIsEditing(true);
     }, 600);
   };
 
@@ -1547,7 +1509,7 @@ export default function ConsultaImpressao() {
               ) : (
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col md:flex-row gap-4 items-end">
-                    <div className="flex-[2]">
+                    <div className="flex-1">
                       <label className="block text-[11px] font-bold text-zinc-600 mb-2 uppercase tracking-wider">
                         Nº da NE Base
                       </label>
@@ -1567,30 +1529,58 @@ export default function ConsultaImpressao() {
                         </button>
                       </div>
                     </div>
-                    <div className="flex-[1]">
-                      <label className="block text-[11px] font-bold text-zinc-600 mb-2 uppercase tracking-wider">
-                        Qtde de Ordens
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="500"
-                        value={batchQuantity}
-                        onChange={(e) => setBatchQuantity(e.target.value)}
-                        placeholder="Ex: 100"
-                        className="w-full p-4 border border-slate-200/80 bg-gray-50 rounded-lg text-sm focus:bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/20 font-bold tracking-wide transition-all text-center"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end mt-2">
                     <button
-                      onClick={gerarLote}
-                      className="bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 text-white font-bold py-4 px-8 rounded-lg text-sm hover:bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-lg shadow-blue-900/30 ring-1 ring-white/20 transition-all flex justify-center items-center shadow-sm hover:shadow-md active:scale-[0.98]"
+                      onClick={buscarOrdensParaLote}
+                      className="bg-zinc-800 text-white font-bold py-4 px-8 rounded-lg text-sm hover:bg-zinc-700 transition-all flex justify-center items-center h-[54px] shadow-sm"
                     >
-                      <FileText className="w-4 h-4 mr-2" /> GERAR LOTE (
-                      {batchQuantity} docs)
+                      BUSCAR PARCELAS
                     </button>
                   </div>
+
+                  {opList.length > 0 && (
+                    <div className="mt-4 p-4 border border-zinc-200 rounded-lg bg-zinc-50 max-h-60 overflow-y-auto">
+                      <div className="flex justify-between items-center mb-3 pb-2 border-b border-zinc-200">
+                        <span className="text-sm font-bold text-zinc-700">Selecione as Parcelas ({opList.length})</span>
+                        <button 
+                          className="text-xs text-blue-600 hover:underline font-semibold"
+                          onClick={() => {
+                            const allSelected = Object.values(selectedOps).every(v => v);
+                            const newSelected: Record<string, boolean> = {};
+                            opList.forEach(op => newSelected[op.id] = !allSelected);
+                            setSelectedOps(newSelected);
+                          }}
+                        >
+                          Selecionar Todos
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {opList.map(op => (
+                          <label key={op.id} className="flex items-center gap-3 p-2 bg-white border border-zinc-200 rounded cursor-pointer hover:border-zinc-400">
+                            <input 
+                              type="checkbox" 
+                              checked={!!selectedOps[op.id]}
+                              onChange={(e) => setSelectedOps({ ...selectedOps, [op.id]: e.target.checked })}
+                              className="w-4 h-4 text-slate-800 rounded border-gray-300 focus:ring-slate-800"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-slate-800">
+                                {op.sub ? `Parcela /${op.sub}` : 'Principal'} - R$ {Number(op.valorPagamento || op.valorEmpenho).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[10px] text-zinc-500 truncate max-w-[200px]" title={op.credorNome}>{op.credorNome}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-end mt-4">
+                        <button
+                          onClick={gerarLote}
+                          className="bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 text-white font-bold py-3 px-8 rounded-lg text-sm hover:bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-lg shadow-blue-900/30 ring-1 ring-white/20 transition-all flex justify-center items-center shadow-sm hover:shadow-md active:scale-[0.98]"
+                        >
+                          <FileText className="w-4 h-4 mr-2" /> GERAR LOTE SELECIONADO
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1644,7 +1634,40 @@ export default function ConsultaImpressao() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col w-full items-center text-slate-800 pb-24 print:pb-0 mt-[20px] print:mt-0 print:block">
+          <div className="flex flex-col w-full items-center text-slate-800 pb-32 print:pb-0 mt-[20px] print:mt-0 print:block relative">
+            
+            {/* Toolbar fixa para impressão e edição */}
+            <div className="print:hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex gap-4 bg-white/95 backdrop-blur-md px-6 py-4 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200/80 items-center">
+              <button
+                onClick={() => setView("search")}
+                className="px-5 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold rounded-xl transition-all shadow-sm text-sm"
+              >
+                Voltar
+              </button>
+              <div className="w-[1px] h-8 bg-zinc-200 mx-1"></div>
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className={`px-5 py-2.5 font-bold rounded-xl transition-all shadow-sm text-sm ${isEditing ? 'bg-blue-100 text-blue-700 hover:bg-blue-200 ring-1 ring-blue-500/20' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'}`}
+              >
+                {isEditing ? 'Modo Leitura' : 'Editar Valores'}
+              </button>
+              <button
+                onClick={() => window.print()}
+                className="px-6 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white font-bold rounded-xl transition-all shadow-md flex items-center gap-2 text-sm ml-2"
+              >
+                <PrinterIcon className="w-4 h-4" />
+                IMPRIMIR
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                disabled={isGeneratingPdf}
+                className={`px-6 py-2.5 font-bold rounded-xl transition-all shadow-md flex items-center gap-2 text-sm ml-2 ${isGeneratingPdf ? 'bg-blue-300 text-white cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'}`}
+              >
+                <FileText className="w-4 h-4" />
+                {isGeneratingPdf ? 'GERANDO...' : 'BAIXAR PDF'}
+              </button>
+            </div>
+
             {isEditing && (
               <div className="w-full max-w-[210mm] text-center text-[#1e293b] font-bold uppercase tracking-widest text-sm bg-blue-50 py-3 rounded-t-lg border border-blue-200 print:hidden mb-4 shadow-sm relative overflow-hidden mx-auto">
                 Editando{" "}
@@ -1660,9 +1683,10 @@ export default function ConsultaImpressao() {
             {documentList.map((doc, index) => (
               <div
                 key={index}
-                className="w-full max-w-[210mm] flex flex-col items-center print:block mx-auto"
+                className="w-full max-w-[210mm] flex flex-col items-center print:block print:max-w-none print:m-0 mx-auto"
               >
                 <div
+                  id={`doc-${index}-frente`}
                   className={`relative w-full isolate ${
                     documentType === "frente" || documentType === "ambos"
                       ? "block print:block"
@@ -1685,6 +1709,7 @@ export default function ConsultaImpressao() {
                 </div>
 
                 <div
+                  id={`doc-${index}-verso`}
                   className={`relative w-full isolate ${
                     documentType === "verso" || documentType === "ambos"
                       ? "block print:block"
@@ -1730,7 +1755,10 @@ export default function ConsultaImpressao() {
                   type="text"
                   placeholder="Pesquisar por NE, CPF/CNPJ ou Credor..."
                   value={searchNeQuery}
-                  onChange={(e) => setSearchNeQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchNeQuery(e.target.value);
+                    fetchNesForModal(e.target.value);
+                  }}
                   className="w-full pl-4 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-l-md text-sm focus:outline-none focus:border-slate-400 transition-shadow"
                 />
                 <button
