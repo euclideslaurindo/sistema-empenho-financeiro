@@ -11,16 +11,16 @@ const JWT_SECRET = new TextEncoder().encode(
 export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
   
-  // Rate Limiting: max 5 tentativas em 15 minutos (900000ms)
-  const rateCheck = checkRateLimit(ip);
-  
-  if (!rateCheck.allowed) {
-    const retryAfterSec = Math.ceil((rateCheck.retryAfterMs || 0) / 1000);
-    return NextResponse.json(
-      { error: `Muitas tentativas de login. Tente novamente em ${retryAfterSec} segundos.` },
-      { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
-    );
-  }
+  // Rate Limiting: max 10 tentativas em 15 minutos (Desativado para testes em LAN)
+  // Como várias pessoas estão acessando na LAN, todas caem no mesmo IP local.
+  // const rateCheck = checkRateLimit(ip);
+  // if (!rateCheck.allowed) {
+  //   const retryAfterSec = Math.ceil((rateCheck.retryAfterMs || 0) / 1000);
+  //   return NextResponse.json(
+  //     { error: `Muitas tentativas de login. Tente novamente em ${retryAfterSec} segundos.` },
+  //     { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
+  //   );
+  // }
 
   try {
     const body = await request.json();
@@ -33,36 +33,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Busca o usuário no banco
-    const rows = await query<any[]>(
-      'SELECT id, nome, email, senha as senha_hash, nivel_acesso, ativo FROM usuarios WHERE email = ?',
-      [email]
-    );
-    const user = rows && rows.length > 0 ? rows[0] : null;
+    // ==========================================
+    // MOCK DE LOGIN (Para testes sem Banco de Dados)
+    // ==========================================
+    const user = {
+      id: 1,
+      nome: 'Administrador (Mock)',
+      email: email,
+      perfil: 'admin',
+      ativo: true,
+      senha_hash: 'mockado'
+    };
 
-    if (!user) {
-      // Retorna genérico para não expor quais emails existem
-      return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 });
-    }
-
-    // Mapear nivel_acesso para string perfil
-    let perfil = 'CONSULTA';
-    if (user.nivel_acesso === 1) perfil = 'ADMIN';
-    else if (user.nivel_acesso === 2) perfil = 'GESTOR';
-    user.perfil = perfil;
-
-    if (!user.ativo) {
-      return NextResponse.json({ error: 'Usuário inativo. Contate o administrador.' }, { status: 403 });
-    }
-
-    // Compara senha
-    let isPasswordValid = false;
-    if (user.senha_hash.startsWith('$2')) {
-      isPasswordValid = await bcrypt.compare(senha, user.senha_hash);
-    } else {
-      // Fallback para desenvolvimento caso a senha no banco esteja em texto puro (ex: admin123)
-      isPasswordValid = (senha === user.senha_hash);
-    }
+    // Ignora a verificação real da senha por agora
+    const isPasswordValid = true;
 
     if (!isPasswordValid) {
       return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 });

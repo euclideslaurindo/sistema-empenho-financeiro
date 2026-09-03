@@ -29,19 +29,30 @@ export async function GET(request: NextRequest) {
          AND status != 'CANCELADO'`
     );
 
-    // Total a pagar: soma de NEs com status EMITIDO (pendentes de pagamento)
+    // Total a pagar: soma de NEs com status EMITIDO (pendentes de pagamento) menos OPs pagas
     const [pagamentosPendentes] = await query<any[]>(
-      `SELECT COALESCE(SUM(valor), 0) as total
-       FROM notas_empenho
-       WHERE status = 'EMITIDO'`
+      `SELECT COALESCE(SUM(ne.valor - COALESCE(op_sum.total_pago, 0)), 0) as total
+       FROM notas_empenho ne
+       LEFT JOIN (
+         SELECT numero_ne, SUM(valor_pagamento) as total_pago
+         FROM ordens_pagamento
+         GROUP BY numero_ne
+       ) op_sum ON op_sum.numero_ne = ne.numero
+       WHERE ne.status = 'EMITIDO'`
     );
 
     // Total pago mês anterior para variação
     const [pagamentosMesAnterior] = await query<any[]>(
-      `SELECT COALESCE(SUM(valor), 0) as total
-       FROM notas_empenho
-       WHERE status = 'EMITIDO' 
-         AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`
+      `SELECT COALESCE(SUM(ne.valor - COALESCE(op_sum.total_pago, 0)), 0) as total
+       FROM notas_empenho ne
+       LEFT JOIN (
+         SELECT numero_ne, SUM(valor_pagamento) as total_pago
+         FROM ordens_pagamento
+         WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
+         GROUP BY numero_ne
+       ) op_sum ON op_sum.numero_ne = ne.numero
+       WHERE ne.status = 'EMITIDO' 
+         AND ne.created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`
     );
 
     // Últimas 5 NEs com unidade gestora

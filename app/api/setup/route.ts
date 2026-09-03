@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 
-// PROTECAO: Esta rota so pode ser executada em ambiente de desenvolvimento.
-// Em producao, retorna 403 imediatamente.
+// essa rota so roda em dev, bloquei em producao pra nao virar problema
+// ela cria o usuario admin inicial no banco
 export async function GET(request: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
     return NextResponse.json(

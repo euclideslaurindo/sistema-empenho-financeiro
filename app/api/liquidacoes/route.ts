@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pool } from '@/lib/db';
+import { query, withTransaction } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import { z } from 'zod';
 
@@ -26,25 +26,22 @@ export async function POST(request: NextRequest) {
 
     const { notas_empenho_id, numero_liquidacao, valor_liquidado, data_liquidacao, responsavel_atesto, documento_fiscal } = parsed.data;
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
+    const liquidacaoId = crypto.randomUUID();
 
-    try {
-      // 1. Lock no Empenho
+    await withTransaction(async (connection) => {
+      // trava o registro pra nao ter problema de concorrencia
       const [neRows]: any = await connection.execute(
         'SELECT id, valor FROM notas_empenho WHERE id = ? FOR UPDATE',
         [notas_empenho_id]
       );
 
       if (!neRows || neRows.length === 0) {
-        await connection.rollback();
-        connection.release();
-        return NextResponse.json({ error: 'Empenho não encontrado.' }, { status: 422 });
+        throw new Error('Empenho não encontrado.');
       }
 
       const valorOriginal = parseFloat(neRows[0].valor);
 
-      // 2. Calcular liquidações anteriores
+      // soma o que ja foi liquidado antes
       const [liqRows]: any = await connection.execute(
         'SELECT SUM(valor_liquidado) as total_liquidado FROM liquidacoes WHERE notas_empenho_id = ?',
         [notas_empenho_id]
@@ -54,20 +51,17 @@ export async function POST(request: NextRequest) {
       const saldoALiquidar = valorOriginal - totalLiquidadoAnterior;
 
       if (valor_liquidado > saldoALiquidar) {
-        await connection.rollback();
-        connection.release();
-        return NextResponse.json({ error: 'O valor da liquidação excede o saldo a liquidar do empenho.' }, { status: 422 });
+        throw new Error('O valor da liquidação excede o saldo a liquidar do empenho.');
       }
 
-      // 3. Insert Liquidação
-      const liquidacaoId = crypto.randomUUID();
+      // insere a liquidacao
       await connection.execute(
         `INSERT INTO liquidacoes (id, numero_liquidacao, notas_empenho_id, valor_liquidado, data_liquidacao, responsavel_atesto, documento_fiscal, created_by)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [liquidacaoId, numero_liquidacao, notas_empenho_id, valor_liquidado, data_liquidacao, responsavel_atesto || null, documento_fiscal || null, user.id]
       );
 
-      // 4. Update status do Empenho
+      // atualiza o status do empenho
       const novoTotal = totalLiquidadoAnterior + valor_liquidado;
       const novoStatus = novoTotal >= valorOriginal ? 'TOTALMENTE_LIQUIDADO' : 'PARCIALMENTE_LIQUIDADO';
       
@@ -75,19 +69,18 @@ export async function POST(request: NextRequest) {
         'UPDATE notas_empenho SET status = ? WHERE id = ?',
         [novoStatus, notas_empenho_id]
       );
+    });
 
-      await connection.commit();
-      connection.release();
+    return NextResponse.json({ success: true, id: liquidacaoId }, { status: 201 });
 
-      return NextResponse.json({ success: true, id: liquidacaoId }, { status: 201 });
-
-    } catch (err: any) {
-      await connection.rollback();
-      connection.release();
-      throw err;
-    }
   } catch (error: any) {
     console.error('[API POST /liquidacoes] Erro:', error);
+    if (error.message === 'Empenho não encontrado.') {
+      return NextResponse.json({ error: error.message }, { status: 422 });
+    }
+    if (error.message === 'O valor da liquidação excede o saldo a liquidar do empenho.') {
+      return NextResponse.json({ error: error.message }, { status: 422 });
+    }
     if (error.code === 'ER_DUP_ENTRY') {
       return NextResponse.json({ error: 'Número de liquidação já cadastrado.' }, { status: 409 });
     }

@@ -11,6 +11,7 @@ import {
   Eye,
 } from "lucide-react";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api-client";
 
 interface Credor {
   id: string;
@@ -19,8 +20,12 @@ interface Credor {
   cpfCnpj: string;
   pis: string;
   rg: string;
+  orgaoEmissor?: string;
   dataExpedicao: string;
-  // Novos campos visuais baseados no design
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
+  bairro?: string;
   cidade?: string;
   uf?: string;
   telefone?: string;
@@ -36,54 +41,18 @@ export default function Credores() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Busca credores da API
+  // carrega a lista de credores do banco
   const fetchCredores = useCallback(async (busca = "") => {
     setIsLoading(true);
     try {
       const url = busca
         ? `/api/credores?busca=${encodeURIComponent(busca)}`
         : "/api/credores";
-      const res = await fetch(url);
-      const data = await res.json();
-      if (res.ok) {
-        setCredores(data.credores || []);
-      } else {
-        toast.error(data.error || "Erro ao carregar credores.");
-      }
-    } catch {
-      toast.error("Erro de conexão com o servidor. Carregando dados Mock.");
-      setCredores([
-        {
-          id: "mock-1",
-          nome: "Tech Solutions Informática LTDA",
-          cpfCnpj: "12.345.678/0001-90",
-          endereco: "Rua das Flores, 123",
-          cidade: "São Paulo",
-          uf: "SP",
-          telefone: "(11) 98765-4321",
-          banco: "001 - Banco do Brasil",
-          agencia: "1234",
-          contaCorrente: "5678-9",
-          pis: "",
-          rg: "",
-          dataExpedicao: ""
-        },
-        {
-          id: "mock-2",
-          nome: "Construtora Edificar S.A.",
-          cpfCnpj: "98.765.432/0001-10",
-          endereco: "Av. Principal, 456",
-          cidade: "Rio de Janeiro",
-          uf: "RJ",
-          telefone: "(21) 99887-6655",
-          banco: "104 - Caixa",
-          agencia: "0987",
-          contaCorrente: "6543-2",
-          pis: "",
-          rg: "",
-          dataExpedicao: ""
-        }
-      ]);
+      const data = await apiClient.get(url);
+      setCredores(data.credores || []);
+    } catch (error: any) {
+      toast.error(error.message || "Erro de conexão com o servidor.");
+      setCredores([]);
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +65,7 @@ export default function Credores() {
     init();
   }, [fetchCredores]);
 
-  // Validações locais (UI rápida)
+  // valida os campos antes de mandar pro servidor
   const checkDuplicateCpfCnpj = (cpfCnpj: string, currentId?: string) => {
     if (!cpfCnpj) return null;
     const clean = cpfCnpj.replace(/\D/g, "");
@@ -119,27 +88,42 @@ export default function Credores() {
     }
   };
 
+  const formatTelefone = (value: string) => {
+    const v = value.replace(/\D/g, "").slice(0, 11);
+    if (v.length <= 10) {
+      return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
+    } else {
+      return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+    }
+  };
+
   const handleCnpjBlur = async () => {
     if (!formData.cpfCnpj) return;
     const val = formData.cpfCnpj.replace(/\D/g, "");
     if (val.length === 14) {
-      toast.info("Buscando CNPJ...");
+      toast.info("Consultando CNPJ na Receita Federal...");
       try {
-        const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${val}`);
-        if (res.ok) {
-          const data = await res.json();
+        const res = await fetch(`/api/consulta-cnpj?cnpj=${val}`);
+        const data = await res.json();
+        
+        if (res.ok && data.razao_social) {
           setFormData(prev => ({
             ...prev,
-            nome: data.razao_social,
-            endereco: `${data.descricao_tipo_de_logradouro || ''} ${data.logradouro}, ${data.numero}${data.complemento ? ' - ' + data.complemento : ''}, ${data.bairro}`.trim(),
-            cidade: data.municipio,
-            uf: data.uf,
+            nome: data.razao_social || prev.nome,
+            logradouro: data.logradouro || prev.logradouro,
+            numero: data.numero || prev.numero,
+            bairro: data.bairro || prev.bairro,
+            cep: data.cep || prev.cep,
+            cidade: data.municipio || prev.cidade,
+            uf: data.uf || prev.uf,
             telefone: data.ddd_telefone_1 || prev.telefone
           }));
-          toast.success("Dados preenchidos via CNPJ!");
+          toast.success("Dados da empresa carregados com sucesso!");
+        } else {
+          toast.warning(data.error || "CNPJ não localizado na Receita Federal.");
         }
       } catch {
-        toast.error("Erro ao buscar CNPJ.");
+        toast.error("Não foi possível consultar o CNPJ externamente.");
       }
     }
   };
@@ -155,7 +139,9 @@ export default function Credores() {
           if (!data.erro) {
             setFormData(prev => ({
               ...prev,
-              endereco: `${data.logradouro}, , ${data.bairro}`,
+              cep: val,
+              logradouro: data.logradouro,
+              bairro: data.bairro,
               cidade: data.localidade,
               uf: data.uf
             }));
@@ -171,6 +157,7 @@ export default function Credores() {
   const handleChange = (field: keyof Credor | 'cepBusca', value: string) => {
     let val = value;
     if (field === 'cpfCnpj') val = formatCpfCnpj(val);
+    if (field === 'telefone') val = formatTelefone(val);
     setFormData((prev) => ({ ...prev, [field]: val }));
   };
 
@@ -190,35 +177,24 @@ export default function Credores() {
 
     setIsSaving(true);
     try {
-      let res: Response;
+      let data: any;
       if (formData.id) {
-        // UPDATE
-        res = await fetch(`/api/credores/${formData.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
-        });
+        // se tem id editando, é update
+        data = await apiClient.put(`/api/credores/${formData.id}`, formData);
       } else {
-        // CREATE
-        const newId = crypto.randomUUID();
-        res = await fetch("/api/credores", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...formData, id: newId }),
-        });
-        if (res.ok) setFormData((prev) => ({ ...prev, id: newId }));
+        // senao é create novo
+        data = await apiClient.post("/api/credores", formData);
       }
 
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Erro ao salvar credor.");
-        return;
+      if (data.id) {
+        setFormData((prev) => ({ ...prev, id: data.id }));
       }
 
       toast.success(formData.id ? "Credor atualizado!" : "Credor salvo com sucesso!");
       await fetchCredores();
-    } catch {
-      toast.error("Erro de conexão com o servidor.");
+    } catch (err: any) {
+      console.error("Erro ao salvar credor:", err);
+      toast.error(err?.message || "Erro de conexão com o servidor.");
     } finally {
       setIsSaving(false);
     }
@@ -231,22 +207,20 @@ export default function Credores() {
     }
     if (!confirm("Tem certeza que deseja desativar este credor?")) return;
     try {
-      const res = await fetch(`/api/credores/${formData.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Erro ao excluir.");
-        return;
-      }
+      await apiClient.delete(`/api/credores/${formData.id}`);
       toast.success("Credor excluído com sucesso!");
       setFormData({});
       await fetchCredores();
-    } catch {
-      toast.error("Erro de conexão com o servidor.");
+    } catch (error: any) {
+      toast.error(error.message || "Erro de conexão com o servidor.");
     }
   };
 
   const handleLoadCredor = (credor: Credor) => {
-    setFormData(credor);
+    setFormData({
+      ...credor,
+      dataExpedicao: credor.dataExpedicao ? credor.dataExpedicao.split('T')[0] : ""
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -275,7 +249,7 @@ export default function Credores() {
               onClick={handleIncluir}
               className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2"
             >
-              <Plus className="w-4 h-4" /> Incluir
+              <Plus className="w-4 h-4" /> Limpar
             </button>
             <button 
               onClick={handleSalvar}
@@ -346,59 +320,52 @@ export default function Credores() {
               />
             </div>
 
-            {/* Row 2 */}
+            {/* Row 2: RG, Órgão, Data Emissão, PIS */}
+            <div className="col-span-12 md:col-span-3">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">PIS</label>
+              <input type="text" placeholder="Número PIS" value={formData.pis || ""} onChange={(e) => handleChange("pis", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+            </div>
+            <div className="col-span-12 md:col-span-3">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">RG</label>
+              <input type="text" placeholder="Número RG" value={formData.rg || ""} onChange={(e) => handleChange("rg", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+            </div>
+            <div className="col-span-12 md:col-span-3">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Órgão Emissor / IE</label>
+              <input type="text" placeholder="Órgão/IE" value={formData.orgaoEmissor || ""} onChange={(e) => handleChange("orgaoEmissor", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+            </div>
+            <div className="col-span-12 md:col-span-3">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Data de Emissão</label>
+              <input type="date" value={formData.dataExpedicao || ""} onChange={(e) => handleChange("dataExpedicao", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+            </div>
+
+            {/* Row 3: Endereço completo */}
             <div className="col-span-12 md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
-                CEP
-              </label>
-              <input
-                type="text"
-                placeholder="00000-000"
-                maxLength={9}
-                onBlur={handleCepBlur}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
-              />
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">CEP</label>
+              <input type="text" placeholder="00000-000" maxLength={9} value={formData.cep || ""} onChange={(e) => handleChange("cep", e.target.value)} onBlur={handleCepBlur} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
-
             <div className="col-span-12 md:col-span-4">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
-                Endereço
-              </label>
-              <input
-                type="text"
-                placeholder="Rua, Número, Bairro"
-                value={formData.endereco || ""}
-                onChange={(e) => handleChange("endereco", e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
-              />
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Logradouro</label>
+              <input type="text" placeholder="Rua, Avenida..." value={formData.logradouro || ""} onChange={(e) => handleChange("logradouro", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
-
-            <div className="col-span-12 md:col-span-4">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
-                Cidade
-              </label>
-              <input
-                type="text"
-                placeholder="Cidade"
-                value={formData.cidade || ""}
-                onChange={(e) => handleChange("cidade", e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
-              />
-            </div>
-
             <div className="col-span-12 md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
-                UF
-              </label>
-              <select
-                value={formData.uf || ""}
-                onChange={(e) => handleChange("uf", e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
-              >
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nº</label>
+              <input type="text" placeholder="Número" value={formData.numero || ""} onChange={(e) => handleChange("numero", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+            </div>
+            <div className="col-span-12 md:col-span-4">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Bairro</label>
+              <input type="text" placeholder="Bairro" value={formData.bairro || ""} onChange={(e) => handleChange("bairro", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+            </div>
+
+            {/* Row 4: Localidade e Contato */}
+            <div className="col-span-12 md:col-span-4">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Município</label>
+              <input type="text" placeholder="Cidade" value={formData.cidade || ""} onChange={(e) => handleChange("cidade", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+            </div>
+            <div className="col-span-12 md:col-span-2">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">UF</label>
+              <select value={formData.uf || ""} onChange={(e) => handleChange("uf", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300">
                 <option value="">UF</option>
-                <option value="SP">SP</option>
-                <option value="RJ">RJ</option>
-                <option value="MG">MG</option>
+                <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option><option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option><option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
               </select>
             </div>
 
@@ -412,6 +379,7 @@ export default function Credores() {
                 placeholder="(00) 00000-0000"
                 value={formData.telefone || ""}
                 onChange={(e) => handleChange("telefone", e.target.value)}
+                maxLength={15}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
               />
             </div>
@@ -471,7 +439,10 @@ export default function Credores() {
                 type="text"
                 placeholder="Buscar credor..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  fetchCredores(e.target.value);
+                }}
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm font-medium focus:outline-none focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
               />
             </div>

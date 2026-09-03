@@ -1,5 +1,5 @@
-﻿// Rate limiter simples em memória para proteger endpoints críticos.
-// Adequado para uso local/single-instance. Para produção multi-instância, use Redis.
+// rate limiter em memoria pra nao deixar alguem ficar tentando login infinitamente
+// funciona pra uso local, pra varias instancias precisaria de redis
 
 interface AttemptRecord {
   count: number;
@@ -8,8 +8,8 @@ interface AttemptRecord {
 
 const store = new Map<string, AttemptRecord>();
 
-const WINDOW_MS = 15 * 60 * 1000; // 15 minutos
-const MAX_ATTEMPTS = 10; // tentativas por janela (generoso para uso local)
+const WINDOW_MS = 15 * 60 * 1000; // janela de 15 minutos
+const MAX_ATTEMPTS = 10; // limite de tentativas por janela
 
 function cleanup() {
   const now = Date.now();
@@ -38,7 +38,7 @@ export function checkRateLimit(ip: string): { allowed: boolean; retryAfterMs?: n
   const elapsed = now - record.firstAttempt;
 
   if (elapsed > WINDOW_MS) {
-    // Janela expirada — resetar
+    // janela expirou, reseta a contagem
     store.set(ip, { count: 1, firstAttempt: now });
     return { allowed: true };
   }

@@ -273,3 +273,47 @@ h1 {
 footer, .pb-8 > p {
   font-size: 12px !important;
 }
+
+/* ══════════════════════════════════════════════════════ */
+/* ── IMPRESSÃO (PRINT STYLES)                         ── */
+/* ══════════════════════════════════════════════════════ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html, body {
+    height: 100% !important;
+    min-height: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background-color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Remove all shadows, blurs and backgrounds for crisp vector print */
+  * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Force absolute elements to be flat in print */
+  .backdrop-blur-md, .bg-white\/70 {
+    background-color: white !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Forçar os containers a expandirem no papel */
+  body > div, main {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+    display: block !important;
+  }
+}

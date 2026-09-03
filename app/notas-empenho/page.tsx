@@ -15,6 +15,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { useAppStore } from "@/lib/store";
+import { maskCurrency } from "@/lib/utils";
+import { apiClient } from "@/lib/api-client";
 
 interface NotaEmpenho {
   id: string;
@@ -27,6 +30,8 @@ interface NotaEmpenho {
   gestao: string;
   status: string;
   historico: string;
+  dataProvisaoConcedida?: string;
+  dataEmissao?: string;
 }
 
 const notaEmpenhoSchema = z.object({
@@ -36,11 +41,24 @@ const notaEmpenhoSchema = z.object({
     const clean = String(val).replace(/[^\d,-]/g, '').replace(',', '.');
     return parseFloat(clean) || 0;
   }).refine(val => val > 0, { message: "O valor da NE deve ser maior que zero." }),
-  dataPagamento: z.string().min(1, "Data é obrigatória"),
+  dataPagamento: z.string().min(1, "Data é obrigatória").refine(val => {
+    const y = parseInt(val.split('-')[0], 10);
+    return y >= 2000 && y <= 2100;
+  }, "Ano inválido"),
   unidadeOrcamentaria: z.string().optional(),
   elementoSubelemento: z.string().optional(),
   gestao: z.string().optional(),
   historico: z.string().optional(),
+  dataProvisaoConcedida: z.string().optional().refine(val => {
+    if (!val) return true;
+    const y = parseInt(val.split('-')[0], 10);
+    return y >= 2000 && y <= 2100;
+  }, "Ano inválido"),
+  dataEmissao: z.string().optional().refine(val => {
+    if (!val) return true;
+    const y = parseInt(val.split('-')[0], 10);
+    return y >= 2000 && y <= 2100;
+  }, "Ano inválido"),
 });
 
 type NotaEmpenhoFormValues = z.input<typeof notaEmpenhoSchema>;
@@ -50,7 +68,7 @@ export default function NotasEmpenho() {
   const [notas, setNotas] = useState<NotaEmpenho[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Form state via React Hook Form
+  // estado do formulario
   const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<NotaEmpenhoFormValues>({
     resolver: zodResolver(notaEmpenhoSchema),
     defaultValues: {
@@ -58,9 +76,9 @@ export default function NotasEmpenho() {
       numeroNE: "",
       valorNE: "",
       dataPagamento: "",
-      unidadeOrcamentaria: "",
+      unidadeOrcamentaria: "Secretaria de Educação",
       elementoSubelemento: "",
-      gestao: "",
+      gestao: "140101",
       historico: "",
     }
   });
@@ -76,42 +94,10 @@ export default function NotasEmpenho() {
     setIsLoading(true);
     try {
       const url = busca ? `/api/notas-empenho?busca=${encodeURIComponent(busca)}` : "/api/notas-empenho";
-      const res = await fetch(url);
-      const data = await res.json();
-      if (res.ok) {
-        setNotas(data.notas || []);
-      } else {
-        // Fallback p/ Teste Visual quando o BD está offline
-        toast.error("Banco de dados offline. Carregando dados de teste (Mock)...");
-        setNotas([
-          {
-            id: "mock-1",
-            codigo: "2024NE00142",
-            numero: "8421/2024",
-            valor: 12450.0,
-            dataPagamento: "2024-03-10",
-            unidadeOrcamentaria: "Secretaria de Saúde",
-            elementoSubelemento: "3.3.90.30",
-            gestao: "140101",
-            historico: "Referente à aquisição de materiais.",
-            status: "EMITIDO"
-          },
-          {
-            id: "mock-2",
-            codigo: "2024NE00143",
-            numero: "8422/2024",
-            valor: 25000.0,
-            dataPagamento: "2024-05-20",
-            unidadeOrcamentaria: "Secretaria de Saúde",
-            elementoSubelemento: "3.3.90.32",
-            gestao: "140102",
-            historico: "Aquisição de medicamentos hospitalares.",
-            status: "LIQUIDADO"
-          }
-        ]);
-      }
-    } catch {
-      toast.error("Erro de conexão. Carregando dados de teste (Mock)...");
+      const data = await apiClient.get(url);
+      setNotas(data.notas || []);
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao carregar Notas de Empenho.");
       setNotas([]);
     } finally {
       setIsLoading(false);
@@ -122,7 +108,7 @@ export default function NotasEmpenho() {
     fetchNotas();
   }, [fetchNotas]);
 
-  // Alerta de prazo: data > 60 dias atrás
+  // avisa quando a data ta passada de 60 dias
   let showAlerta = false;
   const dataPagamentoWatch = watch("dataPagamento");
   if (dataPagamentoWatch) {
@@ -143,7 +129,7 @@ export default function NotasEmpenho() {
     }
   }
 
-  // Detecção de duplicata por valor
+  // detecta se ja tem uma NE com o mesmo valor no banco (possivel duplicata)
   const valorNEWatch = watch("valorNE");
   const getDuplicatedNE = () => {
     if (!valorNEWatch) return null;
@@ -159,12 +145,14 @@ export default function NotasEmpenho() {
     reset({
       codigoNE: ne.codigo,
       numeroNE: ne.numero,
-      dataPagamento: ne.dataPagamento || "",
+      dataPagamento: ne.dataPagamento ? ne.dataPagamento.split('T')[0] : "",
       valorNE: String(ne.valor),
       unidadeOrcamentaria: ne.unidadeOrcamentaria || "",
       elementoSubelemento: ne.elementoSubelemento || "",
       gestao: ne.gestao || "",
       historico: ne.historico || "",
+      dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",
+      dataEmissao: ne.dataEmissao ? ne.dataEmissao.split('T')[0] : "",
     });
     setEditingId(ne.id);
     toast.success("Dados preenchidos com base na NE " + ne.numero);
@@ -178,10 +166,12 @@ export default function NotasEmpenho() {
       numeroNE: "",
       valorNE: "",
       dataPagamento: "",
-      unidadeOrcamentaria: "",
+      unidadeOrcamentaria: "Secretaria de Educação",
       elementoSubelemento: "",
-      gestao: "",
+      gestao: "140101",
       historico: "",
+      dataProvisaoConcedida: "",
+      dataEmissao: "",
     });
     setEditingId(null);
   };
@@ -196,36 +186,23 @@ export default function NotasEmpenho() {
       elementoSubelemento: data.elementoSubelemento,
       gestao: data.gestao,
       historico: data.historico,
+      dataProvisaoConcedida: data.dataProvisaoConcedida || null,
+      dataEmissao: data.dataEmissao || null,
       status: "EMITIDO",
     };
 
     try {
-      let res: Response;
       if (editingId) {
-        res = await fetch(`/api/notas-empenho/${editingId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        await apiClient.put(`/api/notas-empenho/${editingId}`, payload);
       } else {
-        res = await fetch("/api/notas-empenho", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      }
-
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Erro ao salvar NE.");
-        return;
+        await apiClient.post("/api/notas-empenho", payload);
       }
 
       toast.success(editingId ? "NE atualizada com sucesso!" : "NE cadastrada com sucesso!");
       handleIncluir();
       await fetchNotas();
-    } catch {
-      toast.error("Erro de conexão com o servidor.");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao salvar NE.");
     }
   };
 
@@ -235,17 +212,12 @@ export default function NotasEmpenho() {
       return;
     }
     try {
-      const res = await fetch(`/api/notas-empenho/${editingId}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || "Erro ao cancelar NE.");
-        return;
-      }
+      await apiClient.delete(`/api/notas-empenho/${editingId}`);
       toast.success("NE cancelada com sucesso!");
       handleIncluir();
       await fetchNotas();
-    } catch {
-      toast.error("Erro de conexão com o servidor.");
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao cancelar NE.");
     }
   };
 
@@ -290,7 +262,7 @@ export default function NotasEmpenho() {
               onClick={handleIncluir}
               className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2"
             >
-              <Plus className="w-4 h-4" /> Incluir
+              <Plus className="w-4 h-4" /> Limpar
             </button>
             <button 
               onClick={handleSalvar}
@@ -376,13 +348,72 @@ export default function NotasEmpenho() {
               <input
                 type="text"
                 placeholder="0,00"
-                {...register("valorNE")}
+                {...register("valorNE", {
+                  onChange: (e) => {
+                    e.target.value = maskCurrency(e.target.value);
+                  }
+                })}
                 className={`w-full px-4 py-3 rounded-xl border text-sm font-black focus:outline-none focus:ring-4 transition-all duration-300 ${errors.valorNE ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20 text-red-700' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-800'}`}
               />
               {errors.valorNE && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.valorNE.message as string}</p>}
             </div>
             
             <div>
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Data de Provisão
+              </label>
+              <input
+                type="date"
+                {...register("dataProvisaoConcedida")}
+                className={`w-full px-4 py-3 rounded-xl border text-sm font-bold text-slate-500 focus:outline-none focus:ring-4 transition-all duration-300 ${errors.dataProvisaoConcedida ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10'}`}
+              />
+              {errors.dataProvisaoConcedida && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataProvisaoConcedida.message as string}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Data de Emissão
+              </label>
+              <input
+                type="date"
+                {...register("dataEmissao")}
+                className={`w-full px-4 py-3 rounded-xl border text-sm font-bold text-slate-500 focus:outline-none focus:ring-4 transition-all duration-300 ${errors.dataEmissao ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10'}`}
+              />
+              {errors.dataEmissao && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataEmissao.message as string}</p>}
+            </div>
+
+            <div className="md:col-span-1">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Unidade Orçamentária</label>
+              <select
+                {...register("unidadeOrcamentaria")}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
+              >
+                <option value="Secretaria de Educação">Secretaria de Educação</option>
+                <option value="Sec. Saúde">Sec. Saúde</option>
+                <option value="Sec. Administração">Sec. Administração</option>
+                <option value="Sec. Finanças">Sec. Finanças</option>
+                <option value="Sec. Obras">Sec. Obras</option>
+              </select>
+            </div>
+            <div className="md:col-span-1">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Elemento/Subelemento</label>
+              <input
+                type="text"
+                placeholder="Ex: 3.3.90.30/01"
+                {...register("elementoSubelemento")}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+            </div>
+            <div className="md:col-span-1">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Gestão</label>
+              <select
+                {...register("gestao")}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
+              >
+                <option value="140101">140101</option>
+                <option value="140102">140102</option>
+              </select>
+            </div>
+            <div className="md:col-span-1">
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Data de Pagamento
               </label>
@@ -392,28 +423,6 @@ export default function NotasEmpenho() {
                 className={`w-full px-4 py-3 rounded-xl border text-sm font-bold text-slate-500 focus:outline-none focus:ring-4 transition-all duration-300 ${errors.dataPagamento ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10'}`}
               />
               {errors.dataPagamento && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataPagamento.message as string}</p>}
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Unidade Orçamentária</label>
-              <select
-                {...register("unidadeOrcamentaria")}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
-              >
-                <option value="">Selecione a Unidade</option>
-                <option value="Sec. Saúde">Sec. Saúde</option>
-                <option value="Sec. Educação">Sec. Educação</option>
-              </select>
-            </div>
-            <div className="md:col-span-1">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Gestão</label>
-              <select
-                {...register("gestao")}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
-              >
-                <option value="">Selecione a Gestão</option>
-                <option value="140101">140101</option>
-                <option value="140102">140102</option>
-              </select>
             </div>
 
             <div className="md:col-span-4">
@@ -532,11 +541,13 @@ export default function NotasEmpenho() {
                                 codigoNE: ne.codigo,
                                 numeroNE: ne.numero,
                                 valorNE: String(ne.valor),
-                                dataPagamento: ne.dataPagamento,
+                                dataPagamento: ne.dataPagamento ? ne.dataPagamento.split('T')[0] : "",
                                 unidadeOrcamentaria: ne.unidadeOrcamentaria,
                                 elementoSubelemento: ne.elementoSubelemento,
                                 gestao: ne.gestao,
                                 historico: ne.historico,
+                                dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",
+                                dataEmissao: ne.dataEmissao ? ne.dataEmissao.split('T')[0] : "",
                               });
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}

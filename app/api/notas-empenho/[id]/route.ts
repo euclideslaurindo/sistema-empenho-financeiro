@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pool } from '@/lib/db';
+import { query, withTransaction } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 
 // PUT /api/notas-empenho/[id] — atualiza NE com validação de saldo
@@ -10,7 +10,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    const { codigo, numero, valor, dataPagamento, unidadeOrcamentaria, elementoSubelemento, gestao, historico, status } = body;
+    const { codigo, numero, valor, dataPagamento, unidadeOrcamentaria, elementoSubelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao } = body;
 
     const valorDecimal = parseFloat(String(valor).replace(',', '.')) || 0;
 
@@ -18,15 +18,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'O valor da NE deve ser maior que zero.' }, { status: 400 });
     }
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
+    await withTransaction(async (connection) => {
       // Pega o valor antigo da NE
       const [neRows]: any = await connection.execute('SELECT valor, unidade_orcamentaria FROM notas_empenho WHERE id = ? FOR UPDATE', [id]);
       if (!neRows || neRows.length === 0) {
-        await connection.rollback(); connection.release();
-        return NextResponse.json({ error: 'Nota de empenho não encontrada.' }, { status: 404 });
+        throw new Error('Nota de empenho não encontrada.');
       }
 
       const valorAntigo = parseFloat(neRows[0].valor);
@@ -43,36 +39,39 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       const totalPago = parseFloat(opSum[0]?.total_pago || 0);
 
       if (valorDecimal < totalPago) {
-        await connection.rollback(); connection.release();
-        return NextResponse.json(
-          { error: `Não é possível reduzir o valor da NE para R$ ${valorDecimal.toFixed(2)} pois já foram geradas OPs no valor total de R$ ${totalPago.toFixed(2)}.` },
-          { status: 409 }
-        );
+        throw new Error(`Não é possível reduzir o valor da NE para R$ ${valorDecimal.toFixed(2)} pois já foram geradas OPs no valor total de R$ ${totalPago.toFixed(2)}.`);
       }
 
       // Validação de dotação orçamentária (MOCK): Removida porque a tabela não existe.
 
+      let usuarioId: string | null = user.id;
+      try {
+        const userCheck: any = await connection.execute('SELECT id FROM usuarios WHERE id = ?', [usuarioId]);
+        if (!userCheck || !userCheck[0] || userCheck[0].length === 0) usuarioId = null;
+      } catch {
+        usuarioId = null;
+      }
+
       await connection.execute(
         `UPDATE notas_empenho
-         SET codigo = ?, numero = ?, valor = ?, data_pagamento = ?,
+         SET codigo = ?, numero = ?, valor = ?, data_pagamento = ?, data_provisao_concedida = ?, data_emissao = ?,
              unidade_orcamentaria = ?, elemento_subelemento = ?, gestao = ?, status = ?, historico = ?, usuario_id = ?
          WHERE id = ?`,
-        [codigo?.trim() || '', numero?.trim() || '', valorDecimal, dataPagamento || null,
+        [codigo?.trim() || '', numero?.trim() || '', valorDecimal, dataPagamento || null, dataProvisaoConcedida || null, dataEmissao || null,
          unidadeOrcamentaria?.trim() || '', elementoSubelemento?.trim() || '',
-         gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', user.id, id]
+         gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', usuarioId, id]
       );
+    });
 
-      await connection.commit();
-      connection.release();
-
-      return NextResponse.json({ success: true });
-    } catch (err) {
-      await connection.rollback();
-      connection.release();
-      throw err;
-    }
+    return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('[API PUT /notas-empenho/[id]] Erro:', error);
+    if (error.message.includes('Não é possível reduzir')) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    if (error.message === 'Nota de empenho não encontrada.') {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     return NextResponse.json({ error: 'Erro ao atualizar nota de empenho.' }, { status: 500 });
   }
 }
@@ -85,15 +84,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const { id } = await params;
 
-    const connection = await pool.getConnection();
-    await connection.beginTransaction();
-
-    try {
+    await withTransaction(async (connection) => {
       // Pega info da NE para estorno
       const [neRows]: any = await connection.execute('SELECT valor, unidade_orcamentaria FROM notas_empenho WHERE id = ? FOR UPDATE', [id]);
       if (!neRows || neRows.length === 0) {
-        await connection.rollback(); connection.release();
-        return NextResponse.json({ error: 'Nota de empenho não encontrada.' }, { status: 404 });
+        throw new Error('Nota de empenho não encontrada.');
       }
 
       // Bloqueia cancelamento se existem OPs vinculadas
@@ -106,28 +101,23 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
       const totalOps = parseInt(opsVinculadas[0]?.total || 0);
       if (totalOps > 0) {
-        await connection.rollback(); connection.release();
-        return NextResponse.json(
-          { error: `Não é possível cancelar esta NE pois existem ${totalOps} ordem(ns) de pagamento vinculada(s). Exclua as OPs primeiro.` },
-          { status: 409 }
-        );
+        throw new Error(`Não é possível cancelar esta NE pois existem ${totalOps} ordem(ns) de pagamento vinculada(s). Exclua as OPs primeiro.`);
       }
 
       // Estorno (MOCK): A tabela de dotação não existe.
 
       await connection.execute("UPDATE notas_empenho SET status = 'CANCELADO' WHERE id = ?", [id]);
-      
-      await connection.commit();
-      connection.release();
+    });
 
-      return NextResponse.json({ success: true });
-    } catch (err) {
-      await connection.rollback();
-      connection.release();
-      throw err;
-    }
+    return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('[API DELETE /notas-empenho/[id]] Erro:', error);
+    if (error.message.includes('Não é possível cancelar')) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
+    if (error.message === 'Nota de empenho não encontrada.') {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
     return NextResponse.json({ error: 'Erro ao cancelar nota de empenho.' }, { status: 500 });
   }
 }
