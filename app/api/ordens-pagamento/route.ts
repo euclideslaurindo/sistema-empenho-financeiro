@@ -5,15 +5,14 @@ import { z } from 'zod';
 
 const ordemPagamentoSchema = z.object({
   liquidacao_id: z.string().optional().nullable(),
-  numeroNe: z.string().min(1, 'Número da NE é obrigatório.'),
+  numeroNe: z.string().optional(), // Antigo OP (ignorado pelo backend agora)
   numeroCheque: z.string().optional().nullable(),
   valorPagamento: z.union([z.string(), z.number()]).transform(val => {
-    if (typeof val === 'string') {
-      return parseFloat(val.replace(',', '.')) || 0;
-    }
-    return val;
+    if (typeof val === 'number') return val;
+    // Remove separadores de milhar (pontos) ANTES de trocar vírgula por ponto decimal
+    return parseFloat(String(val).replace(/\./g, '').replace(',', '.')) || 0;
   }).refine(val => val > 0, { message: 'O valor do pagamento deve ser maior que zero.' }),
-  numeroEmpenho: z.string().optional(),
+  numeroEmpenho: z.string().min(1, 'O número da Nota de Empenho é obrigatório.'), // Agora é a NE
   sub: z.string().optional(),
   credorNome: z.string().optional(),
   credorCpfCnpj: z.string().optional(),
@@ -123,7 +122,12 @@ export async function POST(request: NextRequest) {
       numeroCheque, dataEmissao, dataPagamento,
     } = parsed.data;
 
-    const toDecimal = (v: any) => parseFloat(String(v || 0).replace(',', '.')) || 0;
+    // Converte de forma segura: remove pontos de milhar, troca vírgula por ponto
+    const toDecimal = (v: any): number => {
+      if (typeof v === 'number') return isNaN(v) ? 0 : v;
+      const clean = String(v || 0).replace(/\./g, '').replace(',', '.');
+      return parseFloat(clean) || 0;
+    };
 
     const result = await withTransaction(async (connection) => {
       // checa se esse numero de cheque ja foi usado
@@ -138,20 +142,27 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // numeroEmpenho vindo do payload (frontend) é na verdade o número da NE.
+      const neReal = numeroEmpenho?.trim() || '';
+
+      if (!neReal) {
+        return { error: 'O número da Nota de Empenho é obrigatório.', status: 400 };
+      }
+
       // busca a NE pra saber quanto de saldo sobrou
       const [neRows]: any = await connection.execute(
         'SELECT id, valor FROM notas_empenho WHERE numero = ?',
-        [numeroNe.trim()]
+        [neReal]
       );
       if (!neRows || neRows.length === 0) {
-        return { error: `NE "${numeroNe}" não encontrada.`, status: 404 };
+        return { error: `NE "${neReal}" não encontrada.`, status: 404 };
       }
       const valorNe = parseFloat(neRows[0].valor) || 0;
 
       // soma tudo que ja foi pago nessa NE
       const [paidRows]: any = await connection.execute(
         'SELECT COALESCE(SUM(valor_pagamento), 0) as total_pago FROM ordens_pagamento WHERE numero_ne = ?',
-        [numeroNe.trim()]
+        [neReal]
       );
       const totalJaPago = parseFloat(paidRows[0]?.total_pago) || 0;
       const saldoDisponivel = valorNe - totalJaPago;
@@ -163,6 +174,23 @@ export async function POST(request: NextRequest) {
           status: 422
         };
       }
+
+      // Gera o número da OP sequencial
+      const anoAtual = new Date().getFullYear();
+      const [countOp]: any = await connection.execute(
+        'SELECT COUNT(*) as count FROM ordens_pagamento WHERE numero_empenho LIKE ?',
+        [`${anoAtual}.OP.%`]
+      );
+      const nextOpNumber = Number(countOp[0].count || 0) + 1;
+      const numeroDaOpGerado = `${anoAtual}.OP.${String(nextOpNumber).padStart(4, '0')}`;
+
+      // Calcula o sub-empenho automaticamente para esta NE
+      const [countSub]: any = await connection.execute(
+        'SELECT COUNT(*) as count FROM ordens_pagamento WHERE numero_ne = ?',
+        [neReal]
+      );
+      const nextSub = Number(countSub[0].count || 0) + 1;
+      const subGerado = String(nextSub).padStart(2, '0');
 
       // tudo ok, insere a OP
       const id = crypto.randomUUID();
@@ -177,7 +205,7 @@ export async function POST(request: NextRequest) {
           numero_cheque, data_emissao, data_pagamento, usuario_id
         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
-          id, liquidacao_id || null, numeroNe.trim(), numeroEmpenho?.trim() || '', sub?.trim() || '01',
+          id, liquidacao_id || null, neReal, numeroDaOpGerado, subGerado,
           credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
           unidadeOrcamentaria || '', elementoSubelemento || '', gestao || '', historico || '',
           itemUnidade || 'UN', toDecimal(itemQuantidade), toDecimal(itemValorUnitario),
@@ -189,12 +217,16 @@ export async function POST(request: NextRequest) {
         ]
       );
 
-      // muda o status da NE: se zerou vira LIQUIDADO, se ainda tem saldo fica EMITIDO
+      // Atualiza status da NE: LIQUIDADO (zerou), PARCIALMENTE PAGO (pagamento parcial) ou EMITIDO
       const saldoRestante = saldoDisponivel - vPagamento;
-      const novoStatus = saldoRestante <= 0.01 ? 'LIQUIDADO' : 'EMITIDO';
+      const novoStatus = saldoRestante <= 0.01
+        ? 'LIQUIDADO'
+        : saldoRestante < valorNe
+          ? 'PARCIALMENTE PAGO'
+          : 'EMITIDO';
       await connection.execute(
         'UPDATE notas_empenho SET status = ? WHERE numero = ?',
-        [novoStatus, numeroNe.trim()]
+        [novoStatus, neReal]
       );
 
       return { success: true, id, saldoRestante, status: 201 };

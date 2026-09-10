@@ -995,7 +995,10 @@ export default function ConsultaImpressao() {
   const [opList, setOpList] = useState<any[]>([]);
   const [selectedOps, setSelectedOps] = useState<Record<string, boolean>>({});
 
-
+  // lista de OPs vinculadas para o modo de consulta individual
+  const [opListSingle, setOpListSingle] = useState<any[]>([]);
+  const [selectedOpsSingle, setSelectedOpsSingle] = useState<Record<string, boolean>>({});
+  const [isBuscandoSingle, setIsBuscandoSingle] = useState(false);
 
   const [showNeModal, setShowNeModal] = useState(false);
   const [searchNeQuery, setSearchNeQuery] = useState("");
@@ -1353,25 +1356,37 @@ export default function ConsultaImpressao() {
     let allDocs: any[] = [];
     
     if (searchMode === "single") {
-      const formattedNe = (batchInput.trim() || "2026NE000123").toUpperCase();
+      const formattedNe = (batchInput.trim() || "").toUpperCase();
+      if (!formattedNe) { toast.error("Informe o número do Empenho."); return; }
       const match = formattedNe.match(/^(\d{4})NE/i);
       const ano = match ? match[1] : frenteData.emissaoAno;
-      let neDB: any = null;
-      try {
-        const neData = await apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(formattedNe)}`);
-        if (neData && neData.ne) neDB = neData.ne;
-      } catch (e) {
-        console.error("Erro na busca da NE", e);
-      }
 
-      const finalNome = frenteData.credorNome;
-      const finalCpf = frenteData.credorCpfCnpj;
-      const finalEndereco = frenteData.credorEndereco;
-      const finalValor = neDB ? neDB.valor : parseFloat(frenteData.valorEmpenho.replace(',','.'));
-      const finalGestao = neDB ? neDB.gestao : frenteData.gestaoUE;
-      const finalUnidade = neDB ? neDB.unidadeOrcamentaria : frenteData.unidadeOrcamentaria;
-      const finalElemento = neDB ? neDB.elementoSubelemento : frenteData.elementoSubelemento;
-      const finalHistorico = neDB ? neDB.historico : frenteData.especificacao;
+      // modo individual: verifica se existem OPs vinculadas e usa as selecionadas
+      const opsParaGerar = opListSingle.filter(op => selectedOpsSingle[op.id]);
+
+      if (opsParaGerar.length > 0) {
+        // tem OPs salvas selecionadas: gera documentos com os dados delas
+        opsParaGerar.forEach((op, opIndex) => {
+          allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex));
+        });
+      } else {
+        // nenhuma OP salva selecionada: gera documento em branco baseado na NE
+        let neDB: any = null;
+        try {
+          const neData = await apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(formattedNe)}`);
+          if (neData && neData.ne) neDB = neData.ne;
+        } catch (e) {
+          console.error("Erro na busca da NE", e);
+        }
+
+        const finalNome = frenteData.credorNome;
+        const finalCpf = frenteData.credorCpfCnpj;
+        const finalEndereco = frenteData.credorEndereco;
+        const finalValor = neDB ? neDB.valor : parseFloat(frenteData.valorEmpenho.replace(',','.'));
+        const finalGestao = neDB ? neDB.gestao : frenteData.gestaoUE;
+        const finalUnidade = neDB ? neDB.unidadeOrcamentaria : frenteData.unidadeOrcamentaria;
+        const finalElemento = neDB ? neDB.elementoSubelemento : frenteData.elementoSubelemento;
+        const finalHistorico = neDB ? neDB.historico : frenteData.especificacao;
 
         const valorFormatado = Number(finalValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
         const vExtenso = numeroPorExtenso(Number(finalValor));
@@ -1405,6 +1420,7 @@ export default function ConsultaImpressao() {
             descontosExtenso: dExtenso,
           },
         });
+      }
     } else {
       // modo lote: pega apenas as ops selecionadas na lista
       const selectedOpData = opList.filter(op => selectedOps[op.id]);
@@ -1499,12 +1515,88 @@ export default function ConsultaImpressao() {
                       </div>
                     </div>
                     <button
-                      onClick={gerarLote}
-                      className="bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 text-white font-bold py-4 px-8 rounded-lg text-sm hover:bg-gradient-to-r from-blue-800 to-blue-900 text-white shadow-lg shadow-blue-900/30 ring-1 ring-white/20 transition-all flex justify-center items-center h-[54px] shadow-sm hover:shadow-md active:scale-[0.98]"
+                      onClick={async () => {
+                        if (!batchInput.trim()) { toast.error("Informe o número do Empenho."); return; }
+                        setIsBuscandoSingle(true);
+                        try {
+                          const formattedNe = batchInput.trim().toUpperCase();
+                          const data = await apiClient.get(`/api/ordens-pagamento?numeroNe=${encodeURIComponent(formattedNe)}`);
+                          if (data && data.ordens && data.ordens.length > 0) {
+                            setOpListSingle(data.ordens);
+                            const newSel: Record<string, boolean> = {};
+                            data.ordens.forEach((op: any) => newSel[op.id] = true);
+                            setSelectedOpsSingle(newSel);
+                            toast.success(`${data.ordens.length} OP(s) encontrada(s). Selecione e clique em Gerar.`);
+                          } else {
+                            setOpListSingle([]);
+                            setSelectedOpsSingle({});
+                            toast.info("Nenhuma OP encontrada para esta NE. Você pode gerar um documento em branco.");
+                          }
+                        } catch (e: any) {
+                          toast.error(e.message || "Erro ao buscar OPs.");
+                        } finally {
+                          setIsBuscandoSingle(false);
+                        }
+                      }}
+                      className="bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 text-white font-bold py-4 px-8 rounded-lg text-sm hover:opacity-90 transition-all flex justify-center items-center h-[54px] shadow-sm hover:shadow-md active:scale-[0.98]"
                     >
-                      <Search className="w-4 h-4 mr-2" /> CONSULTAR
+                      {isBuscandoSingle ? <span className="animate-pulse">Buscando...</span> : <><Search className="w-4 h-4 mr-2" /> CONSULTAR</>}
                     </button>
                   </div>
+
+                  {/* Lista de OPs encontradas no modo individual */}
+                  {opListSingle.length > 0 && (
+                    <div className="mt-2 p-4 border border-emerald-200 rounded-lg bg-emerald-50">
+                      <div className="flex justify-between items-center mb-3 pb-2 border-b border-emerald-200">
+                        <span className="text-sm font-bold text-emerald-800">OPs encontradas para esta NE ({opListSingle.length})</span>
+                        <button
+                          className="text-xs text-blue-600 hover:underline font-semibold"
+                          onClick={() => {
+                            const allSel = Object.values(selectedOpsSingle).every(v => v);
+                            const newSel: Record<string, boolean> = {};
+                            opListSingle.forEach(op => newSel[op.id] = !allSel);
+                            setSelectedOpsSingle(newSel);
+                          }}
+                        >
+                          {Object.values(selectedOpsSingle).every(v => v) ? 'Desmarcar Todos' : 'Selecionar Todos'}
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
+                        {opListSingle.map((op: any) => (
+                          <label key={op.id} className="flex items-center gap-3 p-3 bg-white border border-emerald-200 rounded-lg cursor-pointer hover:border-emerald-400 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!selectedOpsSingle[op.id]}
+                              onChange={(e) => setSelectedOpsSingle({ ...selectedOpsSingle, [op.id]: e.target.checked })}
+                              className="w-4 h-4 text-emerald-600 rounded"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-slate-800">
+                                {op.sub ? `Parcela /${op.sub}` : 'Principal'} — R$ {Number(op.valorPagamento).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </span>
+                              <span className="text-[10px] text-zinc-500 truncate max-w-[200px]">{op.credorNome}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      <button
+                        onClick={gerarLote}
+                        className="w-full bg-gradient-to-r from-emerald-700 to-emerald-800 text-white font-bold py-3 px-8 rounded-lg text-sm hover:opacity-90 transition-all flex justify-center items-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" /> GERAR DOCUMENTO(S) SELECIONADO(S)
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Botão para gerar documento em branco (mesmo sem OPs) */}
+                  {batchInput.trim() && (
+                    <button
+                      onClick={gerarLote}
+                      className="w-full bg-gradient-to-r from-slate-600 to-slate-700 text-white font-bold py-3 px-8 rounded-lg text-sm hover:opacity-90 transition-all flex justify-center items-center gap-2 mt-1"
+                    >
+                      <FileText className="w-4 h-4" /> Gerar Documento em Branco
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col gap-4">

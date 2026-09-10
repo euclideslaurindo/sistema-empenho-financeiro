@@ -21,6 +21,7 @@ update-db.ts
 *.csv
 RESUMO_IA.md
 CONTEXTO_PROJETO.md
+scripts/tests/
 test*.js
 test*.ts
 parse_excel.js
@@ -28,4 +29,3 @@ get_ip.js
 setup_db.js
 remove-mocks.js
 update_colors*.js
-

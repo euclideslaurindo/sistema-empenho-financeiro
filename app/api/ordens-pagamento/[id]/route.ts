@@ -70,7 +70,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       numeroCheque, dataEmissao, dataPagamento, historico
     } = body;
 
-    const toDecimal = (v: any) => parseFloat(String(v || 0).replace(',', '.')) || 0;
+    // Converte de forma segura: remove pontos de milhar, troca vírgula por ponto
+    const toDecimal = (v: any): number => {
+      if (typeof v === 'number') return isNaN(v) ? 0 : v;
+      const clean = String(v || 0).replace(/\./g, '').replace(',', '.');
+      return parseFloat(clean) || 0;
+    };
     const vPagamento = toDecimal(valorPagamento);
 
     await withTransaction(async (conn: PoolConnection) => {
@@ -108,7 +113,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamento,
           toDecimal(irrf), toDecimal(iss), toDecimal(inss), toDecimal(sestSenat), toDecimal(patronal),
           toDecimal(outrosDescontos), toDecimal(totalDescontos), toDecimal(valorLiquido),
-          numeroCheque.trim(), dataEmissao || null, dataPagamento || null, historico || '', user.id, id
+          numeroCheque ? numeroCheque.trim() : null, dataEmissao || null, dataPagamento || null, historico || '', user.id, id
         ]
       );
 

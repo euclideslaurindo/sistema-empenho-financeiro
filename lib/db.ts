@@ -17,7 +17,13 @@ declare global {
   var _mysqlPool: mysql.Pool | undefined;
 }
 
-export const pool = globalThis._mysqlPool || mysql.createPool({ ...dbConfig, connectionLimit: 3 });
+const isDev = process.env.NODE_ENV !== 'production';
+export const pool = globalThis._mysqlPool || mysql.createPool({ 
+  ...dbConfig, 
+  connectionLimit: isDev ? 5 : 50,
+  maxIdle: isDev ? 5 : 50,
+  idleTimeout: 30000 
+});
 if (process.env.NODE_ENV !== 'production') {
   globalThis._mysqlPool = pool;
 }

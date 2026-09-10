@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       SELECT id, cpf_cnpj as cpfCnpj, nome, rg, orgao_emissor as orgaoEmissor,
              endereco, cep, logradouro, numero, bairro,
              pis, data_expedicao as dataExpedicao,
-             cidade, uf, telefone, banco, agencia, conta_corrente as contaCorrente
+             cidade, uf, telefone, banco, agencia, conta_corrente as contaCorrente, pix
       FROM credores
       WHERE ativo = 1`;
     const params: any[] = [];
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     const {
       cpfCnpj, nome, rg, orgaoEmissor, pis, dataExpedicao,
       endereco, cep, logradouro, numero, bairro, cidade, uf, telefone,
-      banco, agencia, contaCorrente
+      banco, agencia, contaCorrente, pix
     } = body;
 
     if (!cpfCnpj || !nome) {
@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
     const id = crypto.randomUUID();
 
     await query(
-      `INSERT INTO credores (id, cpf_cnpj, nome, rg, orgao_emissor, pis, data_expedicao, endereco, cep, logradouro, numero, bairro, cidade, uf, telefone, banco, agencia, conta_corrente, usuario_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO credores (id, cpf_cnpj, nome, rg, orgao_emissor, pis, data_expedicao, endereco, cep, logradouro, numero, bairro, cidade, uf, telefone, banco, agencia, conta_corrente, pix, usuario_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         cpfCnpj.trim(),
@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
         banco?.trim() || null,
         agencia?.trim() || null,
         contaCorrente?.trim() || null,
+        pix?.trim() || null,
         usuarioId
       ]
     );

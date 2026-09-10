@@ -32,6 +32,7 @@ interface Credor {
   banco?: string;
   agencia?: string;
   contaCorrente?: string;
+  pix?: string;
 }
 
 export default function Credores() {
@@ -397,7 +398,7 @@ export default function Credores() {
               />
             </div>
 
-            <div className="col-span-12 md:col-span-2">
+            <div className="col-span-12 md:col-span-3">
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Agência
               </label>
@@ -419,6 +420,19 @@ export default function Credores() {
                 placeholder="00000-0"
                 value={formData.contaCorrente || ""}
                 onChange={(e) => handleChange("contaCorrente", e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+            </div>
+            
+            <div className="col-span-12 md:col-span-4">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Chave Pix
+              </label>
+              <input
+                type="text"
+                placeholder="CPF, CNPJ, E-mail ou Celular"
+                value={formData.pix || ""}
+                onChange={(e) => handleChange("pix", e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
               />
             </div>

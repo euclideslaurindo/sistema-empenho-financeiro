@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
          AND status != 'CANCELADO'`
     );
 
-    // Total a pagar: soma de NEs com status EMITIDO (pendentes de pagamento) menos OPs pagas
+    // Total a pagar: saldo restante de NEs pendentes (EMITIDO ou PARCIALMENTE PAGO)
     const [pagamentosPendentes] = await query<any[]>(
       `SELECT COALESCE(SUM(ne.valor - COALESCE(op_sum.total_pago, 0)), 0) as total
        FROM notas_empenho ne
@@ -38,10 +38,10 @@ export async function GET(request: NextRequest) {
          FROM ordens_pagamento
          GROUP BY numero_ne
        ) op_sum ON op_sum.numero_ne = ne.numero
-       WHERE ne.status = 'EMITIDO'`
+       WHERE ne.status IN ('EMITIDO', 'PARCIALMENTE PAGO')`
     );
 
-    // Total pago mês anterior para variação
+    // Total pago mês anterior para variação (mesmo critério)
     const [pagamentosMesAnterior] = await query<any[]>(
       `SELECT COALESCE(SUM(ne.valor - COALESCE(op_sum.total_pago, 0)), 0) as total
        FROM notas_empenho ne
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
          WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
          GROUP BY numero_ne
        ) op_sum ON op_sum.numero_ne = ne.numero
-       WHERE ne.status = 'EMITIDO' 
+       WHERE ne.status IN ('EMITIDO', 'PARCIALMENTE PAGO')
          AND ne.created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`
     );
 
