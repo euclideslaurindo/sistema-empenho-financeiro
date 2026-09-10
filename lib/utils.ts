@@ -5,13 +5,39 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Formata um valor para moeda brasileira (BRL).
+ * - Se receber um NUMBER, trata como reais (ex: 1500 → "1.500,00").
+ * - Se receber uma STRING (do onChange de input), trata como centavos sendo digitados
+ *   (ex: "150000" → "1.500,00"), seguindo o padrão de máscara BR.
+ */
 export function maskCurrency(value: string | number): string {
-  let v = String(value).replace(/\D/g, '');
-  if (!v) return '';
-  v = (parseInt(v, 10) / 100).toFixed(2);
-  v = v.replace(".", ",");
-  v = v.replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
-  return v;
+  let centavosStr: string;
+  if (typeof value === 'number') {
+    // Número em reais → converte para centavos inteiros
+    if (!isFinite(value) || isNaN(value)) return '';
+    centavosStr = String(Math.round(value * 100));
+  } else {
+    // String digitada pelo usuário → remove tudo que não é dígito
+    centavosStr = String(value).replace(/\D/g, '');
+  }
+  if (!centavosStr || centavosStr === '0') return '';
+  const num = parseInt(centavosStr, 10) / 100;
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * Converte string de moeda BR mascarada ou number para float.
+ * Ex: "1.500,00" → 1500, "10.000,50" → 10000.5, 1500 → 1500
+ * Seguro contra NaN: retorna 0 para entradas inválidas.
+ */
+export function parseFormNumber(val: any): number {
+  if (val === null || val === undefined || val === '') return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  // Remove separadores de milhar (ponto) e troca vírgula decimal por ponto
+  const clean = String(val).replace(/\./g, '').replace(',', '.');
+  const parsed = parseFloat(clean);
+  return isNaN(parsed) ? 0 : parsed;
 }
 
 export function numeroPorExtenso(numero: number): string {

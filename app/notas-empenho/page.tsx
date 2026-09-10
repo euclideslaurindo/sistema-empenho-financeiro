@@ -26,7 +26,8 @@ interface NotaEmpenho {
   valor: number;
   dataPagamento: string;
   unidadeOrcamentaria: string;
-  elementoSubelemento: string;
+  elemento: string;
+  subelemento: string;
   gestao: string;
   status: string;
   historico: string;
@@ -35,7 +36,6 @@ interface NotaEmpenho {
 }
 
 const notaEmpenhoSchema = z.object({
-  codigoNE: z.string().min(1, "Código é obrigatório"),
   numeroNE: z.string().min(1, "Número da NE é obrigatório"),
   valorNE: z.union([z.string(), z.number()]).transform(val => {
     const clean = String(val).replace(/[^\d,-]/g, '').replace(',', '.');
@@ -46,7 +46,8 @@ const notaEmpenhoSchema = z.object({
     return y >= 2000 && y <= 2100;
   }, "Ano inválido"),
   unidadeOrcamentaria: z.string().optional(),
-  elementoSubelemento: z.string().optional(),
+  elemento: z.string().optional(),
+  subelemento: z.string().optional(),
   gestao: z.string().optional(),
   historico: z.string().optional(),
   dataProvisaoConcedida: z.string().optional().refine(val => {
@@ -72,12 +73,12 @@ export default function NotasEmpenho() {
   const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<NotaEmpenhoFormValues>({
     resolver: zodResolver(notaEmpenhoSchema),
     defaultValues: {
-      codigoNE: "",
       numeroNE: "",
       valorNE: "",
       dataPagamento: "",
       unidadeOrcamentaria: "Secretaria de Educação",
-      elementoSubelemento: "",
+      elemento: "",
+      subelemento: "",
       gestao: "140101",
       historico: "",
     }
@@ -143,12 +144,12 @@ export default function NotasEmpenho() {
 
   const handleLoadDuplicate = (ne: NotaEmpenho) => {
     reset({
-      codigoNE: ne.codigo,
       numeroNE: ne.numero,
       dataPagamento: ne.dataPagamento ? ne.dataPagamento.split('T')[0] : "",
       valorNE: String(ne.valor),
       unidadeOrcamentaria: ne.unidadeOrcamentaria || "",
-      elementoSubelemento: ne.elementoSubelemento || "",
+      elemento: ne.elemento || "",
+      subelemento: ne.subelemento || "",
       gestao: ne.gestao || "",
       historico: ne.historico || "",
       dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",
@@ -162,12 +163,12 @@ export default function NotasEmpenho() {
 
   const handleIncluir = () => {
     reset({
-      codigoNE: "",
       numeroNE: "",
       valorNE: "",
       dataPagamento: "",
       unidadeOrcamentaria: "Secretaria de Educação",
-      elementoSubelemento: "",
+      elemento: "",
+      subelemento: "",
       gestao: "140101",
       historico: "",
       dataProvisaoConcedida: "",
@@ -178,12 +179,12 @@ export default function NotasEmpenho() {
 
   const onSubmit = async (data: any) => {
     const payload = {
-      codigo: data.codigoNE,
       numero: data.numeroNE,
       valor: data.valorNE,
       dataPagamento: data.dataPagamento || null,
       unidadeOrcamentaria: data.unidadeOrcamentaria,
-      elementoSubelemento: data.elementoSubelemento,
+      elemento: data.elemento,
+      subelemento: data.subelemento,
       gestao: data.gestao,
       historico: data.historico,
       dataProvisaoConcedida: data.dataProvisaoConcedida || null,
@@ -317,30 +318,19 @@ export default function NotasEmpenho() {
           </div>
 
           <form className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div>
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
-                Código NE
-              </label>
-              <input
-                type="text"
-                placeholder="Ex: 001/2024"
-                {...register("codigoNE")}
-                className={`w-full px-4 py-3 rounded-xl border text-sm font-bold focus:outline-none focus:ring-4 transition-all duration-300 ${errors.codigoNE ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700'}`}
-              />
-              {errors.codigoNE && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.codigoNE.message as string}</p>}
-            </div>
-            <div className="md:col-span-2">
+            <div className="md:col-span-1">
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Número da NE
               </label>
               <input
                 type="text"
-                placeholder="Ex: 2024NE000123"
+                placeholder=""
                 {...register("numeroNE")}
                 className={`w-full px-4 py-3 rounded-xl border text-sm font-bold focus:outline-none focus:ring-4 transition-all duration-300 ${errors.numeroNE ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700'}`}
               />
               {errors.numeroNE && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.numeroNE.message as string}</p>}
             </div>
+
             <div>
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Valor R$
@@ -381,11 +371,12 @@ export default function NotasEmpenho() {
               {errors.dataEmissao && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataEmissao.message as string}</p>}
             </div>
 
-            <div className="md:col-span-1">
+            <div className="md:col-span-2">
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Unidade Orçamentária</label>
               <select
                 {...register("unidadeOrcamentaria")}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
+                disabled
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-100 text-sm font-bold text-slate-600 opacity-80 cursor-not-allowed"
               >
                 <option value="Secretaria de Educação">Secretaria de Educação</option>
                 <option value="Sec. Saúde">Sec. Saúde</option>
@@ -395,23 +386,34 @@ export default function NotasEmpenho() {
               </select>
             </div>
             <div className="md:col-span-1">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Elemento/Subelemento</label>
-              <input
-                type="text"
-                placeholder="Ex: 3.3.90.30/01"
-                {...register("elementoSubelemento")}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
-              />
-            </div>
-            <div className="md:col-span-1">
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Gestão</label>
               <select
                 {...register("gestao")}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
+                disabled
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-100 text-sm font-bold text-slate-600 opacity-80 cursor-not-allowed"
               >
                 <option value="140101">140101</option>
                 <option value="140102">140102</option>
               </select>
+            </div>
+            
+            <div className="md:col-span-2">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Elemento</label>
+              <input
+                type="text"
+                placeholder="Ex: 3.3.90.30"
+                {...register("elemento")}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Subelemento</label>
+              <input
+                type="text"
+                placeholder="Ex: Combustíveis e Lubrificantes"
+                {...register("subelemento")}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
             </div>
             <div className="md:col-span-1">
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
@@ -426,7 +428,7 @@ export default function NotasEmpenho() {
             </div>
 
             <div className="md:col-span-4">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Histórico</label>
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Especificação</label>
               <textarea
                 rows={3}
                 placeholder="Descreva o histórico do empenho..."
@@ -485,7 +487,7 @@ export default function NotasEmpenho() {
                   <th className="pb-4 pl-2 text-sm font-black text-slate-500 uppercase tracking-widest">Número</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Data</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Unidade/Gestão</th>
-                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Histórico</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Especificação</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Valor</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-center">Status</th>
                   <th className="pb-4 pr-2 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Ações</th>
@@ -538,12 +540,12 @@ export default function NotasEmpenho() {
                               setSelecionadoId(ne.id);
                               setEditingId(ne.id);
                               reset({
-                                codigoNE: ne.codigo,
                                 numeroNE: ne.numero,
                                 valorNE: String(ne.valor),
                                 dataPagamento: ne.dataPagamento ? ne.dataPagamento.split('T')[0] : "",
                                 unidadeOrcamentaria: ne.unidadeOrcamentaria,
-                                elementoSubelemento: ne.elementoSubelemento,
+                                elemento: ne.elemento,
+                                subelemento: ne.subelemento,
                                 gestao: ne.gestao,
                                 historico: ne.historico,
                                 dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",

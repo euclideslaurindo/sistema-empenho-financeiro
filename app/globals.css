@@ -316,4 +316,29 @@ footer, .pb-8 > p {
     background: white !important;
     display: block !important;
   }
+
+  /* Inputs e textareas do documento de impressão: sem truncamento, texto completo visível */
+  input[type="text"],
+  input[type="number"],
+  textarea {
+    overflow: visible !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    height: auto !important;
+    min-height: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    resize: none !important;
+    padding: 0 !important;
+    display: inline !important;
+  }
+
+  /* Garantir que células do documento expandam com o conteúdo */
+  .border.border-black {
+    height: auto !important;
+    min-height: 28px;
+    overflow: visible !important;
+  }
 }

@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { 
       nome, endereco, cpfCnpj, pis, rg, orgaoEmissor, dataExpedicao, 
       banco, agencia, contaCorrente, telefone, cidade, uf,
-      cep, logradouro, numero, bairro
+      cep, logradouro, numero, bairro, pix
     } = body;
 
     if (!nome || !cpfCnpj) {
@@ -46,12 +46,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await query(
       `UPDATE credores SET nome = ?, endereco = ?, cpf_cnpj = ?, pis = ?, rg = ?, orgao_emissor = ?, data_expedicao = ?,
                            cidade = ?, uf = ?, telefone = ?, banco = ?, agencia = ?, conta_corrente = ?, 
-                           cep = ?, logradouro = ?, numero = ?, bairro = ?, usuario_id = ?
+                           cep = ?, logradouro = ?, numero = ?, bairro = ?, pix = ?, usuario_id = ?
        WHERE id = ? AND ativo = 1`,
       [nome.trim(), enderecoFinal, cpfCnpj.trim(), pis?.trim() || null, rg?.trim() || 'ISENTO', orgaoEmissor?.trim() || null, dataExpFormatada,
        cidade?.trim() || null, uf?.trim() || null, telefone?.trim() || null, 
        banco?.trim() || null, agencia?.trim() || null, contaCorrente?.trim() || null, 
-       cep?.trim() || null, logradouro?.trim() || null, numero?.trim() || null, bairro?.trim() || null, usuarioId, id]
+       cep?.trim() || null, logradouro?.trim() || null, numero?.trim() || null, bairro?.trim() || null, pix?.trim() || null, usuarioId, id]
     );
 
     return NextResponse.json({ success: true });

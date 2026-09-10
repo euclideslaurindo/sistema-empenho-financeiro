@@ -10,7 +10,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { id } = await params;
     const body = await request.json();
-    const { codigo, numero, valor, dataPagamento, unidadeOrcamentaria, elementoSubelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao } = body;
+    const { numero, valor, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao } = body;
 
     const valorDecimal = parseFloat(String(valor).replace(',', '.')) || 0;
 
@@ -54,11 +54,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       await connection.execute(
         `UPDATE notas_empenho
-         SET codigo = ?, numero = ?, valor = ?, data_pagamento = ?, data_provisao_concedida = ?, data_emissao = ?,
-             unidade_orcamentaria = ?, elemento_subelemento = ?, gestao = ?, status = ?, historico = ?, usuario_id = ?
+         SET numero = ?, valor = ?, data_pagamento = ?, data_provisao_concedida = ?, data_emissao = ?,
+             unidade_orcamentaria = ?, elemento = ?, subelemento = ?, gestao = ?, status = ?, historico = ?, usuario_id = ?
          WHERE id = ?`,
-        [codigo?.trim() || '', numero?.trim() || '', valorDecimal, dataPagamento || null, dataProvisaoConcedida || null, dataEmissao || null,
-         unidadeOrcamentaria?.trim() || '', elementoSubelemento?.trim() || '',
+        [numero?.trim() || '', valorDecimal, dataPagamento || null, dataProvisaoConcedida || null, dataEmissao || null,
+         unidadeOrcamentaria?.trim() || '', elemento?.trim() || '', subelemento?.trim() || '',
          gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', usuarioId, id]
       );
     });

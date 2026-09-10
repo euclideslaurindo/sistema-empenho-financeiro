@@ -33,20 +33,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ==========================================
-    // MOCK DE LOGIN (Para testes sem Banco de Dados)
-    // ==========================================
-    const user = {
-      id: 1,
-      nome: 'Administrador (Mock)',
-      email: email,
-      perfil: 'admin',
-      ativo: true,
-      senha_hash: 'mockado'
-    };
+    // Converter o "nome" do login no mesmo formato de email fake gerado no registro
+    const normalizedUsername = email.trim().toLowerCase().replace(/\s+/g, '.');
+    const fakeEmail = `${normalizedUsername}@empenho.local`;
 
-    // Ignora a verificação real da senha por agora
-    const isPasswordValid = true;
+    // Busca o usuário pelo nome (email fake) ou pelo email exato
+    const dbUsers: any[] = await query(
+      'SELECT id, nome, email, senha_hash, perfil, ativo FROM usuarios WHERE email = ? OR email = ? LIMIT 1',
+      [fakeEmail, email]
+    );
+
+    const user = dbUsers && dbUsers.length > 0 ? dbUsers[0] : null;
+
+    if (!user) {
+      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 401 });
+    }
+
+    if (!user.ativo) {
+      return NextResponse.json({ error: 'Sua conta está desativada' }, { status: 403 });
+    }
+
+    const isPasswordValid = await bcrypt.compare(senha, user.senha_hash);
 
     if (!isPasswordValid) {
       return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 });

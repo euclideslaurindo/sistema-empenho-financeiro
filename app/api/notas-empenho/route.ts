@@ -8,14 +8,15 @@ const notaEmpenhoSchema = z.object({
   codigo: z.string().optional(),
   numero: z.string().min(1, 'Número da NE é obrigatório.'),
   valor: z.union([z.string(), z.number()]).transform(val => {
-    if (typeof val === 'string') {
-      return parseFloat(val.replace(',', '.')) || 0;
-    }
-    return val;
+    if (typeof val === 'number') return val;
+    // Remove separadores de milhar (pontos) antes de parsear
+    return parseFloat(String(val).replace(/\./g, '').replace(',', '.')) || 0;
   }).refine(val => val > 0, { message: 'O valor da NE deve ser maior que zero.' }),
   dataPagamento: z.string().optional().nullable(),
   unidadeOrcamentaria: z.string().optional(),
   elementoSubelemento: z.string().optional(),
+  elemento: z.string().optional(),
+  subelemento: z.string().optional(),
   gestao: z.string().optional(),
   historico: z.string().optional(),
   status: z.string().optional().default('EMITIDO'),
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
            DATE_FORMAT(ne.data_provisao_concedida, '%Y-%m-%d') as dataProvisaoConcedida,
            DATE_FORMAT(ne.data_emissao, '%Y-%m-%d') as dataEmissao,
            ne.unidade_orcamentaria as unidadeOrcamentaria,
-           ne.elemento_subelemento as elementoSubelemento,
+           ne.elemento, ne.subelemento,
            ne.gestao, ne.status, ne.historico,
            (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel
          FROM notas_empenho ne
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest) {
         DATE_FORMAT(ne.data_provisao_concedida, '%Y-%m-%d') as dataProvisaoConcedida,
         DATE_FORMAT(ne.data_emissao, '%Y-%m-%d') as dataEmissao,
         ne.unidade_orcamentaria as unidadeOrcamentaria,
-        ne.elemento_subelemento as elementoSubelemento,
+        ne.elemento, ne.subelemento,
         ne.gestao, ne.status, ne.historico, ne.created_at,
         (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel
       FROM notas_empenho ne
@@ -85,16 +86,16 @@ export async function GET(request: NextRequest) {
     const params: any[] = [];
 
     if (busca) {
-      sql += ' AND (ne.numero LIKE ? OR ne.codigo LIKE ?)';
-      params.push(`%${busca}%`, `%${busca}%`);
+      sql += ' AND (ne.numero LIKE ?)';
+      params.push(`%${busca}%`);
     }
 
     // contagem separada pra montar paginacao
     let countSql = `SELECT COUNT(*) as total FROM notas_empenho ne WHERE 1=1`;
     if (busca) {
-      countSql += ' AND (ne.numero LIKE ? OR ne.codigo LIKE ?)';
+      countSql += ' AND (ne.numero LIKE ?)';
     }
-    const countParams = busca ? [`%${busca}%`, `%${busca}%`] : [];
+    const countParams = busca ? [`%${busca}%`] : [];
     const countResult = await query<any[]>(countSql, countParams);
     const total = countResult[0]?.total || 0;
 
@@ -119,7 +120,7 @@ export async function POST(request: NextRequest) {
     // uso parse() em vez de safeParse() pra o zod jogar o erro direto pro withErrorHandler
     const parsed = notaEmpenhoSchema.parse(body);
 
-    const { codigo, numero, valor: valorDecimal, dataPagamento, unidadeOrcamentaria, elementoSubelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao } = parsed;
+    const { numero, valor: valorDecimal, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao } = parsed;
 
     const result = await withTransaction(async (connection) => {
     // checar se ja existe uma NE com esse numero antes de inserir
@@ -140,10 +141,10 @@ export async function POST(request: NextRequest) {
       }
 
       await connection.execute(
-        `INSERT INTO notas_empenho (id, exercicio, codigo, numero, valor, data_pagamento, data_provisao_concedida, data_emissao, unidade_orcamentaria, elemento_subelemento, gestao, status, historico, usuario_id)
+        `INSERT INTO notas_empenho (id, exercicio, numero, valor, data_pagamento, data_provisao_concedida, data_emissao, unidade_orcamentaria, elemento, subelemento, gestao, status, historico, usuario_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, exercicio, codigo?.trim() || '', numero.trim(), valorDecimal, dataPagamento || null, dataProvisaoConcedida || null, dataEmissao || null,
-         unidadeOrcamentaria?.trim() || '', elementoSubelemento?.trim() || '',
+        [id, exercicio, numero.trim(), valorDecimal, dataPagamento || null, dataProvisaoConcedida || null, dataEmissao || null,
+         unidadeOrcamentaria?.trim() || '', elemento?.trim() || '', subelemento?.trim() || '',
          gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', usuarioId]
       );
 

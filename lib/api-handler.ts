@@ -23,7 +23,7 @@ export async function withErrorHandler(
         {
           success: false,
           error: 'Dados inválidos.',
-          details: error.errors,
+          details: error.issues,
         },
         { status: 400 }
       );

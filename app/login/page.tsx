@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
-import { Lock, User, AlertCircle, Loader2, ArrowRight, Landmark } from "lucide-react";
+import { Lock, User, AlertCircle, Loader2, ArrowRight, Landmark, CheckCircle2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Login() {
+  const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [error, setError] = useState("");
@@ -25,6 +27,33 @@ export default function Login() {
         window.location.href = "/";
       } else {
         setError(data.error || "Credenciais inválidas");
+      }
+    } catch (e) {
+      setError("Erro de conexão com o servidor.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nome: email, senha }),
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        toast.success("Conta criada com sucesso! Você já pode entrar.");
+        setIsRegistering(false);
+        setSenha("");
+      } else {
+        setError(data.error || "Erro ao criar conta.");
       }
     } catch (e) {
       setError("Erro de conexão com o servidor.");
@@ -59,10 +88,10 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-5">
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">
-              E-mail ou Usuário
+              {isRegistering ? "Nome de Usuário" : "E-mail ou Usuário"}
             </label>
             <div className="relative group">
               <User className="w-[18px] h-[18px] absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors duration-200" />
@@ -71,7 +100,7 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@admin.com"
+                placeholder={isRegistering ? "ex: joao.silva" : "admin@admin.com"}
                 className="w-full pl-11 pr-4 py-3 bg-slate-50/80 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 focus:bg-white transition-all duration-200 text-slate-800 placeholder:text-slate-400"
               />
             </div>
@@ -92,18 +121,25 @@ export default function Login() {
                 className="w-full pl-11 pr-4 py-3 bg-slate-50/80 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 focus:bg-white transition-all duration-200 text-slate-800 placeholder:text-slate-400"
               />
             </div>
-            <div className="flex justify-end mt-2">
-              <a href="#" className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">Esqueceu a senha?</a>
-            </div>
+            {!isRegistering && (
+              <div className="flex justify-end mt-2">
+                <a href="#" className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">Esqueceu a senha?</a>
+              </div>
+            )}
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-gradient-to-b from-[#1e293b] to-[#0f172a] hover:from-[#334155] hover:to-[#1e293b] text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 mt-6 shadow-lg shadow-slate-900/15 group disabled:opacity-70"
+            className={`w-full bg-gradient-to-b text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 mt-6 shadow-lg shadow-slate-900/15 group disabled:opacity-70 ${isRegistering ? 'from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900' : 'from-[#1e293b] to-[#0f172a] hover:from-[#334155] hover:to-[#1e293b]'}`}
           >
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
+            ) : isRegistering ? (
+              <>
+                <CheckCircle2 className="w-4 h-4" />
+                Criar Nova Conta
+              </>
             ) : (
               <>
                 Acessar Sistema
@@ -113,7 +149,22 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+        <div className="mt-6 text-center">
+          <button 
+            type="button"
+            onClick={() => {
+              setIsRegistering(!isRegistering);
+              setError("");
+              setEmail("");
+              setSenha("");
+            }}
+            className="text-sm text-blue-600 hover:text-blue-800 font-bold transition-colors"
+          >
+            {isRegistering ? "Já tem uma conta? Fazer Login" : "Criar novo usuário (Gestor)"}
+          </button>
+        </div>
+
+        <div className="mt-6 pt-6 border-t border-slate-100 text-center">
           <p className="text-xs text-slate-400">© 2026 — Departamento Financeiro · v2.0</p>
         </div>
       </div>
