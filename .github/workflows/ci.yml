@@ -1,0 +1,35 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build & Validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Build (Type Check & Lint)
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          # Adicione aqui variáveis falsas necessárias só para o build compilar, se o next.js exigir
+          # DB_HOST: localhost
+          # JWT_SECRET: "dummy_secret_para_build"

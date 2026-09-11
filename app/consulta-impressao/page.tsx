@@ -301,7 +301,7 @@ const EmpenhoVia = ({
                   className="w-full h-full text-center outline-none bg-yellow-50 font-bold"
                 />
               ) : (
-                <span className="tracking-widest">{data.provisaoData}</span>
+                <span className="tracking-tight">{data.provisaoData}</span>
               )}
             </div>
           </div>
@@ -316,7 +316,7 @@ const EmpenhoVia = ({
                   className="w-full h-full text-center outline-none bg-yellow-50 font-bold"
                 />
               ) : (
-                <span className="tracking-widest">
+                <span className="tracking-tight">
                   {data.pagamentoData || ""}
                 </span>
               )}
@@ -543,7 +543,7 @@ const EmpenhoVia = ({
                     className="text-center outline-none bg-yellow-50 font-bold px-2 py-0.5 text-[12px] w-[85px]"
                   />
                 ) : (
-                  <span className="tracking-wider text-[12px] font-bold">{data.chequeNo}</span>
+                  <span className="tracking-tight text-[12px] font-bold">{data.chequeNo}</span>
                 )}
               </div>
             </div>
@@ -593,7 +593,7 @@ const EmpenhoVia = ({
                   className="text-center outline-none bg-yellow-50 font-bold px-2 py-0.5 text-[12px]"
                 />
               ) : (
-                <span className="tracking-wide text-[12px]">{data.recebimentoData}</span>
+                <span className="tracking-tight text-[12px]">{data.recebimentoData}</span>
               )}
             </div>
           </div>
@@ -891,7 +891,7 @@ const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
                 placeholder="Descrição do serviço prestado..."
               />
             ) : (
-              <div className="whitespace-pre-line text-left uppercase">
+              <div className="whitespace-pre-line text-left uppercase break-all">
                 {data.referenteA && !data.referenteA.toLowerCase().startsWith("pagamento referente à nota de empenho")
                   ? data.referenteA
                   : (frente?.especificacao || data.especificacao || data.referenteA || "PAGAMENTO REFERENTE À DESPESA DE SERVIÇO PRESTADO.")}
