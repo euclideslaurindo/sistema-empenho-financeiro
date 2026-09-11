@@ -19,12 +19,6 @@ mysql -u admin -p < database/database.sql
 ```
 Ou abra o arquivo `database/database.sql` no MySQL Workbench/HeidiSQL e execute.
 
-Credenciais do banco (já configuradas em `lib/db.ts`):
-- **Host:** ***REMOVIDO***
-- **Porta:** 3306
-- **Usuário:** admin
-- **Senha:** ***REMOVIDO***
-- **Banco:** empenho
 
 ### 2. Instalar dependências
 ```bash
