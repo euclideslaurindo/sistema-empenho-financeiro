@@ -231,6 +231,23 @@ export default function OrdemPagamento() {
     outrosDescontos: watch("outrosDescontos") || 0
   };
 
+  // watch reativo dos itens para calcular o total em tempo real
+  const wItens = watch("itens") || [];
+  const totalItens = wItens.reduce((acc: number, item: any) => {
+    return acc + (Number(item?.quantidade) || 0) * parseFormNumber(item?.valorUnitario);
+  }, 0);
+
+  // propaga o total dos itens para o campo valorPagamento e recalcula descontos
+  const handleConfirmarItens = () => {
+    if (totalItens <= 0) {
+      toast.error('Preencha ao menos um item com quantidade e valor unitário.');
+      return;
+    }
+    const formatado = maskCurrency(totalItens);
+    setValue('valorPagamento', formatado as any, { shouldDirty: true, shouldValidate: true });
+    toast.success(`Valor a Pagar atualizado para ${formatCurrency(totalItens)}`);
+  };
+
   useEffect(() => {
     // debounce de 350ms: so recalcula quando usuario para de digitar
     // evita valores intermediarios bugados ao apagar digito por digito
@@ -254,10 +271,11 @@ export default function OrdemPagamento() {
 
   // aceita numero opcional para evitar race condition quando chamado do selectNe
   const loadNe = async (overrideNumero?: string) => {
-    const numero = overrideNumero || watch("empenho");
-    if (!numero?.trim()) { toast.error("Digite o número da NE para buscar."); return; }
+    const raw = overrideNumero || watch("empenho");
+    const numero = raw != null ? String(raw).trim() : '';
+    if (!numero) { toast.error("Digite o número da NE para buscar."); return; }
     try {
-      const apiData = await apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(numero.trim())}`);
+      const apiData = await apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(numero)}`);
       if (apiData && apiData.ne) {
         const ne = apiData.ne;
         setValue("empenho", ne.numero);
@@ -364,8 +382,8 @@ export default function OrdemPagamento() {
         });
       }
 
-      if (totalItens > vp && totalItens > 0) {
-        toast.error(`O valor total dos itens especificados (${formatCurrency(totalItens)}) não pode ultrapassar o valor a pagar (${formatCurrency(vp)}).`);
+      if (totalItens !== vp && totalItens > 0) {
+        toast.error(`O valor total dos itens especificados (${formatCurrency(totalItens)}) deve ser exatamente igual ao valor a pagar (${formatCurrency(vp)}).`);
         setIsSaving(false);
         return;
       }
@@ -384,6 +402,7 @@ export default function OrdemPagamento() {
         elementoSubelemento: data.elementoSubelemento,
         gestao: data.gestao,
         saldoAnterior: data.saldoAnterior,
+        valorEmpenho: data.valorEmpenho,
         valorPagamento: vp,
         irrf: parseFormNumber(data.irrf),
         iss: parseFormNumber(data.iss),
@@ -436,7 +455,9 @@ export default function OrdemPagamento() {
 
   const totalDescontos = parseFormNumber(wDesc.irrf) + parseFormNumber(wDesc.iss) + parseFormNumber(wDesc.inss) + parseFormNumber(wDesc.sestSenat) + parseFormNumber(wDesc.patronal) + parseFormNumber(wDesc.outrosDescontos);
   const valorPg = parseFormNumber(wValorPagamento);
-  const liquidoOrdem = valorPg - totalDescontos;
+  // usa o total dos itens como base se estiver preenchido, caso contrário usa valorPagamento
+  const baseCalculo = totalItens > 0 ? totalItens : valorPg;
+  const liquidoOrdem = baseCalculo - totalDescontos;
   const saldoAtual = Number(watch("saldoAnterior")) || 0;
   const ultrapassouSaldo = valorPg > saldoAtual && saldoAtual > 0;
 
@@ -750,6 +771,28 @@ export default function OrdemPagamento() {
                     })}
                   </tbody>
                 </table>
+
+                {/* RODAPÉ REATIVO DOS ITENS */}
+                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-slate-500 uppercase tracking-widest">V. Total dos Itens:</span>
+                    <span className={`text-lg font-black ${
+                      totalItens !== valorPg && valorPg > 0 ? 'text-red-600' : 'text-slate-800'
+                    }`}>
+                      {formatCurrency(totalItens)}
+                    </span>
+                    {totalItens !== valorPg && valorPg > 0 && (
+                      <span className="text-xs text-red-500 font-bold ml-1">⚠ Deve ser exatamente igual ao Valor a Pagar</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleConfirmarItens}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest px-4 py-2 rounded-lg shadow-sm transition-all flex items-center gap-2"
+                  >
+                    ✔ Confirmar Itens
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -811,7 +854,7 @@ export default function OrdemPagamento() {
         {/* BARRA DE AÇÕES INFERIOR - sticky para facilitar navegação */}
         <div className="sticky bottom-4 z-40">
           <div className="bg-slate-900/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/10 px-6 py-4 flex items-center justify-between gap-4">
-            <p className="text-sm text-slate-400 font-medium hidden md:block">Ações rápidas — sem precisar rolar para o topo</p>
+
             <div className="flex items-center gap-3 ml-auto">
               <button
                 type="button"
