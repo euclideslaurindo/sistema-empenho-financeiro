@@ -107,9 +107,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    console.log('[POST OP] body recebido:', JSON.stringify(body, null, 2));
     const parsed = ordemPagamentoSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+      console.error('[POST OP] Erro Zod:', parsed.error.issues);
+      return NextResponse.json({ error: parsed.error.issues[0].message, details: parsed.error.issues }, { status: 400 });
     }
 
     const {
@@ -203,7 +205,7 @@ export async function POST(request: NextRequest) {
           saldo_anterior, valor_empenho, valor_pagamento,
           irrf, iss, inss, sest_senat, patronal, outros_descontos, total_descontos, valor_liquido,
           numero_cheque, data_emissao, data_pagamento, usuario_id
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           id, liquidacao_id || null, neReal, numeroDaOpGerado, subGerado,
           credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
