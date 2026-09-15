@@ -28,7 +28,7 @@ const EmpenhoVia = ({
 }: any) => {
   return (
     <div
-      className={`w-full max-w-[210mm] min-h-[297mm] print:min-h-0 print:h-screen bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 box-border font-sans text-black relative mx-auto mb-8 print:mb-0 shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none`}
+      className={`w-full max-w-[210mm] min-h-[297mm] print:min-h-0 print:h-screen bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 box-border print:font-serif text-black relative mx-auto mb-8 print:mb-0 shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none`}
     >
       <div className="w-full flex flex-col font-sans p-[8px]">
         {/* Header */}
@@ -43,16 +43,21 @@ const EmpenhoVia = ({
           </div>
           <div className="flex flex-col text-center flex-1 tracking-wide font-sans mt-2">
             <span className="text-[16px] font-normal uppercase leading-tight tracking-wider mb-2">
-              PROVISÃO DE CRÉDITO ORÇAMENTÁRIO
-            </span>
-            <span className="text-[16px] font-normal block uppercase leading-tight tracking-wide">
               NOTA DE EMPENHO - Ordem de Pagamento
             </span>
-          </div>
-          <div className="text-right flex items-end justify-end pb-2 pt-2 min-w-[140px]">
-            <span className="text-[17px] font-bold uppercase tracking-wider text-slate-900 leading-none">
-              EMPENHO Nº {data.numeroEmpenho ? (data.sub ? `${data.numeroEmpenho}/${data.sub}` : data.numeroEmpenho) : (typeof empenhoIndex === "number" ? empenhoIndex + 1 : 1)}
+            <span className="text-[16px] font-normal block uppercase leading-tight tracking-wide">
+              PROVISÃO DE CRÉDITO ORÇAMENTÁRIO
             </span>
+          </div>
+          <div className="text-right flex flex-col items-end justify-end pb-2 pt-2 min-w-[140px]">
+            <span className="text-[17px] font-bold uppercase tracking-wider text-slate-900 leading-none">
+              EMPENHO Nº {data.numeroEmpenho || (typeof empenhoIndex === "number" ? empenhoIndex + 1 : 1)}
+            </span>
+            {data.sub && (
+              <span className="text-[13px] font-bold uppercase tracking-wider text-slate-700 mt-1">
+                SUB-EMPENHO: {data.sub}
+              </span>
+            )}
           </div>
         </div>
 
@@ -141,7 +146,9 @@ const EmpenhoVia = ({
                 className="w-full outline-none bg-blue-50/50 backdrop-blur-sm/50 border-b border-transparent focus:border-[#1e293b] px-1 font-bold"
               />
             ) : (
-              <span className="inline-block mt-1">{data.credorNome}</span>
+              <span className="inline-block mt-1">
+                {data.credorNome} {data.credorCpfCnpj ? `- ${data.credorCpfCnpj}` : ""}
+              </span>
             )}
           </div>
         </div>
@@ -307,17 +314,17 @@ const EmpenhoVia = ({
           </div>
 
           <div className="border-l border-black h-full flex items-center px-3 text-[10px] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50">
-            <span className="font-bold uppercase mr-2">PAGO EM</span>
+            <span className="font-bold uppercase mr-2">PAGO EM (CHEQUE Nº)</span>
             <div className="border border-black w-[95px] h-[22px] flex items-center justify-center font-bold">
               {isEditing ? (
                 <input
-                  value={data.pagamentoData || ""}
-                  onChange={(e) => onChange("pagamentoData", e.target.value)}
+                  value={data.numeroCheque || ""}
+                  onChange={(e) => onChange("numeroCheque", e.target.value)}
                   className="w-full h-full text-center outline-none bg-yellow-50 font-bold"
                 />
               ) : (
                 <span className="tracking-tight">
-                  {data.pagamentoData || ""}
+                  {data.numeroCheque || ""}
                 </span>
               )}
             </div>

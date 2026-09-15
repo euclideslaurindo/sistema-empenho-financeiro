@@ -70,13 +70,33 @@ export default function PerfilGestor() {
     toast.info("Modo de edição habilitado. Faça suas alterações.");
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentPassword || !newPassword) return;
-    toast.success("Sua senha foi redefinida com sucesso.");
-    setShowPasswordModal(false);
-    setCurrentPassword("");
-    setNewPassword("");
+    if (!currentPassword || !newPassword) {
+      toast.error("Por favor, preencha ambas as senhas.");
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/perfil/senha', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ senhaAtual: currentPassword, novaSenha: newPassword })
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        toast.success("Sua senha foi redefinida com sucesso.");
+        setShowPasswordModal(false);
+        setCurrentPassword("");
+        setNewPassword("");
+      } else {
+        toast.error(data.error || "Erro ao alterar a senha.");
+      }
+    } catch (err) {
+      toast.error("Erro de conexão com o servidor.");
+    }
   };
 
   const handlePasswordChange = () => {

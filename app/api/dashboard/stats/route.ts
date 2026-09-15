@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 
 // GET /api/dashboard/stats — estatísticas para o dashboard
 export async function GET(request: NextRequest) {
+  const user = await getAuthUser(request);
+  if (!user) return unauthorizedResponse();
+
   try {
     // Total de credores ativos
     const [credoresCount] = await query<any[]>(
@@ -41,7 +45,7 @@ export async function GET(request: NextRequest) {
        WHERE ne.status IN ('EMITIDO', 'PARCIALMENTE PAGO')`
     );
 
-    // Total pago mês anterior para variação (mesmo critério)
+    // Total pago mês anterior para variação (mesmo critério histórico)
     const [pagamentosMesAnterior] = await query<any[]>(
       `SELECT COALESCE(SUM(ne.valor - COALESCE(op_sum.total_pago, 0)), 0) as total
        FROM notas_empenho ne
@@ -51,16 +55,18 @@ export async function GET(request: NextRequest) {
          WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
          GROUP BY numero_ne
        ) op_sum ON op_sum.numero_ne = ne.numero
-       WHERE ne.status IN ('EMITIDO', 'PARCIALMENTE PAGO')
-         AND ne.created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`
+       WHERE ne.created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
+         AND ne.status != 'CANCELADO'
+         AND (ne.valor - COALESCE(op_sum.total_pago, 0)) > 0`
     );
 
     // Últimas 5 NEs com unidade gestora
     const ultimasNes = await query<any[]>(
-      `SELECT numero, DATE_FORMAT(created_at, '%d/%m/%Y') as data,
-              valor, status, unidade_orcamentaria as unidade
-       FROM notas_empenho
-       ORDER BY created_at DESC
+      `SELECT ne.numero, DATE_FORMAT(ne.created_at, '%d/%m/%Y') as data,
+              ne.valor, ne.status, COALESCE(u.nome, 'Sistema') as unidade
+       FROM notas_empenho ne
+       LEFT JOIN usuarios u ON ne.usuario_id = u.id
+       ORDER BY ne.created_at DESC
        LIMIT 5`
     );
 

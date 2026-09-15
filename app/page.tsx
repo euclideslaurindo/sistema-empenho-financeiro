@@ -65,14 +65,21 @@ export default function Dashboard() {
           </div>
           <div className="mt-6 md:mt-0 flex items-center gap-4">
             <button 
+              onClick={() => window.print()}
+              className="print:hidden bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+              Imprimir
+            </button>
+            <button 
               onClick={() => handleNavigate("/notas-empenho")}
-              className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-3 px-6 rounded-xl shadow-[0_8px_20px_rgba(37,99,235,0.25)] transition-all flex items-center gap-2 border border-blue-500"
+              className="print:hidden bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-3 px-6 rounded-xl shadow-[0_8px_20px_rgba(37,99,235,0.25)] transition-all flex items-center gap-2 border border-blue-500"
             >
               Novo Empenho
             </button>
             <button 
               onClick={() => handleNavigate("/credores")}
-              className="bg-white hover:bg-slate-50 text-blue-900 text-sm font-bold py-3 px-6 rounded-xl shadow-sm border border-slate-200 transition-all flex items-center gap-2"
+              className="print:hidden bg-white hover:bg-slate-50 text-blue-900 text-sm font-bold py-3 px-6 rounded-xl shadow-sm border border-slate-200 transition-all flex items-center gap-2"
             >
               Novo Credor
             </button>
@@ -179,7 +186,7 @@ export default function Dashboard() {
                 <tr className="border-b border-slate-100">
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Número NE</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Data</th>
-                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Unidade Gestora</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Quem Atualizou</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Valor (R$)</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Status</th>
                 </tr>
@@ -207,13 +214,13 @@ export default function Dashboard() {
                         {Number(ne.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-4 text-right rounded-r-lg pr-2">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase ${
-                          ne.status === 'LIQUIDADO' ? 'bg-emerald-50 text-emerald-600' :
-                          ne.status === 'CANCELADO' ? 'bg-slate-100 text-slate-500' :
-                          ne.status === 'Processando' ? 'bg-amber-50 text-amber-600' :
-                          'bg-blue-50 text-blue-900'
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase border ${
+                          ne.status === 'LIQUIDADO' ? 'bg-green-100 text-green-800 border-green-300' :
+                          ne.status === 'CANCELADO' ? 'bg-red-100 text-red-700 border-red-200' :
+                          ne.status === 'Processando' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                          'bg-orange-100 text-orange-800 border-orange-300'
                         }`}>
-                          {ne.status}
+                          {ne.status === 'LIQUIDADO' ? 'PAGO' : ne.status === 'EMITIDO' ? 'A PAGAR' : ne.status.toUpperCase()}
                         </span>
                       </td>
                     </tr>

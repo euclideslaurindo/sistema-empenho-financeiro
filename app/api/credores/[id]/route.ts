@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { 
       nome, endereco, cpfCnpj, pis, rg, orgaoEmissor, dataExpedicao, 
       banco, agencia, contaCorrente, telefone, cidade, uf,
-      cep, logradouro, numero, bairro, pix
+      cep, logradouro, numero, bairro, pix, isMei
     } = body;
 
     if (!nome || !cpfCnpj) {
@@ -46,19 +46,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     await query(
       `UPDATE credores SET nome = ?, endereco = ?, cpf_cnpj = ?, pis = ?, rg = ?, orgao_emissor = ?, data_expedicao = ?,
                            cidade = ?, uf = ?, telefone = ?, banco = ?, agencia = ?, conta_corrente = ?, 
-                           cep = ?, logradouro = ?, numero = ?, bairro = ?, pix = ?, usuario_id = ?
+                           cep = ?, logradouro = ?, numero = ?, bairro = ?, pix = ?, is_mei = ?, usuario_id = ?
        WHERE id = ? AND ativo = 1`,
       [nome.trim(), enderecoFinal, cpfCnpj.trim(), pis?.trim() || null, rg?.trim() || 'ISENTO', orgaoEmissor?.trim() || null, dataExpFormatada,
        cidade?.trim() || null, uf?.trim() || null, telefone?.trim() || null, 
        banco?.trim() || null, agencia?.trim() || null, contaCorrente?.trim() || null, 
-       cep?.trim() || null, logradouro?.trim() || null, numero?.trim() || null, bairro?.trim() || null, pix?.trim() || null, usuarioId, id]
+       cep?.trim() || null, logradouro?.trim() || null, numero?.trim() || null, bairro?.trim() || null, pix?.trim() || null, isMei ? 1 : 0, usuarioId, id]
     );
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('[API PUT /credores/[id]] Erro:', error);
     return NextResponse.json({ 
-      error: error.sqlMessage || error.message || 'Erro ao atualizar credor.',
+      error: 'Erro interno ao atualizar credor.',
       code: error.code 
     }, { status: 500 });
   }
@@ -87,16 +87,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
       if (totalOps > 0) {
         return NextResponse.json(
-          { error: `Não é possível excluir este credor pois existem ${totalOps} ordem(ns) de pagamento vinculada(s) a ele.` },
+          { error: `Não é possível excluir este credor pois existem ${totalOps} ordem(ns) de pagamento vinculada(s) a ele. O sistema necessita preservar o histórico.` },
           { status: 409 }
         );
       }
     }
 
+    // Soft delete: Apenas inativa o credor para preservar dados associados que possam existir (logs, etc.)
     await query('UPDATE credores SET ativo = 0 WHERE id = ?', [id]);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('[API DELETE /credores/[id]] Erro:', error);
-    return NextResponse.json({ error: 'Erro ao excluir credor.' }, { status: 500 });
+    return NextResponse.json({ error: 'Erro ao desativar credor.' }, { status: 500 });
   }
 }

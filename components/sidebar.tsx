@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAppStore } from "@/lib/store";
 
 const navItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -21,11 +22,20 @@ const navItems = [
   { name: "Notas de Empenho", href: "/notas-empenho", icon: FileText },
   { name: "Ordem de Pagamento", href: "/ordem-pagamento", icon: Banknote },
   { name: "Consulta/Impressão", href: "/consulta-impressao", icon: Printer },
+  { name: "Usuários", href: "/usuarios", icon: Users },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const userProfile = useAppStore((state) => state.userProfile);
+
+  const getInitials = (name: string) => {
+    if (!name) return "GF";
+    const parts = name.split(" ");
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
+  };
 
   const handleAction = (action: string) => {
     if (action === "Novo Empenho") {
@@ -141,11 +151,11 @@ export function Sidebar() {
       <div className="px-6 mt-6 pt-6 border-t border-white/5">
         <div className="bg-white/5 rounded-2xl p-3 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-black shadow-inner flex-shrink-0">
-            GF
+            {getInitials(userProfile?.nome || "Gestor Financeiro")}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-white truncate">Gestor</p>
-            <p className="text-[10px] text-blue-300/80 uppercase font-bold tracking-wider truncate">Admin</p>
+            <p className="text-sm font-bold text-white truncate">{userProfile?.nome || "Gestor"}</p>
+            <p className="text-[10px] text-blue-300/80 uppercase font-bold tracking-wider truncate">{userProfile?.perfil || "Admin"}</p>
           </div>
         </div>
       </div>

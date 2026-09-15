@@ -21,7 +21,9 @@ const notaEmpenhoSchema = z.object({
   historico: z.string().optional(),
   status: z.string().optional().default('EMITIDO'),
   dataProvisaoConcedida: z.string().optional().nullable(),
-  dataEmissao: z.string().optional().nullable()
+  dataEmissao: z.string().optional().nullable(),
+  credorNome: z.string().optional().nullable(),
+  cpfCnpj: z.string().optional().nullable()
 });
 
 // lista as NEs, se passar ?numero= busca uma especifica (usado na OP)
@@ -47,6 +49,7 @@ export async function GET(request: NextRequest) {
            ne.unidade_orcamentaria as unidadeOrcamentaria,
            ne.elemento, ne.subelemento,
            ne.gestao, ne.status, ne.historico,
+           ne.credor_nome as credorNome, ne.cpf_cnpj as cpfCnpj,
            (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel
          FROM notas_empenho ne
          LEFT JOIN (
@@ -74,8 +77,11 @@ export async function GET(request: NextRequest) {
         ne.unidade_orcamentaria as unidadeOrcamentaria,
         ne.elemento, ne.subelemento,
         ne.gestao, ne.status, ne.historico, ne.created_at,
-        (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel
+        ne.credor_nome as credorNome, ne.cpf_cnpj as cpfCnpj,
+        (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel,
+        u.nome as quemAtualizou
       FROM notas_empenho ne
+      LEFT JOIN usuarios u ON ne.usuario_id = u.id
       LEFT JOIN (
         SELECT numero_ne, SUM(valor_pagamento) as total_pago
         FROM ordens_pagamento
@@ -99,8 +105,8 @@ export async function GET(request: NextRequest) {
     const countResult = await query<any[]>(countSql, countParams);
     const total = countResult[0]?.total || 0;
 
-    sql += ` ORDER BY ne.created_at DESC LIMIT ${limit} OFFSET ${offset}`;
-    // nao usei params.push aqui por causa de um bug estranho no driver mysql2 com LIMIT
+    sql += ' ORDER BY ne.created_at DESC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
 
     const rows = await query<any[]>(sql, params);
     return NextResponse.json({
@@ -120,7 +126,7 @@ export async function POST(request: NextRequest) {
     // uso parse() em vez de safeParse() pra o zod jogar o erro direto pro withErrorHandler
     const parsed = notaEmpenhoSchema.parse(body);
 
-    const { numero, valor: valorDecimal, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao } = parsed;
+    const { numero, valor: valorDecimal, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao, credorNome, cpfCnpj } = parsed;
 
     const result = await withTransaction(async (connection) => {
     // checar se ja existe uma NE com esse numero antes de inserir
@@ -141,11 +147,11 @@ export async function POST(request: NextRequest) {
       }
 
       await connection.execute(
-        `INSERT INTO notas_empenho (id, exercicio, numero, valor, data_pagamento, data_provisao_concedida, data_emissao, unidade_orcamentaria, elemento, subelemento, gestao, status, historico, usuario_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO notas_empenho (id, exercicio, numero, valor, data_pagamento, data_provisao_concedida, data_emissao, unidade_orcamentaria, elemento, subelemento, gestao, status, historico, usuario_id, credor_nome, cpf_cnpj)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [id, exercicio, numero.trim(), valorDecimal, dataPagamento || null, dataProvisaoConcedida || null, dataEmissao || null,
          unidadeOrcamentaria?.trim() || '', elemento?.trim() || '', subelemento?.trim() || '',
-         gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', usuarioId]
+         gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', usuarioId, credorNome?.trim() || null, cpfCnpj?.trim() || null]
       );
 
       return { success: true, id, status: 201 };

@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as jose from 'jose';
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'chave-local-dev-2026-nao-usar-em-producao'
-);
+import { JWT_SECRET } from '@/lib/jwt-secret';
 
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value;
