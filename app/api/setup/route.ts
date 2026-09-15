@@ -5,9 +5,9 @@ import bcrypt from 'bcryptjs';
 // essa rota so roda em dev, bloquei em producao pra nao virar problema
 // ela cria o usuario admin inicial no banco
 export async function GET(request: NextRequest) {
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' || process.env.ENABLE_SETUP !== 'true') {
     return NextResponse.json(
-      { error: 'Esta rota nao esta disponivel em producao.' },
+      { error: 'Esta rota nao esta disponivel. Habilite ENABLE_SETUP=true no .env para usa-la em ambiente de desenvolvimento.' },
       { status: 403 }
     );
   }

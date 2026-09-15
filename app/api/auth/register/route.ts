@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { getAuthUser, unauthorizedResponse, forbiddenResponse } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
+  // Somente ADMIN pode criar novos usuários
+  const admin = await getAuthUser(request);
+  if (!admin) return unauthorizedResponse();
+  if (admin.perfil !== 'ADMIN') return forbiddenResponse();
+
   try {
     const body = await request.json();
     const { nome, senha } = body;

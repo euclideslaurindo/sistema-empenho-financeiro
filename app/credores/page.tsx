@@ -33,6 +33,7 @@ interface Credor {
   agencia?: string;
   contaCorrente?: string;
   pix?: string;
+  isMei?: boolean;
 }
 
 export default function Credores() {
@@ -370,19 +371,34 @@ export default function Credores() {
               </select>
             </div>
 
-            {/* Row 3 */}
+            {/* Row 5 */}
             <div className="col-span-12 md:col-span-3">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
-                Telefone
-              </label>
-              <input
-                type="text"
-                placeholder="(00) 00000-0000"
-                value={formData.telefone || ""}
-                onChange={(e) => handleChange("telefone", e.target.value)}
-                maxLength={15}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
-              />
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Telefone</label>
+              <input type="text" placeholder="(00) 00000-0000" value={formData.telefone || ""} onChange={(e) => handleChange("telefone", e.target.value)} maxLength={15} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+            </div>
+
+            <div className="col-span-12 md:col-span-5">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">CPF / CNPJ</label>
+              <div className="flex gap-4 items-center">
+                <input
+                  type="text"
+                  value={formData.cpfCnpj || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cpfCnpj: e.target.value })
+                  }
+                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+                  placeholder="Somente números"
+                />
+                <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={formData.isMei || false}
+                    onChange={(e) => setFormData({ ...formData, isMei: e.target.checked })}
+                    className="w-5 h-5 rounded border-slate-300 text-blue-900 focus:ring-blue-900"
+                  />
+                  <span className="text-sm font-bold text-slate-700">Sou MEI</span>
+                </label>
+              </div>
             </div>
 
             <div className="col-span-12 md:col-span-4">

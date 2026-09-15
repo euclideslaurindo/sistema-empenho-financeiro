@@ -3,10 +3,12 @@ import { Header } from '@/components/header';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { OfflineIndicator } from '@/components/offline-indicator';
+import { useAppStore } from '@/lib/store';
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isLoginPage = pathname === '/login';
+  const setUserProfile = useAppStore((state) => state.setUserProfile);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
@@ -16,7 +18,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
         }
       });
     }
-  }, []);
+
+    if (!isLoginPage) {
+      fetch('/api/perfil')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && data.usuario) {
+            setUserProfile(data.usuario);
+          }
+        })
+        .catch(err => console.error('Erro ao carregar perfil:', err));
+    }
+  }, [isLoginPage, setUserProfile]);
 
   if (isLoginPage) {
     return (

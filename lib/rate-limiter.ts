@@ -1,9 +1,10 @@
 // rate limiter em memoria pra nao deixar alguem ficar tentando login infinitamente
-// funciona pra uso local, pra varias instancias precisaria de redis
+// otimizado com lazy/timeout delete para evitar O(N) cleanup
 
 interface AttemptRecord {
   count: number;
   firstAttempt: number;
+  timeoutId?: NodeJS.Timeout;
 }
 
 const store = new Map<string, AttemptRecord>();
@@ -11,27 +12,18 @@ const store = new Map<string, AttemptRecord>();
 const WINDOW_MS = 15 * 60 * 1000; // janela de 15 minutos
 const MAX_ATTEMPTS = 10; // limite de tentativas por janela
 
-function cleanup() {
-  const now = Date.now();
-  for (const [key, record] of store.entries()) {
-    if (now - record.firstAttempt > WINDOW_MS) {
-      store.delete(key);
-    }
-  }
-}
-
 /**
  * Verifica se o IP ultrapassou o limite de tentativas.
  * Retorna { allowed: true } se permitido, { allowed: false, retryAfterMs } se bloqueado.
  */
 export function checkRateLimit(ip: string): { allowed: boolean; retryAfterMs?: number } {
-  cleanup();
-
   const now = Date.now();
   const record = store.get(ip);
 
   if (!record) {
-    store.set(ip, { count: 1, firstAttempt: now });
+    const timeoutId = setTimeout(() => store.delete(ip), WINDOW_MS);
+    timeoutId.unref?.(); // Evita bloquear o encerramento do Node.js
+    store.set(ip, { count: 1, firstAttempt: now, timeoutId });
     return { allowed: true };
   }
 
@@ -39,7 +31,10 @@ export function checkRateLimit(ip: string): { allowed: boolean; retryAfterMs?: n
 
   if (elapsed > WINDOW_MS) {
     // janela expirou, reseta a contagem
-    store.set(ip, { count: 1, firstAttempt: now });
+    if (record.timeoutId) clearTimeout(record.timeoutId);
+    const timeoutId = setTimeout(() => store.delete(ip), WINDOW_MS);
+    timeoutId.unref?.();
+    store.set(ip, { count: 1, firstAttempt: now, timeoutId });
     return { allowed: true };
   }
 
@@ -54,5 +49,9 @@ export function checkRateLimit(ip: string): { allowed: boolean; retryAfterMs?: n
 
 /** Limpa o registro de tentativas de um IP (ex: após login bem-sucedido). */
 export function resetRateLimit(ip: string): void {
+  const record = store.get(ip);
+  if (record?.timeoutId) {
+    clearTimeout(record.timeoutId);
+  }
   store.delete(ip);
 }

@@ -2,30 +2,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { SignJWT } from 'jose';
-import { checkRateLimit } from '@/lib/rate-limiter';
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'chave-local-dev-2026-nao-usar-em-producao'
-);
+import { checkRateLimit, resetRateLimit } from '@/lib/rate-limiter';
+import { JWT_SECRET } from '@/lib/jwt-secret';
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
-  
-  // Rate Limiting: max 10 tentativas em 15 minutos (Desativado para testes em LAN)
-  // Como várias pessoas estão acessando na LAN, todas caem no mesmo IP local.
-  // const rateCheck = checkRateLimit(ip);
-  // if (!rateCheck.allowed) {
-  //   const retryAfterSec = Math.ceil((rateCheck.retryAfterMs || 0) / 1000);
-  //   return NextResponse.json(
-  //     { error: `Muitas tentativas de login. Tente novamente em ${retryAfterSec} segundos.` },
-  //     { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
-  //   );
-  // }
+
+  // Lê o body antecipadamente para usar o email na chave do rate limiter
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Body inválido.' }, { status: 400 });
+  }
+
+  const { email, senha } = body;
+
+  // Rate Limiting: max 10 tentativas em 15 minutos, por combinação IP+email
+  // Isso evita o problema de LAN (IP compartilhado) sem bloquear outros usuários
+  const rateKey = `${ip}:${String(email || '').trim().toLowerCase()}`;
+  const rateCheck = checkRateLimit(rateKey);
+  if (!rateCheck.allowed) {
+    const retryAfterSec = Math.ceil((rateCheck.retryAfterMs || 0) / 1000);
+    return NextResponse.json(
+      { error: `Muitas tentativas de login. Tente novamente em ${retryAfterSec} segundos.` },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
+    );
+  }
 
   try {
-    const body = await request.json();
-    const { email, senha } = body;
-
     if (!email || !senha) {
       return NextResponse.json(
         { error: 'Email e senha são obrigatórios' },
@@ -89,11 +94,14 @@ export async function POST(request: NextRequest) {
       maxAge: 60 * 60 * 8 // 8 horas
     });
 
+    // Login bem-sucedido: limpa o contador de tentativas para este usuário
+    resetRateLimit(rateKey);
+
     return response;
   } catch (error) {
     console.error('[API Auth] Erro interno:', error);
     return NextResponse.json(
-      { error: 'Erro interno no servidor: ' + ((error as any).stack || String(error)) },
+      { error: 'Erro interno no servidor.' },
       { status: 500 }
     );
   }

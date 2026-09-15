@@ -1,12 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
+import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const user = await getAuthUser(request);
+  if (!user) return unauthorizedResponse();
+
   try {
     const cwd = process.cwd();
     const filesInDir = fs.readdirSync(cwd);
@@ -188,6 +192,7 @@ export async function GET() {
     });
 
   } catch (error: any) {
-    return NextResponse.json({ error: error.message, stack: error.stack }, { status: 200 });
+    console.error('[API analise-planilha] Erro interno:', error);
+    return NextResponse.json({ error: 'Erro interno ao processar a planilha.' }, { status: 500 });
   }
 }

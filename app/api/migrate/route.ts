@@ -1,7 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { getAuthUser, unauthorizedResponse, forbiddenResponse } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Somente ADMIN pode executar migrações via HTTP
+  const user = await getAuthUser(request);
+  if (!user) return unauthorizedResponse();
+  if (user.perfil !== 'ADMIN') return forbiddenResponse();
+
   try {
     const results = [];
     

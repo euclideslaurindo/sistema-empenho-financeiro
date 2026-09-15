@@ -3,6 +3,9 @@ import { useState, useEffect, useCallback } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
+import { ELEMENTOS, SUBELEMENTOS } from "@/lib/constants";
 import {
   Plus,
   Save,
@@ -33,6 +36,9 @@ interface NotaEmpenho {
   historico: string;
   dataProvisaoConcedida?: string;
   dataEmissao?: string;
+  quemAtualizou?: string;
+  credorNome?: string;
+  cpfCnpj?: string;
 }
 
 const notaEmpenhoSchema = z.object({
@@ -60,6 +66,8 @@ const notaEmpenhoSchema = z.object({
     const y = parseInt(val.split('-')[0], 10);
     return y >= 2000 && y <= 2100;
   }, "Ano inválido"),
+  credorNome: z.string().optional(),
+  cpfCnpj: z.string().optional(),
 });
 
 type NotaEmpenhoFormValues = z.input<typeof notaEmpenhoSchema>;
@@ -68,6 +76,9 @@ export default function NotasEmpenho() {
   const router = useRouter();
   const [notas, setNotas] = useState<NotaEmpenho[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [duplicatedNe, setDuplicatedNe] = useState<NotaEmpenho | null>(null);
 
   // estado do formulario
   const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<NotaEmpenhoFormValues>({
@@ -81,6 +92,8 @@ export default function NotasEmpenho() {
       subelemento: "",
       gestao: "140101",
       historico: "",
+      credorNome: "",
+      cpfCnpj: ""
     }
   });
 
@@ -91,12 +104,17 @@ export default function NotasEmpenho() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const fetchNotas = useCallback(async (busca = "") => {
+  const fetchNotas = useCallback(async (busca = "", page = 1) => {
     setIsLoading(true);
     try {
-      const url = busca ? `/api/notas-empenho?busca=${encodeURIComponent(busca)}` : "/api/notas-empenho";
+      let url = `/api/notas-empenho?page=${page}`;
+      if (busca) url += `&busca=${encodeURIComponent(busca)}`;
+      
       const data = await apiClient.get(url);
       setNotas(data.notas || []);
+      if (data.pagination) {
+        setTotalPages(data.pagination.totalPages || 1);
+      }
     } catch (error: any) {
       toast.error(error.message || "Erro ao carregar Notas de Empenho.");
       setNotas([]);
@@ -106,8 +124,8 @@ export default function NotasEmpenho() {
   }, []);
 
   useEffect(() => {
-    fetchNotas();
-  }, [fetchNotas]);
+    fetchNotas(searchTerm, currentPage);
+  }, [fetchNotas, currentPage]);
 
   // avisa quando a data ta passada de 60 dias
   let showAlerta = false;
@@ -131,16 +149,38 @@ export default function NotasEmpenho() {
   }
 
   // detecta se ja tem uma NE com o mesmo valor no banco (possivel duplicata)
+  // Debounce API check para duplicidade
   const valorNEWatch = watch("valorNE");
-  const getDuplicatedNE = () => {
-    if (!valorNEWatch) return null;
+  
+  useEffect(() => {
+    if (!valorNEWatch) {
+      setDuplicatedNe(null);
+      return;
+    }
     const clean = String(valorNEWatch).replace(/\D/g, "");
-    if (clean.length < 3) return null;
-    return notas.find((ne) => {
-      const neValStr = String(Math.round(ne.valor)).replace(/\D/g, "");
-      return clean.includes(neValStr) && neValStr.length >= 3;
-    }) || null;
-  };
+    if (clean.length < 3) {
+      setDuplicatedNe(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const num = parseFloat(String(valorNEWatch).replace(/\./g, '').replace(',', '.'));
+        if (isNaN(num)) return;
+        const res = await fetch(`/api/notas-empenho/duplicidade?valor=${num}`);
+        const data = await res.json();
+        if (data.duplicado && data.nota) {
+          setDuplicatedNe(data.nota);
+        } else {
+          setDuplicatedNe(null);
+        }
+      } catch (e) {
+        console.error("Erro check duplicidade", e);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [valorNEWatch]);
 
   const handleLoadDuplicate = (ne: NotaEmpenho) => {
     reset({
@@ -154,12 +194,12 @@ export default function NotasEmpenho() {
       historico: ne.historico || "",
       dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",
       dataEmissao: ne.dataEmissao ? ne.dataEmissao.split('T')[0] : "",
+      credorNome: ne.credorNome || "",
+      cpfCnpj: ne.cpfCnpj || "",
     });
-    setEditingId(ne.id);
+    setEditingId(ne.id || "");
     toast.success("Dados preenchidos com base na NE " + ne.numero);
   };
-
-  const duplicatedNe = getDuplicatedNE();
 
   const handleIncluir = () => {
     reset({
@@ -173,6 +213,8 @@ export default function NotasEmpenho() {
       historico: "",
       dataProvisaoConcedida: "",
       dataEmissao: "",
+      credorNome: "",
+      cpfCnpj: "",
     });
     setEditingId(null);
   };
@@ -189,6 +231,8 @@ export default function NotasEmpenho() {
       historico: data.historico,
       dataProvisaoConcedida: data.dataProvisaoConcedida || null,
       dataEmissao: data.dataEmissao || null,
+      credorNome: data.credorNome || null,
+      cpfCnpj: data.cpfCnpj || null,
       status: "EMITIDO",
     };
 
@@ -223,10 +267,10 @@ export default function NotasEmpenho() {
   };
 
   const getStatusBadge = (status: string) => {
-    if (status === 'LIQUIDADO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-emerald-50 text-emerald-600">LIQUIDADO</span>;
-    if (status === 'CANCELADO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-slate-100 text-slate-500">CANCELADO</span>;
-    if (status === 'Processando') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-amber-50 text-amber-600">Processando</span>;
-    return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-blue-50 text-blue-900">EMITIDO</span>;
+    if (status === 'LIQUIDADO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-green-100 text-green-800 border border-green-300">PAGO</span>;
+    if (status === 'CANCELADO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-red-100 text-red-700 border border-red-200">CANCELADO</span>;
+    if (status === 'Processando') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-amber-100 text-amber-700 border border-amber-200">PROCESSANDO</span>;
+    return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-orange-100 text-orange-800 border border-orange-300">A PAGAR</span>;
   };
 
   const formatCurrency = (value: number) =>
@@ -240,6 +284,21 @@ export default function NotasEmpenho() {
   
   const onError = (errors: any) => {
     toast.error("Preencha os campos obrigatórios corretamente.");
+  };
+
+  const maskCpfCnpj = (v: string) => {
+    v = v.replace(/\D/g, "");
+    if (v.length <= 11) {
+      v = v.replace(/(\d{3})(\d)/, "$1.$2");
+      v = v.replace(/(\d{3})(\d)/, "$1.$2");
+      v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+    } else {
+      v = v.replace(/^(\d{2})(\d)/, "$1.$2");
+      v = v.replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3");
+      v = v.replace(/\.(\d{3})(\d)/, ".$1/$2");
+      v = v.replace(/(\d{4})(\d)/, "$1-$2");
+    }
+    return v;
   };
 
   const handleSalvar = handleSubmit(onSubmit, onError);
@@ -372,6 +431,33 @@ export default function NotasEmpenho() {
             </div>
 
             <div className="md:col-span-2">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                Credor (Nome/Razão Social)
+              </label>
+              <input
+                type="text"
+                placeholder="Nome do credor"
+                {...register("credorNome")}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 transition-all duration-300"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+                CPF / CNPJ
+              </label>
+              <input
+                type="text"
+                placeholder="000.000.000-00"
+                {...register("cpfCnpj", {
+                  onChange: (e) => {
+                    e.target.value = maskCpfCnpj(e.target.value);
+                  }
+                })}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 transition-all duration-300"
+              />
+            </div>
+
+            <div className="md:col-span-2">
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Unidade Orçamentária</label>
               <select
                 {...register("unidadeOrcamentaria")}
@@ -399,21 +485,27 @@ export default function NotasEmpenho() {
             
             <div className="md:col-span-2">
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Elemento</label>
-              <input
-                type="text"
-                placeholder="Ex: 3.3.90.30"
+              <select
                 {...register("elemento")}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
-              />
+              >
+                <option value="">Selecione o Elemento</option>
+                {ELEMENTOS.map((el) => (
+                  <option key={el} value={el}>{el}</option>
+                ))}
+              </select>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Subelemento</label>
-              <input
-                type="text"
-                placeholder="Ex: Combustíveis e Lubrificantes"
+              <select
                 {...register("subelemento")}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
-              />
+              >
+                <option value="">Selecione o Subelemento</option>
+                {SUBELEMENTOS.map((sub) => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>
             </div>
             <div className="md:col-span-1">
               <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
@@ -473,7 +565,8 @@ export default function NotasEmpenho() {
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  fetchNotas(e.target.value);
+                  setCurrentPage(1); // Reseta para a pagina 1 ao buscar
+                  fetchNotas(e.target.value, 1);
                 }}
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm font-medium focus:outline-none focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
               />
@@ -486,7 +579,7 @@ export default function NotasEmpenho() {
                 <tr className="border-b border-slate-100">
                   <th className="pb-4 pl-2 text-sm font-black text-slate-500 uppercase tracking-widest">Número</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Data</th>
-                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Unidade/Gestão</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Quem Atualizou</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Especificação</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Valor</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-center">Status</th>
@@ -507,25 +600,32 @@ export default function NotasEmpenho() {
                     </td>
                   </tr>
                 ) : (
-                  notas.map((ne, index) => (
+                  notas.map((ne, index) => {
+                    const isCancelado = ne.status === 'CANCELADO';
+                    const baseRowStyle = isCancelado 
+                      ? 'bg-red-50/30 hover:bg-red-50/60 opacity-80' 
+                      : (selecionadoId === ne.id ? 'bg-blue-50/50' : 'hover:bg-blue-50/50');
+                    const textStyle = isCancelado ? 'line-through decoration-red-300 text-red-400' : '';
+
+                    return (
                     <tr
                       key={ne.id}
                       onClick={() => setSelecionadoId(ne.id)}
-                      className={`group hover:bg-blue-50/50 transition-colors cursor-pointer ${selecionadoId === ne.id ? 'bg-blue-50/50' : ''}`}
+                      className={`group transition-colors cursor-pointer ${baseRowStyle}`}
                     >
-                      <td className="py-5 font-bold text-slate-800 rounded-l-lg pl-2">
+                      <td className={`py-5 font-bold rounded-l-lg pl-2 ${isCancelado ? textStyle : 'text-slate-800'}`}>
                         {ne.numero}
                       </td>
-                      <td className="py-5 font-semibold text-slate-500">
+                      <td className={`py-5 font-semibold ${isCancelado ? textStyle : 'text-slate-500'}`}>
                         {formatDate(ne.dataPagamento)}
                       </td>
-                      <td className="py-5 font-semibold text-slate-600">
-                        {ne.unidadeOrcamentaria || "-"}
+                      <td className={`py-5 font-semibold ${isCancelado ? textStyle : 'text-slate-600'}`}>
+                        {ne.quemAtualizou || "Sistema"}
                       </td>
-                      <td className="py-5 font-medium text-slate-500 truncate max-w-[200px]">
+                      <td className={`py-5 font-medium truncate max-w-[200px] ${isCancelado ? textStyle : 'text-slate-500'}`}>
                         {ne.historico || "-"}
                       </td>
-                      <td className="py-5 font-black text-slate-700 text-right">
+                      <td className={`py-5 font-black text-right ${isCancelado ? textStyle : 'text-slate-700'}`}>
                         {Number(ne.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </td>
                       <td className="py-5 text-center">
@@ -533,37 +633,65 @@ export default function NotasEmpenho() {
                       </td>
                       <td className="py-5 text-right rounded-r-lg pr-2">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            title="Editar"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelecionadoId(ne.id);
-                              setEditingId(ne.id);
-                              reset({
-                                numeroNE: ne.numero,
-                                valorNE: String(ne.valor),
-                                dataPagamento: ne.dataPagamento ? ne.dataPagamento.split('T')[0] : "",
-                                unidadeOrcamentaria: ne.unidadeOrcamentaria,
-                                elemento: ne.elemento,
-                                subelemento: ne.subelemento,
-                                gestao: ne.gestao,
-                                historico: ne.historico,
-                                dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",
-                                dataEmissao: ne.dataEmissao ? ne.dataEmissao.split('T')[0] : "",
-                              });
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-blue-900 hover:bg-white rounded-md transition-all"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
+                          {!isCancelado && (
+                            <button
+                              title="Editar"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelecionadoId(ne.id);
+                                setEditingId(ne.id);
+                                reset({
+                                  numeroNE: ne.numero,
+                                  valorNE: String(ne.valor),
+                                  dataPagamento: ne.dataPagamento ? ne.dataPagamento.split('T')[0] : "",
+                                  unidadeOrcamentaria: ne.unidadeOrcamentaria,
+                                  elemento: ne.elemento,
+                                  subelemento: ne.subelemento,
+                                  gestao: ne.gestao,
+                                  historico: ne.historico,
+                                  dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",
+                                  dataEmissao: ne.dataEmissao ? ne.dataEmissao.split('T')[0] : "",
+                                  credorNome: ne.credorNome || "",
+                                  cpfCnpj: ne.cpfCnpj || "",
+                                });
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-blue-900 hover:bg-white rounded-md transition-all"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
-                  ))
-                )}
+                  );
+                })
+              )}
               </tbody>
             </table>
+          </div>
+          
+          {/* Paginação */}
+          <div className="flex justify-between items-center mt-6">
+            <span className="text-sm font-semibold text-slate-500">
+              Página {currentPage} de {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors shadow-sm"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors shadow-sm"
+              >
+                Próxima
+              </button>
+            </div>
           </div>
         </div>
 

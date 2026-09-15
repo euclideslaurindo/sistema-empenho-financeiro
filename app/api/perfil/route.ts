@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
+import * as jose from 'jose';
+import { JWT_SECRET } from '@/lib/jwt-secret';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
@@ -34,13 +36,46 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 });
     }
 
+    // Verificar se o novo e-mail já existe em outro perfil
+    const [existing] = await query<any[]>(
+      'SELECT id FROM usuarios WHERE email = ? AND id != ? LIMIT 1',
+      [email.trim(), user.id]
+    );
+    if (existing) {
+      return NextResponse.json({ error: 'Este e-mail já está em uso por outro usuário.' }, { status: 409 });
+    }
+
     // cada usuario so pode editar o proprio perfil
     await query(
       'UPDATE usuarios SET nome = ?, email = ? WHERE id = ?',
       [nome.trim(), email.trim(), user.id]
     );
 
-    return NextResponse.json({ message: 'Perfil atualizado com sucesso' });
+    // Gerar um novo JWT atualizado
+    const jwt = await new jose.SignJWT({
+      id: user.id,
+      nome: nome.trim(),
+      email: email.trim(),
+      perfil: user.perfil,
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setExpirationTime('8h')
+      .sign(JWT_SECRET);
+
+    const response = NextResponse.json({ message: 'Perfil atualizado com sucesso' });
+    
+    // Atualizar o cookie com o novo token
+    response.cookies.set({
+      name: 'auth_token',
+      value: jwt,
+      httpOnly: true,
+      path: '/',
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 8, // 8 horas
+    });
+
+    return response;
   } catch (error) {
     console.error('Erro ao atualizar usuário:', error);
     return NextResponse.json({ error: 'Erro interno no servidor' }, { status: 500 });

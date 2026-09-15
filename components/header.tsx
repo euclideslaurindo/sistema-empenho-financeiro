@@ -2,16 +2,37 @@
 import { Search, LogOut, Bell, LayoutDashboard, Users, FileText, Banknote, FileStack, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAppStore } from '@/lib/store';
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
+  const userProfile = useAppStore((state) => state.userProfile);
+
+  const getInitials = (name: string) => {
+    if (!name) return "GF";
+    const parts = name.split(" ");
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return name.substring(0, 2).toUpperCase();
+  };
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && e.currentTarget.value.trim() !== '') {
       toast.success(`Buscando por "${e.currentTarget.value}"...`);
       e.currentTarget.value = '';
     }
+  };
+
+  const handleLogout = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    toast.info('Saindo do sistema...');
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (err) {
+      // Ignora erro e continua com o logout
+    }
+    window.location.href = '/login';
   };
 
   const navLinks = [
@@ -82,21 +103,20 @@ export function Header() {
         <div className="w-px h-6 bg-slate-200 mx-1"></div>
 
         {/* User */}
-        <Link href="/perfil" className="flex items-center gap-3 p-1 rounded-full bg-slate-50 border border-slate-200 shadow-sm hover:bg-white transition-all duration-300 cursor-pointer group">
+        <Link href="/perfil" className="flex items-center gap-3 p-1 rounded-full bg-slate-50 border border-slate-200 shadow-sm hover:bg-white transition-all duration-300 cursor-pointer group" title={userProfile?.nome || "Gestor Financeiro"}>
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-blue-500 flex items-center justify-center text-white text-xs font-bold shadow-md shadow-blue-500/20">
-            GF
+            {getInitials(userProfile?.nome || "Gestor Financeiro")}
           </div>
         </Link>
         
         {/* Logout */}
-        <Link 
-          href="/login" 
-          onClick={() => toast.info('Saindo do sistema...')} 
+        <button 
+          onClick={handleLogout} 
           className="text-slate-400 hover:text-red-500 transition-colors duration-300 p-2 rounded-full hover:bg-red-50"
           title="Sair do Sistema"
         >
           <LogOut className="h-4 w-4" />
-        </Link>
+        </button>
       </div>
     </header>
   );

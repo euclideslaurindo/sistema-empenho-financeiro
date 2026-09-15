@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       SELECT id, cpf_cnpj as cpfCnpj, nome, rg, orgao_emissor as orgaoEmissor,
              endereco, cep, logradouro, numero, bairro,
              pis, data_expedicao as dataExpedicao,
-             cidade, uf, telefone, banco, agencia, conta_corrente as contaCorrente, pix
+             cidade, uf, telefone, banco, agencia, conta_corrente as contaCorrente, pix, is_mei as isMei
       FROM credores
       WHERE ativo = 1`;
     const params: any[] = [];
@@ -40,7 +40,8 @@ export async function GET(request: NextRequest) {
     const countResult = await query<any[]>(countSql, countParams);
     const total = countResult[0]?.total || 0;
 
-    sql += ` ORDER BY nome ASC LIMIT ${limit} OFFSET ${offset}`;
+    sql += ' ORDER BY nome ASC LIMIT ? OFFSET ?';
+    params.push(limit, offset);
 
     const rows = await query<any[]>(sql, params);
 
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     const {
       cpfCnpj, nome, rg, orgaoEmissor, pis, dataExpedicao,
       endereco, cep, logradouro, numero, bairro, cidade, uf, telefone,
-      banco, agencia, contaCorrente, pix
+      banco, agencia, contaCorrente, pix, isMei
     } = body;
 
     if (!cpfCnpj || !nome) {
@@ -81,32 +82,40 @@ export async function POST(request: NextRequest) {
 
     const id = crypto.randomUUID();
 
-    await query(
-      `INSERT INTO credores (id, cpf_cnpj, nome, rg, orgao_emissor, pis, data_expedicao, endereco, cep, logradouro, numero, bairro, cidade, uf, telefone, banco, agencia, conta_corrente, pix, usuario_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        cpfCnpj.trim(),
-        nome.trim(),
-        rg?.trim() || 'ISENTO',
-        orgaoEmissor?.trim() || null,
-        pis?.trim() || null,
-        dataExpFormatada,
-        enderecoFinal,
-        cep?.trim() || null,
-        logradouro?.trim() || null,
-        numero?.trim() || null,
-        bairro?.trim() || null,
-        cidade?.trim() || null,
-        uf?.trim() || null,
-        telefone?.trim() || null,
-        banco?.trim() || null,
-        agencia?.trim() || null,
-        contaCorrente?.trim() || null,
-        pix?.trim() || null,
-        usuarioId
-      ]
-    );
+    try {
+      await query(
+        `INSERT INTO credores (id, cpf_cnpj, nome, rg, orgao_emissor, pis, data_expedicao, endereco, cep, logradouro, numero, bairro, cidade, uf, telefone, banco, agencia, conta_corrente, pix, is_mei, usuario_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          cpfCnpj.trim(),
+          nome.trim(),
+          rg?.trim() || 'ISENTO',
+          orgaoEmissor?.trim() || null,
+          pis?.trim() || null,
+          dataExpFormatada,
+          enderecoFinal,
+          cep?.trim() || null,
+          logradouro?.trim() || null,
+          numero?.trim() || null,
+          bairro?.trim() || null,
+          cidade?.trim() || null,
+          uf?.trim() || null,
+          telefone?.trim() || null,
+          banco?.trim() || null,
+          agencia?.trim() || null,
+          contaCorrente?.trim() || null,
+          pix?.trim() || null,
+          isMei ? 1 : 0,
+          usuarioId
+        ]
+      );
+    } catch (err: any) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        return NextResponse.json({ error: 'Este CPF/CNPJ já está cadastrado no sistema.' }, { status: 409 });
+      }
+      throw err;
+    }
 
     return NextResponse.json({ success: true, id }, { status: 201 });
   });
