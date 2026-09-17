@@ -21,6 +21,16 @@ export function checkRateLimit(ip: string): { allowed: boolean; retryAfterMs?: n
   const record = store.get(ip);
 
   if (!record) {
+    // Segurança contra exaustão de memória (DoS)
+    if (store.size > 10000) {
+      // Limpa os primeiros 1000 iteradores (os mais antigos devido a ordem de inserção do Map)
+      let i = 0;
+      for (const k of store.keys()) {
+        store.delete(k);
+        if (++i > 1000) break;
+      }
+    }
+
     const timeoutId = setTimeout(() => store.delete(ip), WINDOW_MS);
     timeoutId.unref?.(); // Evita bloquear o encerramento do Node.js
     store.set(ip, { count: 1, firstAttempt: now, timeoutId });

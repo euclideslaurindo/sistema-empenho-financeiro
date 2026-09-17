@@ -20,9 +20,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (senha.length < 6) {
+    if (nome.trim().length > 100) {
       return NextResponse.json(
-        { error: 'A senha deve ter no mínimo 6 caracteres' },
+        { error: 'O nome de usuário não pode ter mais de 100 caracteres.' },
+        { status: 400 }
+      );
+    }
+
+    if (senha.length < 8) {
+      return NextResponse.json(
+        { error: 'A senha deve ter no mínimo 8 caracteres' },
+        { status: 400 }
+      );
+    }
+
+    if (senha.length > 128) {
+      return NextResponse.json(
+        { error: 'A senha não pode ter mais de 128 caracteres.' },
         { status: 400 }
       );
     }

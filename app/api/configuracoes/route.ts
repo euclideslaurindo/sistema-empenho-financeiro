@@ -35,6 +35,14 @@ export async function PUT(request: NextRequest) {
       alerta_integracao, aviso_manutencao
     } = data;
 
+    // Valida formato do e-mail corporativo se fornecido
+    if (email_corporativo && email_corporativo.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email_corporativo.trim())) {
+        return NextResponse.json({ error: 'Formato de e-mail corporativo inválido.' }, { status: 400 });
+      }
+    }
+
     await query(
       `UPDATE configuracoes_sistema SET
         nome_completo = ?, email_corporativo = ?, unidade_padrao = ?, gestao_padrao = ?,

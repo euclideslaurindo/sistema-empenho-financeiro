@@ -151,6 +151,8 @@ export default function NotasEmpenho() {
   // detecta se ja tem uma NE com o mesmo valor no banco (possivel duplicata)
   // Debounce API check para duplicidade
   const valorNEWatch = watch("valorNE");
+  const credorNomeWatch = watch("credorNome");
+  const subelementoWatch = watch("subelemento");
   
   useEffect(() => {
     if (!valorNEWatch) {
@@ -165,9 +167,12 @@ export default function NotasEmpenho() {
 
     const timer = setTimeout(async () => {
       try {
-        const num = parseFloat(String(valorNEWatch).replace(/\./g, '').replace(',', '.'));
+        const num = parseFloat(String(valorNEWatch).replace(/[^\d,]/g, '').replace(',', '.'));
         if (isNaN(num)) return;
-        const res = await fetch(`/api/notas-empenho/duplicidade?valor=${num}`);
+        const params = new URLSearchParams({ valor: String(num) });
+        if (credorNomeWatch) params.append('credor', credorNomeWatch);
+        if (subelementoWatch) params.append('subelemento', subelementoWatch);
+        const res = await fetch(`/api/notas-empenho/duplicidade?${params.toString()}`);
         const data = await res.json();
         if (data.duplicado && data.nota) {
           setDuplicatedNe(data.nota);
@@ -180,7 +185,7 @@ export default function NotasEmpenho() {
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timer);
-  }, [valorNEWatch]);
+  }, [valorNEWatch, credorNomeWatch, subelementoWatch]);
 
   const handleLoadDuplicate = (ne: NotaEmpenho) => {
     reset({

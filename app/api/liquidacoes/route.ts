@@ -48,10 +48,14 @@ export async function POST(request: NextRequest) {
       );
       
       const totalLiquidadoAnterior = parseFloat(liqRows[0]?.total_liquidado || 0);
-      const saldoALiquidar = valorOriginal - totalLiquidadoAnterior;
 
-      if (valor_liquidado > saldoALiquidar) {
-        throw new Error('O valor da liquidação excede o saldo a liquidar do empenho.');
+      // Comparação em CENTAVOS inteiros para evitar imprecisão IEEE 754
+      const saldoCentavos = Math.round(valorOriginal * 100) - Math.round(totalLiquidadoAnterior * 100);
+      const valorLiquidadoCentavos = Math.round(valor_liquidado * 100);
+
+      if (valorLiquidadoCentavos > saldoCentavos) {
+        const saldoFormatado = (saldoCentavos / 100).toFixed(2).replace('.', ',');
+        throw new Error(`O valor da liquidação excede o saldo a liquidar do empenho. Saldo disponível: R$ ${saldoFormatado}`);
       }
 
       // insere a liquidacao

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse, forbiddenResponse } from '@/lib/auth';
+import { isValidCpfCnpj } from '@/lib/utils';
 
 // PUT /api/credores/[id] — atualiza credor
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -18,6 +19,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!nome || !cpfCnpj) {
       return NextResponse.json({ error: 'Nome e CPF/CNPJ são obrigatórios.' }, { status: 400 });
+    }
+
+    if (!isValidCpfCnpj(cpfCnpj)) {
+      return NextResponse.json({ error: 'CPF ou CNPJ inválido. Verifique os dígitos digitados.' }, { status: 400 });
     }
 
     // Verificar duplicidade de CPF/CNPJ (excluindo o próprio)
@@ -77,20 +82,22 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const { id } = await params;
     
-    // Verificar se o credor tem ordens de pagamento vinculadas
-    const credorData = await query<any[]>('SELECT cpf_cnpj FROM credores WHERE id = ?', [id]);
-    
-    if (credorData && credorData.length > 0) {
-      const cpfCnpj = credorData[0].cpf_cnpj;
-      const opSum = await query<any[]>('SELECT COUNT(*) as total FROM ordens_pagamento WHERE credor_cpf_cnpj = ?', [cpfCnpj]);
-      const totalOps = parseInt(opSum[0]?.total || 0);
+    // Verificar se o credor existe
+    const credorData = await query<any[]>('SELECT cpf_cnpj FROM credores WHERE id = ? AND ativo = 1', [id]);
 
-      if (totalOps > 0) {
-        return NextResponse.json(
-          { error: `Não é possível excluir este credor pois existem ${totalOps} ordem(ns) de pagamento vinculada(s) a ele. O sistema necessita preservar o histórico.` },
-          { status: 409 }
-        );
-      }
+    if (!credorData || credorData.length === 0) {
+      return NextResponse.json({ error: 'Credor não encontrado.' }, { status: 404 });
+    }
+    
+    const cpfCnpj = credorData[0].cpf_cnpj;
+    const opSum = await query<any[]>('SELECT COUNT(*) as total FROM ordens_pagamento WHERE credor_cpf_cnpj = ?', [cpfCnpj]);
+    const totalOps = parseInt(opSum[0]?.total || 0);
+
+    if (totalOps > 0) {
+      return NextResponse.json(
+        { error: `Não é possível excluir este credor pois existem ${totalOps} ordem(ns) de pagamento vinculada(s) a ele. O sistema necessita preservar o histórico.` },
+        { status: 409 }
+      );
     }
 
     // Soft delete: Apenas inativa o credor para preservar dados associados que possam existir (logs, etc.)

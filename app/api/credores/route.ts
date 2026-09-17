@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-handler';
+import { isValidCpfCnpj } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
   return withErrorHandler(async () => {
@@ -9,8 +10,10 @@ export async function GET(request: NextRequest) {
     if (!user) return unauthorizedResponse();
     const { searchParams } = new URL(request.url);
     const busca = searchParams.get('busca') || '';
-    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-    const limit = Math.min(100, parseInt(searchParams.get('limit') || '50', 10));
+    const rawPage = parseInt(searchParams.get('page') || '1', 10);
+    const rawLimit = parseInt(searchParams.get('limit') || '50', 10);
+    const page = Math.max(1, Number.isNaN(rawPage) ? 1 : rawPage);
+    const limit = Math.min(100, Math.max(1, Number.isNaN(rawLimit) ? 50 : rawLimit));
     const offset = (page - 1) * limit;
 
     let sql = `
@@ -23,10 +26,18 @@ export async function GET(request: NextRequest) {
     const params: any[] = [];
 
     if (busca) {
-      // Busca por nome, CPF/CNPJ formatado OU pelos dígitos puros (sem pontuação)
       const digits = busca.replace(/\D/g, '');
-      sql += ` AND (nome LIKE ? OR cpf_cnpj LIKE ? OR REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') LIKE ?)`;
-      params.push(`%${busca}%`, `%${busca}%`, `%${digits}%`);
+      // Se a busca for só dígitos, pré-formata para CPF/CNPJ para usar o índice
+      // evitando REPLACE() em toda a tabela (Full Table Scan)
+      const buscaFormatada = busca.trim();
+      sql += ` AND (nome LIKE ? OR cpf_cnpj LIKE ?`;
+      params.push(`%${buscaFormatada}%`, `%${buscaFormatada}%`);
+      // Só aplica REPLACE (sem índice) quando a busca tem dígitos parciais
+      if (digits && digits !== buscaFormatada) {
+        sql += ` OR REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') LIKE ?`;
+        params.push(`%${digits}%`);
+      }
+      sql += ')';
     }
 
     // Contar total para paginação
@@ -34,8 +45,14 @@ export async function GET(request: NextRequest) {
     const countParams: any[] = [];
     if (busca) {
       const digits = busca.replace(/\D/g, '');
-      countSql += ` AND (nome LIKE ? OR cpf_cnpj LIKE ? OR REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') LIKE ?)`;
-      countParams.push(`%${busca}%`, `%${busca}%`, `%${digits}%`);
+      const buscaFormatada = busca.trim();
+      countSql += ` AND (nome LIKE ? OR cpf_cnpj LIKE ?`;
+      countParams.push(`%${buscaFormatada}%`, `%${buscaFormatada}%`);
+      if (digits && digits !== buscaFormatada) {
+        countSql += ` OR REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') LIKE ?`;
+        countParams.push(`%${digits}%`);
+      }
+      countSql += ')';
     }
     const countResult = await query<any[]>(countSql, countParams);
     const total = countResult[0]?.total || 0;
@@ -65,6 +82,10 @@ export async function POST(request: NextRequest) {
 
     if (!cpfCnpj || !nome) {
       return NextResponse.json({ error: 'CPF/CNPJ e Nome são obrigatórios.' }, { status: 400 });
+    }
+
+    if (!isValidCpfCnpj(cpfCnpj)) {
+      return NextResponse.json({ error: 'CPF ou CNPJ inválido. Verifique os dígitos digitados.' }, { status: 400 });
     }
 
     let usuarioId: string | null = user.id;

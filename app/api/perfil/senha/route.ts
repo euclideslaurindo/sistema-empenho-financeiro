@@ -11,8 +11,12 @@ export async function PUT(request: NextRequest) {
     const data = await request.json();
     const { senhaAtual, novaSenha } = data;
 
-    if (!senhaAtual || !novaSenha || novaSenha.trim() === '') {
-      return NextResponse.json({ error: 'As senhas são obrigatórias' }, { status: 400 });
+    if (!senhaAtual || !novaSenha) {
+      return NextResponse.json({ error: 'Senha atual e nova senha são obrigatórias.' }, { status: 400 });
+    }
+
+    if (novaSenha.length < 8) {
+      return NextResponse.json({ error: 'A nova senha deve ter no mínimo 8 caracteres.' }, { status: 400 });
     }
 
     const rows = await query<any[]>('SELECT senha_hash FROM usuarios WHERE id = ?', [user.id]);

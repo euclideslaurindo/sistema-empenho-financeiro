@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS dotacao_orcamentaria (
     saldo_disponivel DECIMAL(15,2) DEFAULT 0.00,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    created_by INT,
+    created_by VARCHAR(36),
     deleted_at TIMESTAMP NULL DEFAULT NULL,
     CONSTRAINT fk_dotacao_created_by FOREIGN KEY (created_by) REFERENCES usuarios(id) ON DELETE SET NULL
 );
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS liquidacoes (
     documento_fiscal VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    created_by INT,
+    created_by VARCHAR(36),
     deleted_at TIMESTAMP NULL DEFAULT NULL,
     CONSTRAINT fk_liq_notas_empenho FOREIGN KEY (notas_empenho_id) REFERENCES notas_empenho(id) ON DELETE RESTRICT,
     CONSTRAINT fk_liq_created_by FOREIGN KEY (created_by) REFERENCES usuarios(id) ON DELETE SET NULL
@@ -41,12 +41,12 @@ ALTER TABLE notas_empenho
 
 -- 4. Alteração In-Place: Adição de Auditoria e Soft Delete nas notas_empenho
 ALTER TABLE notas_empenho
-    ADD COLUMN created_by INT AFTER historico,
+    ADD COLUMN created_by VARCHAR(36) AFTER historico,
     ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER created_at,
     ADD CONSTRAINT fk_ne_created_by FOREIGN KEY (created_by) REFERENCES usuarios(id) ON DELETE SET NULL;
 
 -- 5. Alteração In-Place: Adição de Auditoria e Soft Delete nas ordens_pagamento
 ALTER TABLE ordens_pagamento
-    ADD COLUMN created_by INT AFTER data_pagamento,
+    ADD COLUMN created_by VARCHAR(36) AFTER data_pagamento,
     ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL AFTER created_at,
     ADD CONSTRAINT fk_op_created_by FOREIGN KEY (created_by) REFERENCES usuarios(id) ON DELETE SET NULL;

@@ -1,7 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Operação proibida: Migrações via API estão desabilitadas em ambiente de produção.' }, { status: 403 });
+  }
+
+  const user = await getAuthUser(request);
+  if (!user || user.perfil !== 'ADMIN') return unauthorizedResponse();
+
   const results: string[] = [];
   try {
     

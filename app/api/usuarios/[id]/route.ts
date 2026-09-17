@@ -16,6 +16,11 @@ export async function DELETE(
     return NextResponse.json({ error: 'Você não pode excluir seu próprio usuário' }, { status: 400 });
   }
 
+  // Trava de Deleção do Root Admin
+  if (idToDel === 'user-admin-1') {
+    return NextResponse.json({ error: 'Acesso Negado: O usuário administrador raiz não pode ser excluído do sistema.' }, { status: 403 });
+  }
+
   try {
     // verifica se o user existe
     const [existing] = await query<any[]>('SELECT id FROM usuarios WHERE id = ?', [idToDel]);
@@ -54,6 +59,11 @@ export async function PUT(
   
   if (user.id === idToUpdate) {
     return NextResponse.json({ error: 'Você não pode alterar seu próprio status' }, { status: 400 });
+  }
+
+  // Trava de Desativação do Root Admin
+  if (idToUpdate === 'user-admin-1') {
+    return NextResponse.json({ error: 'Acesso Negado: O usuário administrador raiz não pode ser alterado ou bloqueado.' }, { status: 403 });
   }
 
   try {

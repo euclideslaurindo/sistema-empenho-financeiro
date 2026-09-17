@@ -1,10 +1,10 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ['nagmcggr019', '10.82.28.48', 'localhost'],
+  allowedDevOrigins: ['localhost'],
   reactStrictMode: true,
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   typescript: {
     ignoreBuildErrors: false,

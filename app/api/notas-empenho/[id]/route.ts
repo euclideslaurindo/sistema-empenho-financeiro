@@ -75,13 +75,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
          credorNome?.trim() || null, cpfCnpj?.trim() || null, id]
       );
 
-      // se mudou o numero, atualiza nas ops tambem senao quebra a relacao
-      if (numeroNovo !== numeroAntigo) {
-        await connection.execute(
-          'UPDATE ordens_pagamento SET numero_ne = ? WHERE numero_ne = ?',
-          [numeroNovo, numeroAntigo]
-        );
-      }
+      // A FK fk_op_ne em database.sql já possui ON UPDATE CASCADE,
+      // então o MySQL atualiza ordens_pagamento.numero_ne automaticamente.
+
     });
 
     return NextResponse.json({ success: true });
