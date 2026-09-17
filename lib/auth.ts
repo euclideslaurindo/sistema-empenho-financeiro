@@ -9,9 +9,6 @@ export interface AuthUser {
   perfil: string;
 }
 
-// Cache de Memória (RAM) para status ativo dos usuários. Evita queries ao MySQL em cada requisição.
-const activeUserCache = new Map<string, { ativo: boolean, expires: number }>();
-
 /**
  * Extrai e valida o usuário autenticado a partir do cookie JWT da requisição.
  * Retorna null se o token não existir ou for inválido.
@@ -23,22 +20,11 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
 
     const { payload } = await jose.jwtVerify(token, JWT_SECRET);
     const id = payload.id as string;
-    
-    // Verificacao com Cache (5 minutos)
-    const now = Date.now();
-    let isAtivo = false;
-    
-    const cached = activeUserCache.get(id);
-    if (cached && cached.expires > now) {
-      isAtivo = cached.ativo;
-    } else {
-      const { query } = await import('@/lib/db');
-      const users: any[] = await query('SELECT ativo FROM usuarios WHERE id = ?', [id]);
-      isAtivo = (users && users.length > 0 && users[0].ativo);
-      
-      // Salva no cache por 5 minutos (300.000 ms)
-      activeUserCache.set(id, { ativo: isAtivo, expires: now + 300000 });
-    }
+
+    // Consulta o banco em tempo real para garantir revogação imediata de acesso
+    const { query } = await import('@/lib/db');
+    const users: any[] = await query('SELECT ativo FROM usuarios WHERE id = ?', [id]);
+    const isAtivo = (users && users.length > 0 && users[0].ativo);
 
     if (!isAtivo) {
       return null;

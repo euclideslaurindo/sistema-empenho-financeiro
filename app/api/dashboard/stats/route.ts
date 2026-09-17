@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 
+// Cache em memória — safe em instância única (standalone Next.js)
+// TTL de 5 minutos: dashboard não precisa de tempo real
+const CACHE_TTL_MS = 5 * 60 * 1000;
+let statsCache: { data: any; expiresAt: number } | null = null;
+
 // GET /api/dashboard/stats — estatísticas para o dashboard
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
   if (!user) return unauthorizedResponse();
+
+  // Servir do cache se ainda válido
+  if (statsCache && Date.now() < statsCache.expiresAt) {
+    return NextResponse.json(statsCache.data);
+  }
 
   try {
     // Total de credores ativos
@@ -99,7 +109,7 @@ export async function GET(request: NextRequest) {
       ? Number((((pagAtual - pagAnterior) / pagAnterior) * 100).toFixed(1)) 
       : 0;
 
-    return NextResponse.json({
+    const responseData = {
       credoresTotal: credoresAtual,
       credoresVariacao,
       nesUltimos30: nesAtual,
@@ -108,7 +118,12 @@ export async function GET(request: NextRequest) {
       pagamentosVariacao: pagVariacao,
       ultimasNes: ultimasNes || [],
       ultimasOrdens: ultimasOrdens || [],
-    });
+    };
+
+    // Salva no cache com TTL de 5 minutos
+    statsCache = { data: responseData, expiresAt: Date.now() + CACHE_TTL_MS };
+
+    return NextResponse.json(responseData);
   } catch (error: any) {
     console.error('[API GET /dashboard/stats] Erro:', error);
     return NextResponse.json({ error: 'Erro ao buscar estatísticas.' }, { status: 500 });

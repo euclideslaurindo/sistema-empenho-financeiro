@@ -171,7 +171,8 @@ export class OrdemPagamentoService {
           });
         }
         totalItensCalc = Math.round(totalItensCalc * 100) / 100;
-        if (totalItensCalc > 0 && Math.abs(totalItensCalc - vPagamentoArredondado) > 0) {
+        // Tolerância de 1 centavo para evitar falso positivo por imprecisão IEEE 754
+        if (totalItensCalc > 0 && Math.abs(totalItensCalc - vPagamentoArredondado) > 0.01) {
           throw { status: 400, error: `A soma dos itens (R$ ${totalItensCalc.toFixed(2)}) não bate com o valor a pagar da OP (R$ ${vPagamentoArredondado.toFixed(2)}). Fraude detectada.` };
         }
 
@@ -218,6 +219,11 @@ export class OrdemPagamentoService {
           finalLiquido = Math.round((vPagamentoArredondado - finalTotalDescontos) * 100) / 100;
         }
 
+        // Guarda de tamanho: evita estouro do max_allowed_packet do MySQL (~16MB padrão)
+        const itensJson = itens ? JSON.stringify(itens) : null;
+        if (itensJson && itensJson.length > 65535) {
+          throw { status: 400, error: 'A lista de itens é muito grande. Reduza a quantidade de itens ou o tamanho das descrições.' };
+        }
         const id = crypto.randomUUID();
         await conn.execute(
           `INSERT INTO ordens_pagamento (
@@ -232,7 +238,7 @@ export class OrdemPagamentoService {
             id, liquidacao_id || null, neReal, numeroDaOpGerado, subGerado,
             credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
             unidadeOrcamentaria || '', elemento || '', subelemento || '', gestao || '', historico || '',
-            itens ? JSON.stringify(itens) : null,
+            itensJson,
             toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamento,
             finalIrrf, finalIss, finalInss, finalSestSenat, finalPatronal,
             finalOutros, finalTotalDescontos, finalLiquido,

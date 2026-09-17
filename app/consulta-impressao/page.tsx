@@ -34,7 +34,7 @@ const EmpenhoVia = ({
         {/* Header */}
         <div className="flex justify-between items-start pt-2 px-2 pb-1 relative">
           <div className="w-[84px] h-[84px] flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            { }
             <img
               src="/brasao_pernambuco.png"
               alt="Brasão do Estado de Pernambuco"
@@ -1136,7 +1136,7 @@ export default function ConsultaImpressao() {
   >([{ frente: frenteData, verso: versoData }]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setMounted(true);
 
     try {
@@ -1359,7 +1359,7 @@ export default function ConsultaImpressao() {
   };
 
   const gerarLote = async () => {
-    toast.info("Processando impressões...");
+    toast.info("Processando impressões, por favor aguarde...");
     let allDocs: any[] = [];
     
     if (searchMode === "single") {
@@ -1445,7 +1445,18 @@ export default function ConsultaImpressao() {
       });
     }
 
-    setDocumentList(allDocs);
+    // Renderização em lotes (chunks) para não travar a UI thread
+    setDocumentList([]);
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    const CHUNK_SIZE = 10;
+    for (let i = 0; i < allDocs.length; i += CHUNK_SIZE) {
+      const chunk = allDocs.slice(i, i + CHUNK_SIZE);
+      setDocumentList((prev) => [...prev, ...chunk]);
+      // Yield main thread
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
     if (allDocs.length > 1) {
       toast.success(`${allDocs.length} impressões prontas.`);
     } else {
@@ -1455,7 +1466,7 @@ export default function ConsultaImpressao() {
     setTimeout(() => {
       setView("document");
       setIsEditing(true);
-    }, 600);
+    }, 100);
   };
 
   if (!mounted) return null;

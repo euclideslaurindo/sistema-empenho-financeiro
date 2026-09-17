@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Lock, User, AlertCircle, Loader2, ArrowRight, Landmark, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,6 +10,7 @@ export default function Login() {
   const [senha, setSenha] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +26,7 @@ export default function Login() {
       const data = await res.json();
       
       if (res.ok) {
-        window.location.href = "/";
+        router.push("/");
       } else {
         setError(data.error || "Credenciais inválidas");
       }

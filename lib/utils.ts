@@ -14,16 +14,23 @@ export function cn(...inputs: ClassValue[]) {
 export function maskCurrency(value: string | number): string {
   let centavosStr: string;
   if (typeof value === 'number') {
-    // Número em reais → converte para centavos inteiros
+    // Número em reais → converte para centavos inteiros sem usar ponto flutuante
     if (!isFinite(value) || isNaN(value)) return '';
+    // Multiply by 100 and round to avoid IEEE 754 drift
     centavosStr = String(Math.round(value * 100));
   } else {
     // String digitada pelo usuário → remove tudo que não é dígito
     centavosStr = String(value).replace(/\D/g, '');
   }
   if (!centavosStr || centavosStr === '0') return '';
-  const num = parseInt(centavosStr, 10) / 100;
-  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Operação em inteiros: não há ponto flutuante → sem imprecisão
+  const centavos = parseInt(centavosStr, 10);
+  if (isNaN(centavos)) return '';
+  const reais = Math.floor(centavos / 100);
+  const cents = centavos % 100;
+  const reaisStr = reais.toLocaleString('pt-BR');
+  const centsStr = String(cents).padStart(2, '0');
+  return `${reaisStr},${centsStr}`;
 }
 
 /**
@@ -34,8 +41,21 @@ export function maskCurrency(value: string | number): string {
 export function parseFormNumber(val: any): number {
   if (val === null || val === undefined || val === '') return 0;
   if (typeof val === 'number') return isNaN(val) ? 0 : val;
-  // Remove separadores de milhar (ponto) e troca vírgula decimal por ponto
-  const clean = String(val).replace(/\./g, '').replace(',', '.');
+  const str = String(val).trim();
+  // Detecta o separador decimal: se houver vírgula, é formato BR (1.500,00)
+  // Senão, pode ser formato US (1500.00) ou número puro
+  if (str.includes(',')) {
+    // Formato BR: remove pontos de milhar, troca vírgula por ponto
+    const clean = str.replace(/\./g, '').replace(',', '.');
+    const parsed = parseFloat(clean);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  // Formato sem vírgula: apenas remove caracteres não-numéricos exceto ponto final
+  // Garante apenas um ponto decimal (pega o último)
+  const parts = str.replace(/[^\d.]/g, '').split('.');
+  const clean = parts.length > 1 
+    ? parts.slice(0, -1).join('') + '.' + parts[parts.length - 1]
+    : parts[0];
   const parsed = parseFloat(clean);
   return isNaN(parsed) ? 0 : parsed;
 }
@@ -102,4 +122,54 @@ export function numeroPorExtenso(numero: number): string {
   }
   
   return partes.join(" ");
+}
+
+/**
+ * Valida o dígito verificador matemático de CPFs e CNPJs.
+ */
+export function isValidCpfCnpj(val: string): boolean {
+  if (!val) return false;
+  const numbers = val.replace(/\D/g, '');
+  
+  if (numbers.length === 11) {
+    if (/^(\d)\1{10}$/.test(numbers)) return false;
+    let sum = 0, rest;
+    for (let i = 1; i <= 9; i++) sum += parseInt(numbers.substring(i-1, i)) * (11 - i);
+    rest = (sum * 10) % 11;
+    if (rest === 10 || rest === 11) rest = 0;
+    if (rest !== parseInt(numbers.substring(9, 10))) return false;
+    sum = 0;
+    for (let i = 1; i <= 10; i++) sum += parseInt(numbers.substring(i-1, i)) * (12 - i);
+    rest = (sum * 10) % 11;
+    if (rest === 10 || rest === 11) rest = 0;
+    if (rest !== parseInt(numbers.substring(10, 11))) return false;
+    return true;
+  }
+  
+  if (numbers.length === 14) {
+    if (/^(\d)\1{13}$/.test(numbers)) return false;
+    let length = numbers.length - 2;
+    let numbersSub = numbers.substring(0, length);
+    const digits = numbers.substring(length);
+    let sum = 0, pos = length - 7;
+    for (let i = length; i >= 1; i--) {
+      sum += parseInt(numbersSub.charAt(length - i)) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    let result = sum % 11 < 2 ? 0 : 11 - sum % 11;
+    if (result !== parseInt(digits.charAt(0))) return false;
+    length = length + 1;
+    numbersSub = numbers.substring(0, length);
+    sum = 0;
+    pos = length - 7;
+    for (let i = length; i >= 1; i--) {
+      sum += parseInt(numbersSub.charAt(length - i)) * pos--;
+      if (pos < 2) pos = 9;
+    }
+    result = sum % 11 < 2 ? 0 : 11 - sum % 11;
+    if (result !== parseInt(digits.charAt(1))) return false;
+    return true;
+  }
+  
+  return false;
 }

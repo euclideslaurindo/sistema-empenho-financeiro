@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
+import { isValidCpfCnpj } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,11 @@ export async function GET(request: NextRequest) {
 
     if (cnpj.length !== 14) {
       return NextResponse.json({ error: 'CNPJ deve conter 14 dígitos.' }, { status: 400 });
+    }
+
+    // Valida algebricamente (Módulo 11) antes de bater nas APIs externas
+    if (!isValidCpfCnpj(cnpj)) {
+      return NextResponse.json({ error: 'CNPJ inválido. Verifique os dígitos verificadores.' }, { status: 400 });
     }
 
     // 1. Tentar BrasilAPI pelo Backend (sem bloqueio de CORS)

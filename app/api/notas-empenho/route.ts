@@ -9,8 +9,10 @@ const notaEmpenhoSchema = z.object({
   numero: z.string().min(1, 'Número da NE é obrigatório.'),
   valor: z.union([z.string(), z.number()]).transform(val => {
     if (typeof val === 'number') return val;
-    // Remove separadores de milhar (pontos) antes de parsear
-    return parseFloat(String(val).replace(/\./g, '').replace(',', '.')) || 0;
+    const str = String(val).trim();
+    // Remove tudo que não seja dígito ou vírgula, depois troca a última vírgula por ponto decimal
+    const clean = str.replace(/[^\d,]/g, '').replace(',', '.');
+    return parseFloat(clean) || 0;
   }).refine(val => val > 0, { message: 'O valor da NE deve ser maior que zero.' }),
   dataPagamento: z.string().optional().nullable(),
   unidadeOrcamentaria: z.string().optional(),
@@ -78,15 +80,13 @@ export async function GET(request: NextRequest) {
         ne.elemento, ne.subelemento,
         ne.gestao, ne.status, ne.historico, ne.created_at,
         ne.credor_nome as credorNome, ne.cpf_cnpj as cpfCnpj,
-        (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel,
+        -- Subquery correlacionada: usa índice em numero_ne, roda só nas linhas da página
+        (ne.valor - COALESCE(
+          (SELECT SUM(op.valor_pagamento) FROM ordens_pagamento op WHERE op.numero_ne = ne.numero),
+        0)) as saldoDisponivel,
         u.nome as quemAtualizou
       FROM notas_empenho ne
       LEFT JOIN usuarios u ON ne.usuario_id = u.id
-      LEFT JOIN (
-        SELECT numero_ne, SUM(valor_pagamento) as total_pago
-        FROM ordens_pagamento
-        GROUP BY numero_ne
-      ) op_sum ON op_sum.numero_ne = ne.numero
       WHERE 1=1`;
 
     const params: any[] = [];

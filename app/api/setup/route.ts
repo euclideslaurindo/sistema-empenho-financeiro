@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
       )
     `);
 
-    const hash = await bcrypt.hash('admin123', 12);
+    const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || 'Mudar@123';
+    const hash = await bcrypt.hash(initialPassword, 12);
 
     await query(`
       INSERT IGNORE INTO usuarios (id, nome, email, senha_hash, perfil)

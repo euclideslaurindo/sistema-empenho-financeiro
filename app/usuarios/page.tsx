@@ -9,6 +9,8 @@ export default function UsuariosPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({ nome: "", email: "", cpf: "", senha: "", perfil: "USER" });
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     fetchUsuarios();
@@ -31,6 +33,34 @@ export default function UsuariosPage() {
       toast.error("Preencha todos os campos");
       return;
     }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email.trim())) {
+      toast.error("Formato de e-mail inválido.");
+      return;
+    }
+
+    // Remove formatação e valida CPF com Módulo 11
+    const cpfDigits = formData.cpf.replace(/\D/g, '');
+    if (cpfDigits.length !== 11) {
+      toast.error("CPF deve conter 11 dígitos.");
+      return;
+    }
+    // Validação Módulo 11 inline
+    if (/^(\d)\1{10}$/.test(cpfDigits)) {
+      toast.error("CPF inválido (dígitos repetidos).");
+      return;
+    }
+    let sum = 0;
+    for (let i = 1; i <= 9; i++) sum += parseInt(cpfDigits[i - 1]) * (11 - i);
+    let rest = (sum * 10) % 11;
+    if (rest === 10 || rest === 11) rest = 0;
+    if (rest !== parseInt(cpfDigits[9])) { toast.error("CPF inválido."); return; }
+    sum = 0;
+    for (let i = 1; i <= 10; i++) sum += parseInt(cpfDigits[i - 1]) * (12 - i);
+    rest = (sum * 10) % 11;
+    if (rest === 10 || rest === 11) rest = 0;
+    if (rest !== parseInt(cpfDigits[10])) { toast.error("CPF inválido."); return; }
     try {
       const { error } = await apiClient.post("/api/usuarios", formData);
       if (error) throw new Error(error.message);
@@ -97,7 +127,7 @@ export default function UsuariosPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={5} className="py-8 text-center text-slate-400 font-bold">Carregando...</td></tr>
-            ) : usuarios.map((u) => (
+            ) : usuarios.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((u) => (
               <tr key={u.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
                 <td className="py-4 font-bold text-slate-700">{u.nome}</td>
                 <td className="py-4 font-semibold text-slate-500">{u.email}</td>
@@ -123,6 +153,31 @@ export default function UsuariosPage() {
             ))}
           </tbody>
         </table>
+
+        {/* Paginação */}
+        {!loading && usuarios.length > PAGE_SIZE && (
+          <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-100">
+            <span className="text-sm font-semibold text-slate-500">
+              Página {currentPage} de {Math.ceil(usuarios.length / PAGE_SIZE)} — {usuarios.length} usuários
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(usuarios.length / PAGE_SIZE), p + 1))}
+                disabled={currentPage === Math.ceil(usuarios.length / PAGE_SIZE)}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {showModal && (

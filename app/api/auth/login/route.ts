@@ -6,7 +6,10 @@ import { checkRateLimit, resetRateLimit } from '@/lib/rate-limiter';
 import { JWT_SECRET } from '@/lib/jwt-secret';
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
+  // Prioriza headers padrão de proxy reverso, fallback para request.ip
+  const ip = request.headers.get('x-real-ip') 
+          || request.headers.get('x-forwarded-for')?.split(',')[0].trim() 
+          || '127.0.0.1';
 
   // Lê o body antecipadamente para usar o email na chave do rate limiter
   let body: any;

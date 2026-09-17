@@ -13,9 +13,22 @@ export async function GET(request: NextRequest) {
 
   try {
     const cwd = process.cwd();
-    const filesInDir = fs.readdirSync(cwd);
-    const xlsxFileName = filesInDir.find(f => f.endsWith('.xlsx')) || 'Sistema de Empenho e Gestão Financeira (1).xlsx';
-    const targetPath = path.join(cwd, xlsxFileName);
+    // Restringe a busca a um diretório seguro para evitar varredura do root (Directory Traversal)
+    const safeDir = path.join(cwd, 'public'); 
+    let targetPath = '';
+
+    if (fs.existsSync(safeDir)) {
+      const filesInDir = fs.readdirSync(safeDir);
+      const xlsxFileName = filesInDir.find(f => f.endsWith('.xlsx'));
+      if (xlsxFileName) {
+        targetPath = path.join(safeDir, xlsxFileName);
+      }
+    }
+
+    // Fallback caso seja um upload nomeado fixo (evita expor outros arquivos)
+    if (!targetPath) {
+       targetPath = path.join(cwd, 'Sistema de Empenho e Gestão Financeira (1).xlsx');
+    }
 
     if (!fs.existsSync(targetPath)) {
       return NextResponse.json({ error: 'Arquivo não encontrado: ' + targetPath }, { status: 200 });

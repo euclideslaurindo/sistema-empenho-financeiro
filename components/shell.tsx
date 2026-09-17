@@ -11,14 +11,6 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const setUserProfile = useAppStore((state) => state.setUserProfile);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          registration.unregister();
-        }
-      });
-    }
-
     if (!isLoginPage) {
       fetch('/api/perfil')
         .then(res => res.ok ? res.json() : null)
@@ -42,8 +34,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col w-full min-h-screen relative z-10 overflow-x-hidden bg-[#E2E8F0] print:block print:min-h-auto print:overflow-visible print:bg-white">
-      {/* Noise Texture Background */}
-      <div className="print:hidden fixed inset-0 z-0 opacity-20 pointer-events-none mix-blend-multiply" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
+      {/* Subtle noise-like texture via CSS — sem GPU overdraw */}
+      <div className="print:hidden fixed inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #64748b 1px, transparent 0)', backgroundSize: '24px 24px' }}></div>
 
       {/* Offline Indicator floating at the top */}
       <OfflineIndicator />

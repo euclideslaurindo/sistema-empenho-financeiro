@@ -55,13 +55,29 @@ export default function Configuracoes() {
     }
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword || !newPassword) return;
-    toast.success("Sua senha foi redefinida com sucesso.");
-    setShowPasswordModal(false);
-    setCurrentPassword("");
-    setNewPassword("");
+
+    try {
+      const res = await fetch("/api/perfil/senha", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ senhaAtual: currentPassword, novaSenha: newPassword }),
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success("Sua senha foi redefinida com sucesso.");
+        setShowPasswordModal(false);
+        setCurrentPassword("");
+        setNewPassword("");
+      } else {
+        toast.error(data.error || "Erro ao alterar senha.");
+      }
+    } catch {
+      toast.error("Erro de conexão com o servidor.");
+    }
   };
 
   const handleAction = async (action: string) => {

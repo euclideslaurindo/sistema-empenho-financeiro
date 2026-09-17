@@ -106,7 +106,10 @@ export default function Dashboard() {
               <div>
                 <p className="text-blue-100/90 text-xs font-black tracking-widest uppercase mb-1">Total a Pagar</p>
                 <h2 className="text-5xl md:text-[4rem] font-black text-white tracking-tighter drop-shadow-sm leading-none mt-2">
-                  {statsLoading ? "..." : `R$ ${Number(stats?.pagamentosPendentesTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  {statsLoading 
+                    ? <span className="inline-block w-64 h-14 bg-white/20 rounded-xl animate-pulse" />
+                    : `R$ ${Number(stats?.pagamentosPendentesTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  }
                 </h2>
               </div>
               
@@ -137,7 +140,10 @@ export default function Dashboard() {
               <div>
                 <p className="text-slate-400 text-xs font-black tracking-widest uppercase mb-1">Credores Ativos</p>
                 <h2 className="text-4xl font-black text-slate-800 tracking-tight">
-                  {statsLoading ? "..." : stats?.credoresTotal ?? 0}
+                  {statsLoading 
+                    ? <span className="inline-block w-16 h-10 bg-slate-100 rounded-lg animate-pulse" />
+                    : stats?.credoresTotal ?? 0
+                  }
                 </h2>
               </div>
             </div>
@@ -159,7 +165,10 @@ export default function Dashboard() {
               <div>
                 <p className="text-slate-400 text-xs font-black tracking-widest uppercase mb-1">Notas Emitidas</p>
                 <h2 className="text-4xl font-black text-slate-800 tracking-tight">
-                  {statsLoading ? "..." : stats?.nesUltimos30 ?? 0}
+                  {statsLoading 
+                    ? <span className="inline-block w-12 h-10 bg-slate-100 rounded-lg animate-pulse" />
+                    : stats?.nesUltimos30 ?? 0
+                  }
                 </h2>
               </div>
             </div>

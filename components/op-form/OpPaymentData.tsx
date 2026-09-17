@@ -1,13 +1,64 @@
 "use client";
 import { useState } from "react";
-import { useFormContext } from "react-hook-form";
+import { useFormContext, useWatch } from "react-hook-form";
 import { Search, Wallet, User } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
-import { maskCurrency } from "@/lib/utils";
+import { maskCurrency, parseFormNumber } from "@/lib/utils";
+
+function IndicadorSaldo({ control }: { control: any }) {
+  const empenho = useWatch({ control, name: "empenho" });
+  const saldoAnterior = useWatch({ control, name: "saldoAnterior" });
+  const valorPagamento = useWatch({ control, name: "valorPagamento" });
+
+  if (!empenho) return null;
+
+  const valorPg = parseFormNumber(valorPagamento);
+  const saldoAtual = Number(saldoAnterior) || 0;
+  const ultrapassouSaldo = valorPg > saldoAtual && saldoAtual > 0;
+
+  return (
+    <div className={`p-4 rounded-xl border flex items-center gap-4 mb-8 ${ultrapassouSaldo ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+      <Wallet className="w-6 h-6" />
+      <div>
+        <p className="text-sm font-bold uppercase tracking-widest opacity-80">Saldo Anterior da NE</p>
+        <p className="text-2xl font-black">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldoAtual)}</p>
+      </div>
+      <div className="ml-auto text-right">
+        <p className="text-sm font-bold uppercase tracking-widest opacity-80">Saldo Restante Após Pagamento</p>
+        <p className="text-xl font-bold">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldoAtual - valorPg)}</p>
+      </div>
+    </div>
+  );
+}
+
+function InputValorPagamento({ register, control, errors }: { register: any, control: any, errors: any }) {
+  const saldoAnterior = useWatch({ control, name: "saldoAnterior" });
+  const valorPagamento = useWatch({ control, name: "valorPagamento" });
+
+  const valorPg = parseFormNumber(valorPagamento);
+  const saldoAtual = Number(saldoAnterior) || 0;
+  const ultrapassouSaldo = valorPg > saldoAtual && saldoAtual > 0;
+
+  return (
+    <div className="col-span-12 md:col-span-4 mt-4">
+      <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Valor a Pagar R$</label>
+      <input 
+        type="text" 
+        placeholder="0,00" 
+        {...register("valorPagamento", {
+          onChange: (e: any) => {
+            e.target.value = maskCurrency(e.target.value);
+          }
+        })} 
+        className={`w-full px-4 py-3 rounded-xl border text-lg font-black focus:outline-none focus:ring-4 transition-all duration-300 ${ultrapassouSaldo ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-emerald-700 focus:border-emerald-400 focus:ring-emerald-500/10'}`} 
+      />
+    </div>
+  );
+}
 
 export default function OpPaymentData({ errors }: { errors: any }) {
-  const { register, setValue, watch } = useFormContext<any>();
+  const { register, setValue, getValues, control } = useFormContext<any>();
 
   const [neSuggestions, setNeSuggestions] = useState<any[]>([]);
   const [showNeSuggestions, setShowNeSuggestions] = useState(false);
@@ -22,7 +73,7 @@ export default function OpPaymentData({ errors }: { errors: any }) {
 
   // aceita numero opcional para evitar race condition quando chamado do selectNe
   const loadNe = async (overrideNumero?: string) => {
-    const raw = overrideNumero || watch("empenho");
+    const raw = overrideNumero || getValues("empenho");
     const numero = raw != null ? String(raw).trim() : '';
     if (!numero) { toast.error("Digite o número da NE para buscar."); return; }
     try {
@@ -41,7 +92,7 @@ export default function OpPaymentData({ errors }: { errors: any }) {
         const saldoFormatado = maskCurrency(Number(ne.saldoDisponivel) || 0);
         setValue("valorPagamento", saldoFormatado as any);
 
-        const currentItens = watch("itens") || [];
+        const currentItens = getValues("itens") || [];
         const newItens = [...currentItens];
         newItens[0] = {
           especificacao: ne.historico || 'Pagamento referente ao empenho ' + ne.numero,
@@ -134,33 +185,9 @@ export default function OpPaymentData({ errors }: { errors: any }) {
     setShowCredorSuggestions(false);
   };
 
-  const parseFormNumber = (val: any): number => {
-    if (!val && val !== 0) return 0;
-    if (typeof val === 'number') return val;
-    const clean = String(val).replace(/\./g, '').replace(',', '.');
-    return parseFloat(clean) || 0;
-  };
-
-  const valorPg = parseFormNumber(watch("valorPagamento"));
-  const saldoAtual = Number(watch("saldoAnterior")) || 0;
-  const ultrapassouSaldo = valorPg > saldoAtual && saldoAtual > 0;
-
   return (
     <>
-      {/* INDICADOR DE SALDO */}
-      {watch("empenho") && (
-        <div className={`p-4 rounded-xl border flex items-center gap-4 mb-8 ${ultrapassouSaldo ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
-          <Wallet className="w-6 h-6" />
-          <div>
-            <p className="text-sm font-bold uppercase tracking-widest opacity-80">Saldo Anterior da NE</p>
-            <p className="text-2xl font-black">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldoAtual)}</p>
-          </div>
-          <div className="ml-auto text-right">
-            <p className="text-sm font-bold uppercase tracking-widest opacity-80">Saldo Restante Após Pagamento</p>
-            <p className="text-xl font-bold">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldoAtual - valorPg)}</p>
-          </div>
-        </div>
-      )}
+      <IndicadorSaldo control={control} />
 
       <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
         <div className="flex items-center mb-8 pb-4 border-b border-slate-100">
@@ -199,7 +226,7 @@ export default function OpPaymentData({ errors }: { errors: any }) {
               placeholder="Buscar NE (ex: 2024NE000123)" 
               {...register("empenho")}
               onChange={(e) => handleNeSearchChange(e.target.value)}
-              onFocus={() => { if(watch("empenho")?.length >= 2) setShowNeSuggestions(true); }}
+              onFocus={() => { if(getValues("empenho")?.length >= 2) setShowNeSuggestions(true); }}
               onBlur={() => setTimeout(() => setShowNeSuggestions(false), 200)}
               className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" 
             />
@@ -247,7 +274,7 @@ export default function OpPaymentData({ errors }: { errors: any }) {
             {...register("cpfCnpj")}
             onChange={(e) => handleCpfChange(e.target.value)}
             onBlur={() => setTimeout(() => setShowCpfSuggestions(false), 200)}
-            onFocus={() => { if (watch("cpfCnpj")?.replace(/\D/g,'').length >= 4) setShowCpfSuggestions(true); }}
+            onFocus={() => { if (getValues("cpfCnpj")?.replace(/\D/g,'').length >= 4) setShowCpfSuggestions(true); }}
             className={`w-full px-4 py-3 rounded-xl border bg-slate-50 focus:border-blue-800 transition-all duration-300 ${errors?.cpfCnpj ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
           />
           {errors?.cpfCnpj && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.cpfCnpj.message}</p>}
@@ -275,7 +302,7 @@ export default function OpPaymentData({ errors }: { errors: any }) {
             {...register("nomeCredor")}
             onChange={(e) => handleCredorNameChange(e.target.value)}
             onBlur={() => setTimeout(() => setShowCredorSuggestions(false), 200)}
-            onFocus={() => { if (watch("nomeCredor")?.length >= 2) setShowCredorSuggestions(true); }}
+            onFocus={() => { if (getValues("nomeCredor")?.length >= 2) setShowCredorSuggestions(true); }}
             className={`w-full px-4 py-3 rounded-xl border bg-blue-50 text-blue-900 font-bold focus:border-blue-800 transition-all duration-300 ${errors?.nomeCredor ? 'border-red-400 bg-red-50 text-slate-900' : 'border-blue-100'}`}
           />
           {errors?.nomeCredor && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.nomeCredor.message}</p>}
@@ -305,19 +332,7 @@ export default function OpPaymentData({ errors }: { errors: any }) {
           <input type="text" {...register("enderecoCredor")} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" />
         </div>
 
-        <div className="col-span-12 md:col-span-4 mt-4">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Valor a Pagar R$</label>
-          <input 
-            type="text" 
-            placeholder="0,00" 
-            {...register("valorPagamento", {
-              onChange: (e: any) => {
-                e.target.value = maskCurrency(e.target.value);
-              }
-            })} 
-            className={`w-full px-4 py-3 rounded-xl border text-lg font-black focus:outline-none focus:ring-4 transition-all duration-300 ${ultrapassouSaldo ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-emerald-700 focus:border-emerald-400 focus:ring-emerald-500/10'}`} 
-          />
-        </div>
+          <InputValorPagamento register={register} control={control} errors={errors} />
 
       </div>
     </div>

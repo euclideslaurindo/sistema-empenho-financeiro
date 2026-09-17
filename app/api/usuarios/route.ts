@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const usuarios = await query<any[]>(
-      `SELECT id, nome, email, cpf, perfil, ativo, created_at FROM usuarios ORDER BY nome ASC`
+      `SELECT id, nome, email, perfil, ativo, created_at FROM usuarios ORDER BY nome ASC`
     );
     return NextResponse.json({ usuarios });
   } catch (error: any) {
@@ -26,10 +26,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { nome, email, cpf, senha, perfil } = body;
+    const { nome, email, senha, perfil } = body;
 
-    if (!nome || !email || !cpf || !senha) {
-      return NextResponse.json({ error: 'Todos os campos são obrigatórios' }, { status: 400 });
+    if (!nome || !email || !senha) {
+      return NextResponse.json({ error: 'Nome, e-mail e senha são obrigatórios' }, { status: 400 });
     }
 
     const hashed = await hash(senha, 10);
@@ -38,17 +38,17 @@ export async function POST(request: NextRequest) {
 
     // check se ja existe
     const [existing] = await query<any[]>(
-      'SELECT id FROM usuarios WHERE email = ? OR cpf = ?',
-      [email, cpf]
+      'SELECT id FROM usuarios WHERE email = ?',
+      [email]
     );
 
     if (existing) {
-      return NextResponse.json({ error: 'E-mail ou CPF já cadastrado' }, { status: 409 });
+      return NextResponse.json({ error: 'E-mail já cadastrado' }, { status: 409 });
     }
 
     await query(
-      `INSERT INTO usuarios (id, nome, email, cpf, password_hash, perfil, ativo) VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      [id, nome, email, cpf, hashed, roleValue]
+      `INSERT INTO usuarios (id, nome, email, senha_hash, perfil, ativo) VALUES (?, ?, ?, ?, ?, 1)`,
+      [id, nome, email, hashed, roleValue]
     );
 
     return NextResponse.json({ success: true, id }, { status: 201 });
