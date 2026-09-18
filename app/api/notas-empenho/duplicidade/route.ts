@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Duplicidade = mesmo Valor + mesmo Credor + mesmo Subelemento
-    const rows = await query<any[]>(
+    const rows = await query<{numero: string, data_emissao: Date}[]>(
       `SELECT numero, data_emissao FROM notas_empenho 
        WHERE valor = ? 
          AND (credor_nome = ? OR ? = '')

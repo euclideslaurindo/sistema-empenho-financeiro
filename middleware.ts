@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import * as jose from 'jose';
 import { JWT_SECRET } from '@/lib/jwt-secret';
+import { AUTH_COOKIE_NAME } from '@/lib/constants';
 
 export async function middleware(request: NextRequest) {
-  const token = request.cookies.get('auth_token')?.value;
+  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const { pathname } = request.nextUrl;
 
   // Rotas que não precisam de autenticação
@@ -35,11 +36,11 @@ export async function middleware(request: NextRequest) {
     // Token inválido ou expirado
     if (pathname.startsWith('/api/')) {
       const response = NextResponse.json({ error: 'Sessao expirada.' }, { status: 401 });
-      response.cookies.delete('auth_token');
+      response.cookies.delete(AUTH_COOKIE_NAME);
       return response;
     }
     const response = NextResponse.redirect(new URL('/login', request.url));
-    response.cookies.delete('auth_token');
+    response.cookies.delete(AUTH_COOKIE_NAME);
     return response;
   }
 }

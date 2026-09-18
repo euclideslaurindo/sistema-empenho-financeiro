@@ -2,10 +2,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { ELEMENTOS, SUBELEMENTOS } from "@/lib/constants";
+import { notaEmpenhoSchema, type NotaEmpenhoFormValues } from "@/lib/schemas";
 import {
   Plus,
   Save,
@@ -40,37 +40,6 @@ interface NotaEmpenho {
   credorNome?: string;
   cpfCnpj?: string;
 }
-
-const notaEmpenhoSchema = z.object({
-  numeroNE: z.string().min(1, "Número da NE é obrigatório"),
-  valorNE: z.union([z.string(), z.number()]).transform(val => {
-    const clean = String(val).replace(/[^\d,-]/g, '').replace(',', '.');
-    return parseFloat(clean) || 0;
-  }).refine(val => val > 0, { message: "O valor da NE deve ser maior que zero." }),
-  dataPagamento: z.string().min(1, "Data é obrigatória").refine(val => {
-    const y = parseInt(val.split('-')[0], 10);
-    return y >= 2000 && y <= 2100;
-  }, "Ano inválido"),
-  unidadeOrcamentaria: z.string().optional(),
-  elemento: z.string().optional(),
-  subelemento: z.string().optional(),
-  gestao: z.string().optional(),
-  historico: z.string().optional(),
-  dataProvisaoConcedida: z.string().optional().refine(val => {
-    if (!val) return true;
-    const y = parseInt(val.split('-')[0], 10);
-    return y >= 2000 && y <= 2100;
-  }, "Ano inválido"),
-  dataEmissao: z.string().optional().refine(val => {
-    if (!val) return true;
-    const y = parseInt(val.split('-')[0], 10);
-    return y >= 2000 && y <= 2100;
-  }, "Ano inválido"),
-  credorNome: z.string().optional(),
-  cpfCnpj: z.string().optional(),
-});
-
-type NotaEmpenhoFormValues = z.input<typeof notaEmpenhoSchema>;
 
 export default function NotasEmpenho() {
   const router = useRouter();
@@ -383,23 +352,27 @@ export default function NotasEmpenho() {
 
           <form className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="md:col-span-1">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+              <label htmlFor="ne-numero" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Número da NE
               </label>
               <input
+                id="ne-numero"
                 type="text"
                 placeholder=""
                 {...register("numeroNE")}
+                aria-invalid={!!errors.numeroNE}
+                aria-describedby={errors.numeroNE ? "ne-numero-error" : undefined}
                 className={`w-full px-4 py-3 rounded-xl border text-sm font-bold focus:outline-none focus:ring-4 transition-all duration-300 ${errors.numeroNE ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700'}`}
               />
-              {errors.numeroNE && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.numeroNE.message as string}</p>}
+              {errors.numeroNE && <p id="ne-numero-error" className="text-red-500 text-xs mt-1.5 font-bold">{errors.numeroNE.message as string}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+              <label htmlFor="ne-valor" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Valor R$
               </label>
               <input
+                id="ne-valor"
                 type="text"
                 placeholder="0,00"
                 {...register("valorNE", {
@@ -407,39 +380,48 @@ export default function NotasEmpenho() {
                     e.target.value = maskCurrency(e.target.value);
                   }
                 })}
+                aria-invalid={!!errors.valorNE}
+                aria-describedby={errors.valorNE ? "ne-valor-error" : undefined}
                 className={`w-full px-4 py-3 rounded-xl border text-sm font-black focus:outline-none focus:ring-4 transition-all duration-300 ${errors.valorNE ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20 text-red-700' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-800'}`}
               />
-              {errors.valorNE && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.valorNE.message as string}</p>}
+              {errors.valorNE && <p id="ne-valor-error" className="text-red-500 text-xs mt-1.5 font-bold">{errors.valorNE.message as string}</p>}
             </div>
-            
+
             <div>
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+              <label htmlFor="ne-data-provisao" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Data de Provisão
               </label>
               <input
+                id="ne-data-provisao"
                 type="date"
                 {...register("dataProvisaoConcedida")}
+                aria-invalid={!!errors.dataProvisaoConcedida}
+                aria-describedby={errors.dataProvisaoConcedida ? "ne-data-provisao-error" : undefined}
                 className={`w-full px-4 py-3 rounded-xl border text-sm font-bold text-slate-500 focus:outline-none focus:ring-4 transition-all duration-300 ${errors.dataProvisaoConcedida ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10'}`}
               />
-              {errors.dataProvisaoConcedida && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataProvisaoConcedida.message as string}</p>}
+              {errors.dataProvisaoConcedida && <p id="ne-data-provisao-error" className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataProvisaoConcedida.message as string}</p>}
             </div>
             <div>
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+              <label htmlFor="ne-data-emissao" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Data de Emissão
               </label>
               <input
+                id="ne-data-emissao"
                 type="date"
                 {...register("dataEmissao")}
+                aria-invalid={!!errors.dataEmissao}
+                aria-describedby={errors.dataEmissao ? "ne-data-emissao-error" : undefined}
                 className={`w-full px-4 py-3 rounded-xl border text-sm font-bold text-slate-500 focus:outline-none focus:ring-4 transition-all duration-300 ${errors.dataEmissao ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10'}`}
               />
-              {errors.dataEmissao && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataEmissao.message as string}</p>}
+              {errors.dataEmissao && <p id="ne-data-emissao-error" className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataEmissao.message as string}</p>}
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+              <label htmlFor="ne-credor-nome" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Credor (Nome/Razão Social)
               </label>
               <input
+                id="ne-credor-nome"
                 type="text"
                 placeholder="Nome do credor"
                 {...register("credorNome")}
@@ -447,10 +429,11 @@ export default function NotasEmpenho() {
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+              <label htmlFor="ne-cpf-cnpj" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 CPF / CNPJ
               </label>
               <input
+                id="ne-cpf-cnpj"
                 type="text"
                 placeholder="000.000.000-00"
                 {...register("cpfCnpj", {
@@ -463,8 +446,9 @@ export default function NotasEmpenho() {
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Unidade Orçamentária</label>
+              <label htmlFor="ne-unidade" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Unidade Orçamentária</label>
               <select
+                id="ne-unidade"
                 {...register("unidadeOrcamentaria")}
                 disabled
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-100 text-sm font-bold text-slate-600 opacity-80 cursor-not-allowed"
@@ -477,8 +461,9 @@ export default function NotasEmpenho() {
               </select>
             </div>
             <div className="md:col-span-1">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Gestão</label>
+              <label htmlFor="ne-gestao" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Gestão</label>
               <select
+                id="ne-gestao"
                 {...register("gestao")}
                 disabled
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-100 text-sm font-bold text-slate-600 opacity-80 cursor-not-allowed"
@@ -487,10 +472,11 @@ export default function NotasEmpenho() {
                 <option value="140102">140102</option>
               </select>
             </div>
-            
+
             <div className="md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Elemento</label>
+              <label htmlFor="ne-elemento" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Elemento</label>
               <select
+                id="ne-elemento"
                 {...register("elemento")}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
               >
@@ -501,8 +487,9 @@ export default function NotasEmpenho() {
               </select>
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Subelemento</label>
+              <label htmlFor="ne-subelemento" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Subelemento</label>
               <select
+                id="ne-subelemento"
                 {...register("subelemento")}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
               >
@@ -513,20 +500,24 @@ export default function NotasEmpenho() {
               </select>
             </div>
             <div className="md:col-span-1">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+              <label htmlFor="ne-data-pagamento" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Data de Pagamento
               </label>
               <input
+                id="ne-data-pagamento"
                 type="date"
                 {...register("dataPagamento")}
+                aria-invalid={!!errors.dataPagamento}
+                aria-describedby={errors.dataPagamento ? "ne-data-pagamento-error" : undefined}
                 className={`w-full px-4 py-3 rounded-xl border text-sm font-bold text-slate-500 focus:outline-none focus:ring-4 transition-all duration-300 ${errors.dataPagamento ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10'}`}
               />
-              {errors.dataPagamento && <p className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataPagamento.message as string}</p>}
+              {errors.dataPagamento && <p id="ne-data-pagamento-error" className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataPagamento.message as string}</p>}
             </div>
 
             <div className="md:col-span-4">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Especificação</label>
+              <label htmlFor="ne-historico" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Especificação</label>
               <textarea
+                id="ne-historico"
                 rows={3}
                 placeholder="Descreva o histórico do empenho..."
                 {...register("historico")}
@@ -616,7 +607,15 @@ export default function NotasEmpenho() {
                     <tr
                       key={ne.id}
                       onClick={() => setSelecionadoId(ne.id)}
-                      className={`group transition-colors cursor-pointer ${baseRowStyle}`}
+                      tabIndex={0}
+                      role="button"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelecionadoId(ne.id);
+                        }
+                      }}
+                      className={`group transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset ${baseRowStyle}`}
                     >
                       <td className={`py-5 font-bold rounded-l-lg pl-2 ${isCancelado ? textStyle : 'text-slate-800'}`}>
                         {ne.numero}

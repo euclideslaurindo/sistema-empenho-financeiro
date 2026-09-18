@@ -75,4 +75,3 @@ GET   /api/dashboard/stats         → KPIs do dashboard
 | /consulta-impressao | Consulta e Impressão |
 | /configuracoes | Configurações |
 | /perfil | Perfil do Usuário |
-| /suporte | Suporte |

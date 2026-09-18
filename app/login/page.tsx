@@ -92,12 +92,13 @@ export default function Login() {
 
         <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-5">
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">
+            <label htmlFor="login-email" className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">
               {isRegistering ? "Nome de Usuário" : "E-mail ou Usuário"}
             </label>
             <div className="relative group">
               <User className="w-[18px] h-[18px] absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors duration-200" />
               <input
+                id="login-email"
                 type="text"
                 required
                 value={email}
@@ -109,12 +110,13 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">
+            <label htmlFor="login-senha" className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">
               Senha de Acesso
             </label>
             <div className="relative group">
               <Lock className="w-[18px] h-[18px] absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors duration-200" />
               <input
+                id="login-senha"
                 type="password"
                 required
                 value={senha}

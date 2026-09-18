@@ -15,11 +15,6 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(100, parseInt(searchParams.get('limit') || '50', 10));
 
     const result = await OrdemPagamentoService.listar({ numeroNe, busca, page, limit });
-    
-    if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
-    }
-    
     return NextResponse.json(result.data);
   });
 }

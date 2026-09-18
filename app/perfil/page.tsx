@@ -3,12 +3,11 @@ import { useState, useEffect } from "react";
 import { UserCircle, Settings, Mail, Shield, Bell, Key } from "lucide-react";
 import { ActionToolbar, ActionButton } from "@/components/action-toolbar";
 import { toast } from "sonner";
+import { ChangePasswordModal } from "@/components/change-password-modal";
 
 export default function PerfilGestor() {
   const [isEditing, setIsEditing] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
   
   const [perfil, setPerfil] = useState({
     id: "",
@@ -68,35 +67,6 @@ export default function PerfilGestor() {
   const handleEditProfile = () => {
     setIsEditing(true);
     toast.info("Modo de edição habilitado. Faça suas alterações.");
-  };
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentPassword || !newPassword) {
-      toast.error("Por favor, preencha ambas as senhas.");
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/perfil/senha', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ senhaAtual: currentPassword, novaSenha: newPassword })
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok) {
-        toast.success("Sua senha foi redefinida com sucesso.");
-        setShowPasswordModal(false);
-        setCurrentPassword("");
-        setNewPassword("");
-      } else {
-        toast.error(data.error || "Erro ao alterar a senha.");
-      }
-    } catch (err) {
-      toast.error("Erro de conexão com o servidor.");
-    }
   };
 
   const handlePasswordChange = () => {
@@ -284,57 +254,7 @@ export default function PerfilGestor() {
       </div>
 
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden p-6 relative z-50">
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">
-              Alterar Senha
-            </h2>
-            <p className="text-sm text-zinc-500 mb-6">
-              Informe a senha atual e a nova senha que deseja utilizar.
-            </p>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-zinc-700 mb-1">
-                  Senha Atual
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0f2942]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-zinc-700 mb-1">
-                  Nova Senha
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-4 py-3 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0f2942]"
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordModal(false)}
-                  className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-semibold py-3 rounded-xl transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 hover:bg-slate-700 text-white text-white font-semibold py-3 rounded-xl transition-colors"
-                >
-                  Confirmar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
       )}
     </div>
   );

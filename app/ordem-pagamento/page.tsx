@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Plus, Save, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import { parseFormNumber } from "@/lib/utils";
 
 import OpPaymentData from "@/components/op-form/OpPaymentData";
 import OpItemsTable from "@/components/op-form/OpItemsTable";
@@ -85,12 +86,7 @@ export default function OrdemPagamento() {
   const [userRole, setUserRole] = useState<string>("GESTOR");
   const [lastSavedNe, setLastSavedNe] = useState<string | null>(null);
 
-  const parseFormNumber = (val: any): number => {
-    if (!val && val !== 0) return 0;
-    if (typeof val === 'number') return val;
-    const clean = String(val).replace(/\./g, '').replace(',', '.');
-    return parseFloat(clean) || 0;
-  };
+
 
   const methods = useForm<OpFormValues>({
     resolver: zodResolver(ordemPagamentoSchema),

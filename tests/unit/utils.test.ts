@@ -6,16 +6,16 @@ describe('maskCurrency', () => {
     expect(maskCurrency(1500)).toBe('1.500,00');
   });
 
-  test('formata 0 como "0,00"', () => {
-    expect(maskCurrency(0)).toBe('0,00');
+  test('formata 0 como string vazia (evita pré-preencher "0,00" no input)', () => {
+    expect(maskCurrency(0)).toBe('');
   });
 
   test('formata 1234567.89 como "1.234.567,89"', () => {
     expect(maskCurrency(1234567.89)).toBe('1.234.567,89');
   });
 
-  test('converte string "1500.5" corretamente', () => {
-    expect(maskCurrency('1500.5')).toBe('1.500,50');
+  test('trata string como dígitos digitados (máscara de input): "150050" vira "1.500,50"', () => {
+    expect(maskCurrency('150050')).toBe('1.500,50');
   });
 });
 

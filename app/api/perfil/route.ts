@@ -3,6 +3,8 @@ import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import * as jose from 'jose';
 import { JWT_SECRET } from '@/lib/jwt-secret';
+import { AUTH_COOKIE_NAME } from '@/lib/constants';
+import { UsuarioDB } from '@/lib/types/db';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
@@ -10,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // busca os dados do usuario logado pelo email que veio do token
-    const rows = await query<any[]>(
+    const rows = await query<UsuarioDB[]>(
       'SELECT id, nome, email, perfil, ativo, created_at FROM usuarios WHERE email = ? LIMIT 1',
       [user.email]
     );
@@ -37,7 +39,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Verificar se o novo e-mail já existe em outro perfil
-    const [existing] = await query<any[]>(
+    const [existing] = await query<{id: string}[]>(
       'SELECT id FROM usuarios WHERE email = ? AND id != ? LIMIT 1',
       [email.trim(), user.id]
     );
@@ -66,7 +68,7 @@ export async function PUT(request: NextRequest) {
     
     // Atualizar o cookie com o novo token
     response.cookies.set({
-      name: 'auth_token',
+      name: AUTH_COOKIE_NAME,
       value: jwt,
       httpOnly: true,
       path: '/',

@@ -41,11 +41,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Criar um email fake baseado no nome de usuário para respeitar a coluna UNIQUE EMAIL do banco
+    // Criar um email fake baseado no nome de usuário + hash único para evitar colisão de homônimos
+    // Ex: "João Silva" + UUID abc12345 → "joao.silva.abc12345@empenho.local"
+    const id = crypto.randomUUID();
     const normalizedUsername = nome.trim().toLowerCase().replace(/\s+/g, '.');
-    const fakeEmail = `${normalizedUsername}@empenho.local`;
+    const uniqueSuffix = id.replace(/-/g, '').substring(0, 8);
+    const fakeEmail = `${normalizedUsername}.${uniqueSuffix}@empenho.local`;
 
-    // Verifica se já existe
+    // Verifica se já existe (praticamente impossível com UUID, mas segurança extra)
     const [existing]: any = await query(
       'SELECT id FROM usuarios WHERE email = ?',
       [fakeEmail]
@@ -60,7 +63,6 @@ export async function POST(request: NextRequest) {
 
     const salt = await bcrypt.genSalt(10);
     const hash = await bcrypt.hash(senha, salt);
-    const id = crypto.randomUUID();
 
     // Inserir no banco como GESTOR (Usuário normal)
     await query(

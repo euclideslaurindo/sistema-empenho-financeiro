@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   if (!user) return unauthorizedResponse();
 
   try {
-    const rows = await query<any[]>('SELECT * FROM configuracoes_sistema WHERE id = 1');
+    const rows = await query<Record<string, any>[]>('SELECT * FROM configuracoes_sistema WHERE id = 1');
     if (!rows || rows.length === 0) {
       return NextResponse.json({ error: 'Configuracoes nao encontradas.' }, { status: 404 });
     }

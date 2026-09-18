@@ -34,11 +34,7 @@ export function ActionButton({
          const result = onClick();
          if (result instanceof Promise) {
             await result;
-         } else {
-            await new Promise(r => setTimeout(r, 500));
          }
-      } else {
-         await new Promise(r => setTimeout(r, 500)); 
       }
       setStatus('success');
     } catch (e) {
@@ -77,9 +73,10 @@ export function ActionButton({
   }
 
   return (
-    <button 
+    <button
       onClick={handleClick}
       disabled={status !== 'idle'}
+      aria-busy={status === 'loading'}
       className={`flex items-center text-sm font-bold px-5 py-2.5 rounded-xl transition-all duration-300 disabled:pointer-events-none cursor-pointer ${currentColorClasses}`}>
       {IconToRender && <IconToRender className={`h-4 w-4 mr-2.5 ${status === 'loading' ? 'animate-spin' : ''} ${iconColorClass}`} />}
       {status === 'loading' ? 'Processando...' : status === 'success' ? 'Efetuado ✓' : label}
