@@ -11,7 +11,7 @@ USE empenho;
 -- TABELA: usuarios
 -- ============================================================
 CREATE TABLE IF NOT EXISTS usuarios (
-  id VARCHAR(36) PRIMARY KEY,
+  id CHAR(36) PRIMARY KEY,
   nome VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   senha_hash VARCHAR(255) NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
 -- TABELA: credores
 -- ============================================================
 CREATE TABLE IF NOT EXISTS credores (
-  id VARCHAR(36) PRIMARY KEY,
+  id CHAR(36) PRIMARY KEY,
   nome VARCHAR(200) NOT NULL,
   endereco VARCHAR(300),
   cpf_cnpj VARCHAR(20) NOT NULL,
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS credores (
   banco VARCHAR(100),
   agencia VARCHAR(20),
   conta_corrente VARCHAR(50),
-  usuario_id VARCHAR(36),
+  usuario_id CHAR(36),
   ativo TINYINT(1) DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS credores (
 -- TABELA: notas_empenho
 -- ============================================================
 CREATE TABLE IF NOT EXISTS notas_empenho (
-  id VARCHAR(36) PRIMARY KEY,
+  id CHAR(36) PRIMARY KEY,
   exercicio VARCHAR(4),
   codigo VARCHAR(50),
   numero VARCHAR(60) NOT NULL,
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS notas_empenho (
   gestao VARCHAR(20),
   status VARCHAR(30) DEFAULT 'EMITIDO' COMMENT 'EMITIDO, LIQUIDADO, CANCELADO',
   historico TEXT,
-  usuario_id VARCHAR(36),
+  usuario_id CHAR(36),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_numero (numero),
@@ -73,8 +73,8 @@ CREATE TABLE IF NOT EXISTS notas_empenho (
 -- TABELA: ordens_pagamento
 -- ============================================================
 CREATE TABLE IF NOT EXISTS ordens_pagamento (
-  id VARCHAR(36) PRIMARY KEY,
-  liquidacao_id VARCHAR(36),
+  id CHAR(36) PRIMARY KEY,
+  liquidacao_id CHAR(36),
   numero_ne VARCHAR(60) NOT NULL,
   numero_empenho VARCHAR(60),
   sub VARCHAR(5) DEFAULT '01',
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS ordens_pagamento (
   numero_cheque VARCHAR(30),
   data_emissao DATE,
   data_pagamento DATE,
-  usuario_id VARCHAR(36),
+  usuario_id CHAR(36),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_cheque (numero_cheque),
   CONSTRAINT fk_op_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
@@ -178,3 +178,4 @@ ALTER TABLE ordens_pagamento
   REFERENCES credores(cpf_cnpj) 
   ON DELETE RESTRICT 
   ON UPDATE CASCADE;
+

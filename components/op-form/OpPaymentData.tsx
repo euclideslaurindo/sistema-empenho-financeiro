@@ -5,6 +5,7 @@ import { Search, Wallet, User } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { maskCurrency, parseFormNumber } from "@/lib/utils";
+import { useListboxKeyboardNav } from "@/hooks/use-listbox-keyboard-nav";
 
 function IndicadorSaldo({ control }: { control: any }) {
   const empenho = useWatch({ control, name: "empenho" });
@@ -185,6 +186,14 @@ export default function OpPaymentData({ errors }: { errors: any }) {
     setShowCredorSuggestions(false);
   };
 
+  const neNav = useListboxKeyboardNav(neSuggestions, selectNe);
+  const cpfNav = useListboxKeyboardNav(cpfSuggestions, (c: any) => {
+    selectCredor(c);
+    setCpfSuggestions([]);
+    setShowCpfSuggestions(false);
+  });
+  const credorNav = useListboxKeyboardNav(credorSuggestions, selectCredor);
+
   return (
     <>
       <IndicadorSaldo control={control} />
@@ -221,24 +230,33 @@ export default function OpPaymentData({ errors }: { errors: any }) {
         <div className="col-span-12 md:col-span-4 relative">
           <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nota de Empenho (NE)</label>
           <div className="relative flex">
-            <input 
-              type="text" 
-              placeholder="Buscar NE (ex: 2024NE000123)" 
+            <input
+              type="text"
+              placeholder="Buscar NE (ex: 2024NE000123)"
               {...register("empenho")}
               onChange={(e) => handleNeSearchChange(e.target.value)}
               onFocus={() => { if(getValues("empenho")?.length >= 2) setShowNeSuggestions(true); }}
               onBlur={() => setTimeout(() => setShowNeSuggestions(false), 200)}
-              className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" 
+              onKeyDown={neNav.onKeyDown}
+              role="combobox"
+              aria-expanded={showNeSuggestions && neSuggestions.length > 0}
+              aria-controls="ne-suggestions-listbox"
+              aria-activedescendant={neNav.highlightedIndex >= 0 ? `ne-option-${neNav.highlightedIndex}` : undefined}
+              className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300"
             />
             <button onClick={() => loadNe()} type="button" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><Search className="w-4 h-4" /></button>
           </div>
           {showNeSuggestions && neSuggestions.length > 0 && (
-            <div className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto">
-              {neSuggestions.map(ne => (
-                <div 
-                  key={ne.id} 
+            <div id="ne-suggestions-listbox" role="listbox" className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto">
+              {neSuggestions.map((ne, i) => (
+                <div
+                  key={ne.id}
+                  id={`ne-option-${i}`}
+                  role="option"
+                  aria-selected={neNav.highlightedIndex === i}
                   onClick={() => selectNe(ne)}
-                  className="p-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
+                  onMouseEnter={() => neNav.setHighlightedIndex(i)}
+                  className={`p-3 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${neNav.highlightedIndex === i ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
                 >
                   <div className="font-bold text-slate-700">{ne.numero}</div>
                   <div className="text-xs text-slate-500 truncate">{ne.historico || 'Sem especificação'}</div>
@@ -267,24 +285,36 @@ export default function OpPaymentData({ errors }: { errors: any }) {
         </div>
 
         <div className="col-span-12 md:col-span-3 relative">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">CPF/CNPJ</label>
+          <label htmlFor="op-cpf-cnpj" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">CPF/CNPJ</label>
           <input
+            id="op-cpf-cnpj"
             type="text"
             placeholder="Digite para buscar..."
             {...register("cpfCnpj")}
             onChange={(e) => handleCpfChange(e.target.value)}
             onBlur={() => setTimeout(() => setShowCpfSuggestions(false), 200)}
             onFocus={() => { if (getValues("cpfCnpj")?.replace(/\D/g,'').length >= 4) setShowCpfSuggestions(true); }}
+            onKeyDown={cpfNav.onKeyDown}
+            role="combobox"
+            aria-expanded={showCpfSuggestions && cpfSuggestions.length > 0}
+            aria-controls="cpf-suggestions-listbox"
+            aria-activedescendant={cpfNav.highlightedIndex >= 0 ? `cpf-option-${cpfNav.highlightedIndex}` : undefined}
+            aria-invalid={!!errors?.cpfCnpj}
+            aria-describedby={errors?.cpfCnpj ? "op-cpf-cnpj-error" : undefined}
             className={`w-full px-4 py-3 rounded-xl border bg-slate-50 focus:border-blue-800 transition-all duration-300 ${errors?.cpfCnpj ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
           />
-          {errors?.cpfCnpj && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.cpfCnpj.message}</p>}
+          {errors?.cpfCnpj && <p id="op-cpf-cnpj-error" className="text-red-500 text-xs mt-1 font-semibold">{errors.cpfCnpj.message}</p>}
           {showCpfSuggestions && cpfSuggestions.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 max-h-52 overflow-y-auto">
-              {cpfSuggestions.map((c: any) => (
+            <div id="cpf-suggestions-listbox" role="listbox" className="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 max-h-52 overflow-y-auto">
+              {cpfSuggestions.map((c: any, i: number) => (
                 <div
                   key={c.id}
+                  id={`cpf-option-${i}`}
+                  role="option"
+                  aria-selected={cpfNav.highlightedIndex === i}
                   onMouseDown={() => { selectCredor(c); setCpfSuggestions([]); setShowCpfSuggestions(false); }}
-                  className="p-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
+                  onMouseEnter={() => cpfNav.setHighlightedIndex(i)}
+                  className={`p-3 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${cpfNav.highlightedIndex === i ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
                 >
                   <div className="font-bold text-slate-800 text-sm">{c.nome} {c.is_mei ? <span className="text-emerald-600 ml-1 font-black text-xs uppercase bg-emerald-100 px-1 rounded">MEI</span> : ""}</div>
                   <div className="text-xs text-slate-500">{c.cpf_cnpj || c.cpfCnpj}</div>
@@ -295,24 +325,36 @@ export default function OpPaymentData({ errors }: { errors: any }) {
         </div>
 
         <div className="col-span-12 md:col-span-5 relative">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nome do Credor</label>
+          <label htmlFor="op-nome-credor" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nome do Credor</label>
           <input
+            id="op-nome-credor"
             type="text"
             placeholder="Digite o nome para buscar..."
             {...register("nomeCredor")}
             onChange={(e) => handleCredorNameChange(e.target.value)}
             onBlur={() => setTimeout(() => setShowCredorSuggestions(false), 200)}
             onFocus={() => { if (getValues("nomeCredor")?.length >= 2) setShowCredorSuggestions(true); }}
+            onKeyDown={credorNav.onKeyDown}
+            role="combobox"
+            aria-expanded={showCredorSuggestions && credorSuggestions.length > 0}
+            aria-controls="credor-suggestions-listbox"
+            aria-activedescendant={credorNav.highlightedIndex >= 0 ? `credor-option-${credorNav.highlightedIndex}` : undefined}
+            aria-invalid={!!errors?.nomeCredor}
+            aria-describedby={errors?.nomeCredor ? "op-nome-credor-error" : undefined}
             className={`w-full px-4 py-3 rounded-xl border bg-blue-50 text-blue-900 font-bold focus:border-blue-800 transition-all duration-300 ${errors?.nomeCredor ? 'border-red-400 bg-red-50 text-slate-900' : 'border-blue-100'}`}
           />
-          {errors?.nomeCredor && <p className="text-red-500 text-xs mt-1 font-semibold">{errors.nomeCredor.message}</p>}
+          {errors?.nomeCredor && <p id="op-nome-credor-error" className="text-red-500 text-xs mt-1 font-semibold">{errors.nomeCredor.message}</p>}
           {showCredorSuggestions && credorSuggestions.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 max-h-52 overflow-y-auto">
-              {credorSuggestions.map((c: any) => (
+            <div id="credor-suggestions-listbox" role="listbox" className="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 max-h-52 overflow-y-auto">
+              {credorSuggestions.map((c: any, i: number) => (
                 <div
                   key={c.id}
+                  id={`credor-option-${i}`}
+                  role="option"
+                  aria-selected={credorNav.highlightedIndex === i}
                   onMouseDown={() => selectCredor(c)}
-                  className="p-3 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-0 transition-colors"
+                  onMouseEnter={() => credorNav.setHighlightedIndex(i)}
+                  className={`p-3 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${credorNav.highlightedIndex === i ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
                 >
                   <div className="font-bold text-slate-800 text-sm">{c.nome} {c.is_mei ? <span className="text-emerald-600 ml-1 font-black text-xs uppercase bg-emerald-100 px-1 rounded">MEI</span> : ""}</div>
                   <div className="text-xs text-slate-500">{c.cpf_cnpj || c.cpfCnpj}</div>

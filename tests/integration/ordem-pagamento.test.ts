@@ -41,8 +41,8 @@ describe('Integração OrdemPagamentoService', () => {
     (withTransaction as any).mockImplementation(async (callback: any) => {
       const conn = {
         execute: vi.fn().mockImplementation((queryStr: string, params: any[]) => {
-          if (queryStr.includes('SELECT id, valor FROM notas_empenho')) {
-            return [[{ id: 'ne-1', valor: 1000 }]]; // NE de R$ 1000
+          if (queryStr.includes('SELECT id, valor, status FROM notas_empenho')) {
+            return [[{ id: 'ne-1', valor: 1000, status: 'EMITIDO' }]]; // NE de R$ 1000
           }
           if (queryStr.includes('SELECT COALESCE(SUM(valor_pagamento), 0)')) {
             return [[{ total_pago: 800 }]]; // Já pago R$ 800 (Saldo R$ 200)
@@ -79,8 +79,8 @@ describe('Integração OrdemPagamentoService', () => {
       const conn = {
         execute: vi.fn().mockImplementation((queryStr: string, params: any[]) => {
           executeSpy(queryStr, params);
-          if (queryStr.includes('SELECT id, valor FROM notas_empenho')) {
-            return [[{ id: 'ne-1', valor: 1000 }]]; 
+          if (queryStr.includes('SELECT id, valor, status FROM notas_empenho')) {
+            return [[{ id: 'ne-1', valor: 1000, status: 'EMITIDO' }]];
           }
           if (queryStr.includes('SELECT COALESCE(SUM(valor_pagamento), 0)')) {
             return [[{ total_pago: 0 }]]; 
@@ -119,14 +119,15 @@ describe('Integração OrdemPagamentoService', () => {
     expect(insertCall).toBeDefined();
 
     const params = insertCall[1];
-    
-    expect(params[23]).toBe(100); // vPagamento
-    expect(params[24]).toBe(1.5); // finalIrrf
-    expect(params[25]).toBe(5.0); // finalIss
-    expect(params[26]).toBe(11.0); // finalInss
-    expect(params[27]).toBe(2.5); // finalSestSenat
-    expect(params[28]).toBe(20.0); // finalPatronal
-    expect(params[30]).toBe(40.0); // finalTotalDescontos
-    expect(params[31]).toBe(60.0); // finalLiquido
+
+    expect(params[17]).toBe(100); // vPagamento
+    expect(params[18]).toBe(1.5); // finalIrrf (recalculado: 1.5% do valor a pagar)
+    expect(params[19]).toBe(0.01); // finalIss (não é mais recalculado por perfil, mantém o valor enviado)
+    expect(params[20]).toBe(11.0); // finalInss (recalculado: 11% do valor a pagar)
+    expect(params[21]).toBe(2.5); // finalSestSenat (recalculado: 2.5% do valor a pagar)
+    expect(params[22]).toBe(20.0); // finalPatronal (recalculado: 20% do valor a pagar)
+    expect(params[23]).toBe(0); // finalOutros (zerado à força para perfis não-ADMIN)
+    expect(params[24]).toBe(35.01); // finalTotalDescontos (soma dos descontos recalculados)
+    expect(params[25]).toBe(64.99); // finalLiquido (valor a pagar - total de descontos)
   });
 });

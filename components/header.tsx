@@ -4,18 +4,12 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAppStore } from '@/lib/store';
+import { getInitials } from '@/lib/utils';
 
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const userProfile = useAppStore((state) => state.userProfile);
-
-  const getInitials = (name: string) => {
-    if (!name) return "GF";
-    const parts = name.split(" ");
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    return name.substring(0, 2).toUpperCase();
-  };
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && e.currentTarget.value.trim() !== '') {
@@ -95,7 +89,7 @@ export function Header() {
         </div>
 
         {/* Notifications */}
-        <button className="relative p-2.5 rounded-full bg-slate-50/50 border border-slate-200 text-slate-500 hover:text-blue-900 hover:bg-white transition-all duration-300 shadow-sm ml-2">
+        <button aria-label="Notificações" className="relative p-2.5 rounded-full bg-slate-50/50 border border-slate-200 text-slate-500 hover:text-blue-900 hover:bg-white transition-all duration-300 shadow-sm ml-2">
           <div className="absolute top-2 right-2 w-2 h-2 bg-blue-500 rounded-full ring-2 ring-white"></div>
           <Bell className="w-4 h-4" />
         </button>
@@ -110,10 +104,11 @@ export function Header() {
         </Link>
         
         {/* Logout */}
-        <button 
-          onClick={handleLogout} 
+        <button
+          onClick={handleLogout}
           className="text-slate-400 hover:text-red-500 transition-colors duration-300 p-2 rounded-full hover:bg-red-50"
           title="Sair do Sistema"
+          aria-label="Sair do sistema"
         >
           <LogOut className="h-4 w-4" />
         </button>

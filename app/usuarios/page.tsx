@@ -3,13 +3,24 @@ import { useState, useEffect } from "react";
 import { Plus, Save, Search, Trash2, ShieldAlert, UserX, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ nome: "", email: "", cpf: "", senha: "", perfil: "USER" });
+  const [formData, setFormData] = useState({ nome: "", email: "", senha: "", perfil: "USER" });
   const [currentPage, setCurrentPage] = useState(1);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const PAGE_SIZE = 10;
 
   useEffect(() => {
@@ -18,9 +29,8 @@ export default function UsuariosPage() {
 
   const fetchUsuarios = async () => {
     try {
-      const { data, error } = await apiClient.get<{ usuarios: any[] }>("/api/usuarios");
-      if (error) throw new Error(error.message);
-      if (data) setUsuarios(data.usuarios);
+      const data = await apiClient.get<{ usuarios: any[] }>("/api/usuarios");
+      setUsuarios(data.usuarios);
     } catch (error: any) {
       toast.error(error.message || "Erro ao carregar usuários. Você é ADMIN?");
     } finally {
@@ -29,7 +39,7 @@ export default function UsuariosPage() {
   };
 
   const handleCreate = async () => {
-    if (!formData.nome || !formData.email || !formData.cpf || !formData.senha) {
+    if (!formData.nome || !formData.email || !formData.senha) {
       toast.error("Preencha todos os campos");
       return;
     }
@@ -40,27 +50,6 @@ export default function UsuariosPage() {
       return;
     }
 
-    // Remove formatação e valida CPF com Módulo 11
-    const cpfDigits = formData.cpf.replace(/\D/g, '');
-    if (cpfDigits.length !== 11) {
-      toast.error("CPF deve conter 11 dígitos.");
-      return;
-    }
-    // Validação Módulo 11 inline
-    if (/^(\d)\1{10}$/.test(cpfDigits)) {
-      toast.error("CPF inválido (dígitos repetidos).");
-      return;
-    }
-    let sum = 0;
-    for (let i = 1; i <= 9; i++) sum += parseInt(cpfDigits[i - 1]) * (11 - i);
-    let rest = (sum * 10) % 11;
-    if (rest === 10 || rest === 11) rest = 0;
-    if (rest !== parseInt(cpfDigits[9])) { toast.error("CPF inválido."); return; }
-    sum = 0;
-    for (let i = 1; i <= 10; i++) sum += parseInt(cpfDigits[i - 1]) * (12 - i);
-    rest = (sum * 10) % 11;
-    if (rest === 10 || rest === 11) rest = 0;
-    if (rest !== parseInt(cpfDigits[10])) { toast.error("CPF inválido."); return; }
     try {
       const { error } = await apiClient.post("/api/usuarios", formData);
       if (error) throw new Error(error.message);
@@ -72,15 +61,21 @@ export default function UsuariosPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Tem certeza que deseja DELETAR este usuário? Essa ação não pode ser desfeita e pode quebrar dados caso ele tenha notas empenhadas.")) return;
+  const handleDelete = (id: string) => {
+    setDeleteTargetId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
     try {
-      const { error } = await apiClient.delete(`/api/usuarios/${id}`);
+      const { error } = await apiClient.delete(`/api/usuarios/${deleteTargetId}`);
       if (error) throw new Error(error.message);
       toast.success("Usuário deletado");
       fetchUsuarios();
     } catch (error: any) {
       toast.error(error.message || "Erro ao deletar");
+    } finally {
+      setDeleteTargetId(null);
     }
   };
 
@@ -180,42 +175,49 @@ export default function UsuariosPage() {
         )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-3xl p-8 shadow-2xl relative">
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight mb-6">Novo Usuário</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nome</label>
-                <input value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">E-mail (Login)</label>
-                <input value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} type="email" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">CPF</label>
-                <input value={formData.cpf} onChange={(e) => setFormData({ ...formData, cpf: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Senha Provisória</label>
-                <input value={formData.senha} onChange={(e) => setFormData({ ...formData, senha: e.target.value })} type="password" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none" />
-              </div>
-              <div>
-                <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Permissão</label>
-                <select value={formData.perfil} onChange={(e) => setFormData({ ...formData, perfil: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none">
-                  <option value="USER">Comum</option>
-                  <option value="ADMIN">Administrador</option>
-                </select>
-              </div>
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-md">
+          <DialogTitle className="text-2xl font-black text-slate-800 tracking-tight mb-6">Novo Usuário</DialogTitle>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="novo-usuario-nome" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nome</label>
+              <input id="novo-usuario-nome" value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none" />
             </div>
-            <div className="flex gap-4 mt-8">
-              <button onClick={() => setShowModal(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-bold uppercase rounded-xl hover:bg-slate-200">Cancelar</button>
-              <button onClick={handleCreate} className="flex-1 px-4 py-3 bg-blue-900 text-white font-bold uppercase rounded-xl hover:bg-blue-800">Salvar</button>
+            <div>
+              <label htmlFor="novo-usuario-email" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">E-mail (Login)</label>
+              <input id="novo-usuario-email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} type="email" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none" />
+            </div>
+            <div>
+              <label htmlFor="novo-usuario-senha" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Senha Provisória</label>
+              <input id="novo-usuario-senha" value={formData.senha} onChange={(e) => setFormData({ ...formData, senha: e.target.value })} type="password" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none" />
+            </div>
+            <div>
+              <label htmlFor="novo-usuario-perfil" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Permissão</label>
+              <select id="novo-usuario-perfil" value={formData.perfil} onChange={(e) => setFormData({ ...formData, perfil: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none">
+                <option value="USER">Comum</option>
+                <option value="ADMIN">Administrador</option>
+              </select>
             </div>
           </div>
-        </div>
-      )}
+          <div className="flex gap-4 mt-8">
+            <button onClick={() => setShowModal(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 font-bold uppercase rounded-xl hover:bg-slate-200">Cancelar</button>
+            <button onClick={handleCreate} className="flex-1 px-4 py-3 bg-blue-900 text-white font-bold uppercase rounded-xl hover:bg-blue-800">Salvar</button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Deletar usuário</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja DELETAR este usuário? Essa ação não pode ser desfeita e pode quebrar dados caso ele tenha notas empenhadas.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Deletar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

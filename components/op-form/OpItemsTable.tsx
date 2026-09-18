@@ -101,6 +101,7 @@ function ItemRow({ field, index, remove, control, register, setValue }: any) {
         <button
           type="button"
           onClick={() => remove(index)}
+          aria-label="Remover item"
           className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
         >
           <Trash2 className="w-4 h-4" />
@@ -143,7 +144,7 @@ export default function OpItemsTable() {
               <th className="pb-2 text-xs font-black text-slate-500 uppercase tracking-widest w-24">Unid.</th>
               <th className="pb-2 text-xs font-black text-slate-500 uppercase tracking-widest w-32">V. Unitário</th>
               <th className="pb-2 text-xs font-black text-slate-500 uppercase tracking-widest w-32">V. Total</th>
-              <th className="pb-2 w-12"></th>
+              <th aria-hidden="true" className="pb-2 w-12"></th>
             </tr>
           </thead>
           <tbody>

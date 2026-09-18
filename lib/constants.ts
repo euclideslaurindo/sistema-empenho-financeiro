@@ -1,3 +1,9 @@
+/**
+ * Nome do cookie de autenticação JWT.
+ * Centralizado aqui para evitar erros de digitação em múltiplos arquivos.
+ */
+export const AUTH_COOKIE_NAME = 'auth_token';
+
 export const ELEMENTOS = [
   "3.3.90.14 - Diárias - Civil",
   "3.3.90.30 - Material de Consumo",

@@ -3,6 +3,7 @@ import { query, withTransaction } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import { z } from 'zod';
 import { withErrorHandler } from '@/lib/api-handler';
+import { NotaEmpenhoDB } from '@/lib/types/db';
 
 const notaEmpenhoSchema = z.object({
   codigo: z.string().optional(),
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     // se passou ?numero= eh pra buscar uma NE especifica (chamada da tela de OP)
     if (numero) {
-      const rows = await query<any[]>(
+      const rows = await query<Partial<NotaEmpenhoDB>[]>(
         `SELECT
            ne.id, ne.codigo, ne.numero, ne.valor,
            DATE_FORMAT(ne.data_pagamento, '%Y-%m-%d') as dataPagamento,
@@ -102,13 +103,13 @@ export async function GET(request: NextRequest) {
       countSql += ' AND (ne.numero LIKE ?)';
     }
     const countParams = busca ? [`%${busca}%`] : [];
-    const countResult = await query<any[]>(countSql, countParams);
+    const countResult = await query<{total: number}[]>(countSql, countParams);
     const total = countResult[0]?.total || 0;
 
     sql += ' ORDER BY ne.created_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    const rows = await query<any[]>(sql, params);
+    const rows = await query<Partial<NotaEmpenhoDB>[]>(sql, params);
     return NextResponse.json({
       notas: rows,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }

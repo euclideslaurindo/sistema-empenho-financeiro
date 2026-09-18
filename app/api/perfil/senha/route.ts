@@ -19,7 +19,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'A nova senha deve ter no mínimo 8 caracteres.' }, { status: 400 });
     }
 
-    const rows = await query<any[]>('SELECT senha_hash FROM usuarios WHERE id = ?', [user.id]);
+    const rows = await query<{senha_hash: string}[]>('SELECT senha_hash FROM usuarios WHERE id = ?', [user.id]);
     if (!rows || rows.length === 0) {
       return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 });
     }

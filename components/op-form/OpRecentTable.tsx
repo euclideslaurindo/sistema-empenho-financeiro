@@ -1,20 +1,19 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Search } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
 
 export default function OpRecentTable({ ops, onSearch }: { ops: any[], onSearch: (term: string) => void }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const formatCurrency = (val: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
-
-  const handleSearch = (val: string) => {
+  const handleSearch = useCallback((val: string) => {
     setSearchTerm(val);
-    if (searchTimeout) clearTimeout(searchTimeout);
-    setSearchTimeout(setTimeout(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
       onSearch(val);
-    }, 400));
-  };
+    }, 400);
+  }, [onSearch]);
 
   return (
     <div className="pb-12 mt-8">

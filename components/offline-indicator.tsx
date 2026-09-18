@@ -35,7 +35,7 @@ export function OfflineIndicator() {
   if (!isOffline) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 bg-slate-800 border border-zinc-700 text-white p-4 rounded-xl shadow-2xl flex items-start text-sm z-50 animate-in slide-in-from-bottom-5 max-w-sm">
+    <div role="alert" className="fixed bottom-6 right-6 bg-slate-800 border border-zinc-700 text-white p-4 rounded-xl shadow-2xl flex items-start text-sm z-50 animate-in slide-in-from-bottom-5 max-w-sm">
       <div className="bg-indigo-500/20 p-2 rounded-lg mr-4 border border-indigo-500/50">
         <WifiOff className="w-5 h-5 text-indigo-500 shrink-0 relative" />
       </div>

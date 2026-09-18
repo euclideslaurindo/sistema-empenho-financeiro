@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import { hash } from 'bcryptjs';
+import { UsuarioDB } from '@/lib/types/db';
 
 // GET /api/usuarios - Lista usuários
 export async function GET(request: NextRequest) {
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!user || user.perfil !== 'ADMIN') return unauthorizedResponse();
 
   try {
-    const usuarios = await query<any[]>(
+    const usuarios = await query<UsuarioDB[]>(
       `SELECT id, nome, email, perfil, ativo, created_at FROM usuarios ORDER BY nome ASC`
     );
     return NextResponse.json({ usuarios });
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     const roleValue = perfil === 'ADMIN' ? 'ADMIN' : 'USER';
 
     // check se ja existe
-    const [existing] = await query<any[]>(
+    const [existing] = await query<{id: string}[]>(
       'SELECT id FROM usuarios WHERE email = ?',
       [email]
     );

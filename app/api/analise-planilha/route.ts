@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const buf = fs.readFileSync(targetPath);
 
     // Parse ZIP by scanning local headers
-    const localHeaders: any[] = [];
+    const localHeaders: Record<string, any>[] = [];
     for (let i = 0; i < buf.length - 30; i++) {
       if (buf[i] === 0x50 && buf[i+1] === 0x4b && buf[i+2] === 0x03 && buf[i+3] === 0x04) {
         const flags = buf.readUInt16LE(i + 6);
@@ -195,7 +195,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      fileName: xlsxFileName,
+      fileName: path.basename(targetPath),
       fileSizeBytes: buf.length,
       totalSheets: sheets.length,
       sheets,

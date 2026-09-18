@@ -1,6 +1,7 @@
 import * as jose from 'jose';
 import { NextRequest, NextResponse } from 'next/server';
 import { JWT_SECRET } from '@/lib/jwt-secret';
+import { AUTH_COOKIE_NAME } from '@/lib/constants';
 
 export interface AuthUser {
   id: string;
@@ -15,7 +16,7 @@ export interface AuthUser {
  */
 export async function getAuthUser(request: NextRequest): Promise<AuthUser | null> {
   try {
-    const token = request.cookies.get('auth_token')?.value;
+    const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
     if (!token) return null;
 
     const { payload } = await jose.jwtVerify(token, JWT_SECRET);

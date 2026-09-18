@@ -3,13 +3,13 @@ import { ActionToolbar, ActionButton } from "@/components/action-toolbar";
 import { Save, Shield, Bell, User, Lock, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { ChangePasswordModal } from "@/components/change-password-modal";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export default function Configuracoes() {
   const [activeTab, setActiveTab] = useState("perfil");
   const [mounted, setMounted] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -52,31 +52,6 @@ export default function Configuracoes() {
       console.error("Erro ao carregar configuracoes", e);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentPassword || !newPassword) return;
-
-    try {
-      const res = await fetch("/api/perfil/senha", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ senhaAtual: currentPassword, novaSenha: newPassword }),
-      });
-      const data = await res.json();
-
-      if (res.ok) {
-        toast.success("Sua senha foi redefinida com sucesso.");
-        setShowPasswordModal(false);
-        setCurrentPassword("");
-        setNewPassword("");
-      } else {
-        toast.error(data.error || "Erro ao alterar senha.");
-      }
-    } catch {
-      toast.error("Erro de conexão com o servidor.");
     }
   };
 
@@ -132,13 +107,19 @@ export default function Configuracoes() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          orientation="vertical"
+          className="grid grid-cols-1 md:grid-cols-4 gap-8 animate-slide-up"
+          style={{ animationDelay: '0.1s' }}
+        >
           {/* Sidebar Params */}
-          <div className="col-span-1 space-y-2">
+          <TabsList className="col-span-1 space-y-2 flex flex-col items-stretch">
             {menuItems.map((item) => (
-              <button
+              <TabsTrigger
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                value={item.id}
                 className={`w-full text-left px-4 py-3.5 font-semibold rounded-xl transition-all flex items-center group ${
                   activeTab === item.id
                     ? "bg-blue-50 text-blue-700 shadow-sm ring-1 ring-blue-500/20"
@@ -146,13 +127,13 @@ export default function Configuracoes() {
                 }`}
               >
                 <item.icon className={`w-5 h-5 mr-3 transition-colors ${activeTab === item.id ? "text-blue-600" : "text-slate-400 group-hover:text-slate-600"}`} /> {item.label}
-              </button>
+              </TabsTrigger>
             ))}
-          </div>
+          </TabsList>
 
           {/* Config Area */}
           <div className="col-span-3">
-            {activeTab === "perfil" && (
+            <TabsContent value="perfil">
               <div className="enterprise-card p-8 animate-scale-in">
                 <div className="flex items-center mb-8 border-b border-slate-100 pb-5">
                   <div className="w-1.5 h-6 bg-blue-600 rounded-full mr-3"></div>
@@ -263,9 +244,9 @@ export default function Configuracoes() {
                   </>
                 )}
               </div>
-            )}
+            </TabsContent>
 
-            {activeTab === "permissoes" && (
+            <TabsContent value="permissoes">
               <div className="enterprise-card p-8 animate-scale-in">
                 <div className="flex items-center mb-6 border-b border-slate-100 pb-5">
                   <div className="w-1.5 h-6 bg-blue-600 rounded-full mr-3"></div>
@@ -320,9 +301,9 @@ export default function Configuracoes() {
                   </div>
                 </div>
               </div>
-            )}
+            </TabsContent>
 
-            {activeTab === "notificacoes" && (
+            <TabsContent value="notificacoes">
               <div className="enterprise-card p-8 animate-scale-in">
                 <div className="flex items-center mb-6 border-b border-slate-100 pb-5">
                   <div className="w-1.5 h-6 bg-blue-600 rounded-full mr-3"></div>
@@ -389,9 +370,9 @@ export default function Configuracoes() {
                   </div>
                 </div>
               </div>
-            )}
+            </TabsContent>
 
-            {activeTab === "seguranca" && (
+            <TabsContent value="seguranca">
               <div className="enterprise-card p-8 animate-scale-in">
                 <div className="flex items-center mb-6 border-b border-slate-100 pb-5">
                   <div className="w-1.5 h-6 bg-blue-600 rounded-full mr-3"></div>
@@ -437,63 +418,13 @@ export default function Configuracoes() {
                   </div>
                 </div>
               </div>
-            )}
+            </TabsContent>
           </div>
-        </div>
+        </Tabs>
       </div>
 
       {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-8 animate-scale-in">
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">
-              Alterar Senha
-            </h2>
-            <p className="text-sm text-slate-500 mb-6 font-medium">
-              Informe a senha atual e defina uma nova senha forte.
-            </p>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-                  Senha Atual
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="enterprise-input"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-                  Nova Senha
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="enterprise-input mb-4"
-                />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordModal(false)}
-                  className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold py-2.5 rounded-lg transition-colors shadow-sm"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-all shadow-md shadow-blue-600/20"
-                >
-                  Confirmar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
       )}
     </div>
   );

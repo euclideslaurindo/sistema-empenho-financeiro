@@ -38,7 +38,7 @@ describe('Integração API Credores', () => {
     
     const credorData = {
       nome: 'Empresa Teste LTDA',
-      cpfCnpj: '11.222.333/0001-44'
+      cpfCnpj: '11.222.333/0001-81'
     };
     
     const req = new NextRequest('http://localhost:3000/api/credores', {

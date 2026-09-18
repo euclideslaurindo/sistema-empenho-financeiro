@@ -8,11 +8,10 @@ import {
   Banknote,
   Printer,
   Settings,
-  HelpCircle,
   Landmark,
   Plus,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store";
 
@@ -29,13 +28,6 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const userProfile = useAppStore((state) => state.userProfile);
-
-  const getInitials = (name: string) => {
-    if (!name) return "GF";
-    const parts = name.split(" ");
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    return name.substring(0, 2).toUpperCase();
-  };
 
   const handleAction = (action: string) => {
     if (action === "Novo Empenho") {
@@ -74,7 +66,7 @@ export function Sidebar() {
         Menu Principal
       </p>
 
-      <nav className="w-full flex-1 flex flex-col space-y-1.5 px-4">
+      <nav aria-label="Navegação principal" className="w-full flex-1 flex flex-col space-y-1.5 px-4">
         {navItems.map((item, index) => {
           const isActive =
             pathname === item.href ||
@@ -129,21 +121,6 @@ export function Sidebar() {
              )} 
           />
           Configurações
-        </Link>
-        <Link
-          href="/suporte"
-          className={cn(
-            "flex items-center px-4 py-3 rounded-xl text-sm transition-all duration-300 group relative",
-            pathname === "/suporte"
-              ? "bg-blue-600/20 text-white font-bold border border-blue-500/30"
-              : "text-slate-400 hover:bg-white/5 hover:text-slate-200 border border-transparent",
-          )}
-        >
-          <HelpCircle className={cn(
-            "mr-3 h-5 w-5 transition-transform duration-300",
-            pathname === "/suporte" ? "text-blue-400 scale-110" : "text-slate-500 group-hover:text-slate-400 group-hover:scale-110"
-          )} />
-          Suporte
         </Link>
       </div>
 

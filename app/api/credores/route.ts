@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-handler';
 import { isValidCpfCnpj } from '@/lib/utils';
+import { CredorDB } from '@/lib/types/db';
 
 export async function GET(request: NextRequest) {
   return withErrorHandler(async () => {
@@ -54,13 +55,13 @@ export async function GET(request: NextRequest) {
       }
       countSql += ')';
     }
-    const countResult = await query<any[]>(countSql, countParams);
+    const countResult = await query<{total: number}[]>(countSql, countParams);
     const total = countResult[0]?.total || 0;
 
     sql += ' ORDER BY nome ASC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    const rows = await query<any[]>(sql, params);
+    const rows = await query<Partial<CredorDB>[]>(sql, params);
 
     return NextResponse.json({
       credores: rows,

@@ -26,7 +26,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Verificar duplicidade de CPF/CNPJ (excluindo o próprio)
-    const existing = await query<any[]>(
+    const existing = await query<{id: string, nome: string}[]>(
       'SELECT id, nome FROM credores WHERE cpf_cnpj = ? AND id != ? AND ativo = 1',
       [cpfCnpj, id]
     );
@@ -39,24 +39,45 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     let usuarioId: string | null = user.id;
     try {
-      const userCheck: any = await query('SELECT id FROM usuarios WHERE id = ?', [usuarioId]);
+      const userCheck = await query<{id: string}[]>('SELECT id FROM usuarios WHERE id = ?', [usuarioId]);
       if (!userCheck || userCheck.length === 0) usuarioId = null;
     } catch {
       usuarioId = null;
     }
 
-    const dataExpFormatada = dataExpedicao && String(dataExpedicao).trim().length >= 8 ? String(dataExpedicao).trim() : null;
+    // Construção dinâmica do UPDATE para evitar erros de posição com 20+ parâmetros
     const enderecoFinal = endereco?.trim() || [logradouro, numero ? `Nº ${numero}` : '', bairro, cidade, uf].filter(Boolean).join(', ') || null;
+    const dataExpFormatada = dataExpedicao && String(dataExpedicao).trim().length >= 8 ? String(dataExpedicao).trim() : null;
+
+    const updateFields: Record<string, any> = {
+      nome: nome.trim(),
+      endereco: enderecoFinal,
+      cpf_cnpj: cpfCnpj.trim(),
+      pis: pis?.trim() || null,
+      rg: rg?.trim() || 'ISENTO',
+      orgao_emissor: orgaoEmissor?.trim() || null,
+      data_expedicao: dataExpFormatada,
+      cidade: cidade?.trim() || null,
+      uf: uf?.trim() || null,
+      telefone: telefone?.trim() || null,
+      banco: banco?.trim() || null,
+      agencia: agencia?.trim() || null,
+      conta_corrente: contaCorrente?.trim() || null,
+      cep: cep?.trim() || null,
+      logradouro: logradouro?.trim() || null,
+      numero: numero?.trim() || null,
+      bairro: bairro?.trim() || null,
+      pix: pix?.trim() || null,
+      is_mei: isMei ? 1 : 0,
+      usuario_id: usuarioId,
+    };
+
+    const setClauses = Object.keys(updateFields).map(col => `${col} = ?`).join(', ');
+    const values = [...Object.values(updateFields), id];
 
     await query(
-      `UPDATE credores SET nome = ?, endereco = ?, cpf_cnpj = ?, pis = ?, rg = ?, orgao_emissor = ?, data_expedicao = ?,
-                           cidade = ?, uf = ?, telefone = ?, banco = ?, agencia = ?, conta_corrente = ?, 
-                           cep = ?, logradouro = ?, numero = ?, bairro = ?, pix = ?, is_mei = ?, usuario_id = ?
-       WHERE id = ? AND ativo = 1`,
-      [nome.trim(), enderecoFinal, cpfCnpj.trim(), pis?.trim() || null, rg?.trim() || 'ISENTO', orgaoEmissor?.trim() || null, dataExpFormatada,
-       cidade?.trim() || null, uf?.trim() || null, telefone?.trim() || null, 
-       banco?.trim() || null, agencia?.trim() || null, contaCorrente?.trim() || null, 
-       cep?.trim() || null, logradouro?.trim() || null, numero?.trim() || null, bairro?.trim() || null, pix?.trim() || null, isMei ? 1 : 0, usuarioId, id]
+      `UPDATE credores SET ${setClauses} WHERE id = ? AND ativo = 1`,
+      values
     );
 
     return NextResponse.json({ success: true });
@@ -83,15 +104,15 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const { id } = await params;
     
     // Verificar se o credor existe
-    const credorData = await query<any[]>('SELECT cpf_cnpj FROM credores WHERE id = ? AND ativo = 1', [id]);
+    const credorData = await query<{cpf_cnpj: string}[]>('SELECT cpf_cnpj FROM credores WHERE id = ? AND ativo = 1', [id]);
 
     if (!credorData || credorData.length === 0) {
       return NextResponse.json({ error: 'Credor não encontrado.' }, { status: 404 });
     }
     
     const cpfCnpj = credorData[0].cpf_cnpj;
-    const opSum = await query<any[]>('SELECT COUNT(*) as total FROM ordens_pagamento WHERE credor_cpf_cnpj = ?', [cpfCnpj]);
-    const totalOps = parseInt(opSum[0]?.total || 0);
+    const opSum = await query<{total: number}[]>('SELECT COUNT(*) as total FROM ordens_pagamento WHERE credor_cpf_cnpj = ?', [cpfCnpj]);
+    const totalOps = parseInt(opSum[0]?.total as any || 0);
 
     if (totalOps > 0) {
       return NextResponse.json(

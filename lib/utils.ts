@@ -127,6 +127,49 @@ export function numeroPorExtenso(numero: number): string {
 /**
  * Valida o dígito verificador matemático de CPFs e CNPJs.
  */
+/**
+ * Formata um valor numérico como moeda brasileira (R$).
+ * Usa Intl.NumberFormat para garantir localização correta.
+ */
+export function formatCurrency(val: number): string {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+}
+
+/**
+ * Extrai as iniciais de um nome completo.
+ * Ex: "João Silva" → "JS", "Maria" → "MA"
+ */
+export function getInitials(name: string): string {
+  if (!name) return "GF";
+  const parts = name.split(" ");
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+}
+
+/**
+ * Formata CPF (xxx.xxx.xxx-xx) ou CNPJ (xx.xxx.xxx/xxxx-xx) a partir de dígitos.
+ */
+export function formatCpfCnpj(value: string): string {
+  const v = value.replace(/\D/g, "");
+  if (v.length <= 11) {
+    return v.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  } else {
+    return v.replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2").substr(0, 18);
+  }
+}
+
+/**
+ * Formata telefone fixo (xx) xxxx-xxxx ou celular (xx) xxxxx-xxxx.
+ */
+export function formatTelefone(value: string): string {
+  const v = value.replace(/\D/g, "").slice(0, 11);
+  if (v.length <= 10) {
+    return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
+  } else {
+    return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
+  }
+}
+
 export function isValidCpfCnpj(val: string): boolean {
   if (!val) return false;
   const numbers = val.replace(/\D/g, '');

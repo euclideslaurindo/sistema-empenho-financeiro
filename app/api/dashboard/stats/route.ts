@@ -19,24 +19,24 @@ export async function GET(request: NextRequest) {
 
   try {
     // Total de credores ativos
-    const [credoresCount] = await query<any[]>(
+    const [credoresCount] = await query<{total: number}[]>(
       'SELECT COUNT(*) as total FROM credores WHERE ativo = 1'
     );
 
     // Credores do mês anterior (para calcular variação)
-    const [credoresMesAnterior] = await query<any[]>(
+    const [credoresMesAnterior] = await query<{total: number}[]>(
       `SELECT COUNT(*) as total FROM credores 
        WHERE ativo = 1 AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`
     );
 
     // NEs dos últimos 30 dias
-    const [nesCount] = await query<any[]>(
+    const [nesCount] = await query<{total: number}[]>(
       `SELECT COUNT(*) as total FROM notas_empenho
        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) AND status != 'CANCELADO'`
     );
 
     // NEs do período anterior (30-60 dias) para calcular variação
-    const [nesCountAnterior] = await query<any[]>(
+    const [nesCountAnterior] = await query<{total: number}[]>(
       `SELECT COUNT(*) as total FROM notas_empenho
        WHERE created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY) 
          AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY) 
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Total a pagar: saldo restante de NEs pendentes (EMITIDO ou PARCIALMENTE PAGO)
-    const [pagamentosPendentes] = await query<any[]>(
+    const [pagamentosPendentes] = await query<{total: number}[]>(
       `SELECT COALESCE(SUM(ne.valor - COALESCE(op_sum.total_pago, 0)), 0) as total
        FROM notas_empenho ne
        LEFT JOIN (
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Total pago mês anterior para variação (mesmo critério histórico)
-    const [pagamentosMesAnterior] = await query<any[]>(
+    const [pagamentosMesAnterior] = await query<{total: number}[]>(
       `SELECT COALESCE(SUM(ne.valor - COALESCE(op_sum.total_pago, 0)), 0) as total
        FROM notas_empenho ne
        LEFT JOIN (
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Últimas 5 NEs com unidade gestora
-    const ultimasNes = await query<any[]>(
+    const ultimasNes = await query<Record<string, any>[]>(
       `SELECT ne.numero, DATE_FORMAT(ne.created_at, '%d/%m/%Y') as data,
               ne.valor, ne.status, COALESCE(u.nome, 'Sistema') as unidade
        FROM notas_empenho ne
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Atividades recentes (últimas ordens)
-    const ultimasOrdens = await query<any[]>(
+    const ultimasOrdens = await query<Record<string, any>[]>(
       `SELECT credor_nome as credorNome, valor_pagamento as valorPagamento,
               DATE_FORMAT(created_at, '%d/%m/%Y às %H:%i') as quando
        FROM ordens_pagamento

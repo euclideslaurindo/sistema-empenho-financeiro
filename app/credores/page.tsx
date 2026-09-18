@@ -12,6 +12,16 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import { formatCpfCnpj, formatTelefone } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 interface Credor {
   id: string;
@@ -42,6 +52,7 @@ export default function Credores() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // carrega a lista de credores do banco
   const fetchCredores = useCallback(async (busca = "") => {
@@ -80,24 +91,6 @@ export default function Credores() {
   const dupCpfCnpj = formData.cpfCnpj
     ? checkDuplicateCpfCnpj(formData.cpfCnpj, formData.id)
     : null;
-
-  const formatCpfCnpj = (value: string) => {
-    const v = value.replace(/\D/g, "");
-    if (v.length <= 11) {
-      return v.replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-    } else {
-      return v.replace(/^(\d{2})(\d)/, "$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3").replace(/\.(\d{3})(\d)/, ".$1/$2").replace(/(\d{4})(\d)/, "$1-$2").substr(0, 18);
-    }
-  };
-
-  const formatTelefone = (value: string) => {
-    const v = value.replace(/\D/g, "").slice(0, 11);
-    if (v.length <= 10) {
-      return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{4})(\d)/, "$1-$2");
-    } else {
-      return v.replace(/(\d{2})(\d)/, "($1) $2").replace(/(\d{5})(\d)/, "$1-$2");
-    }
-  };
 
   const handleCnpjBlur = async () => {
     if (!formData.cpfCnpj) return;
@@ -202,12 +195,15 @@ export default function Credores() {
     }
   };
 
-  const handleExcluir = async () => {
+  const handleExcluir = () => {
     if (!formData.id) {
       toast.error("Nenhum credor selecionado para excluir. Clique em Editar na tabela primeiro.");
       return;
     }
-    if (!confirm("Tem certeza que deseja desativar este credor?")) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmExcluir = async () => {
     try {
       await apiClient.delete(`/api/credores/${formData.id}`);
       toast.success("Credor excluído com sucesso!");
@@ -508,7 +504,15 @@ export default function Credores() {
                     <tr
                       key={c.id}
                       onClick={() => handleLoadCredor(c)}
-                      className={`group hover:bg-blue-50/50 transition-colors cursor-pointer ${formData.id === c.id ? 'bg-blue-50/50' : ''}`}
+                      tabIndex={0}
+                      role="button"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleLoadCredor(c);
+                        }
+                      }}
+                      className={`group hover:bg-blue-50/50 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset ${formData.id === c.id ? 'bg-blue-50/50' : ''}`}
                     >
                       <td className="py-5 font-bold text-slate-500 rounded-l-lg pl-2">
                         {c.cpfCnpj}
@@ -566,6 +570,19 @@ export default function Credores() {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Desativar credor</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja desativar este credor? Essa ação pode ser revertida apenas por um administrador.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmExcluir}>Desativar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

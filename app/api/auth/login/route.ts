@@ -3,7 +3,9 @@ import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { SignJWT } from 'jose';
 import { checkRateLimit, resetRateLimit } from '@/lib/rate-limiter';
+import { UsuarioDB } from '@/lib/types/db';
 import { JWT_SECRET } from '@/lib/jwt-secret';
+import { AUTH_COOKIE_NAME } from '@/lib/constants';
 
 export async function POST(request: NextRequest) {
   // Prioriza headers padrão de proxy reverso, fallback para request.ip
@@ -43,12 +45,13 @@ export async function POST(request: NextRequest) {
 
     // Converter o "nome" do login no mesmo formato de email fake gerado no registro
     const normalizedUsername = email.trim().toLowerCase().replace(/\s+/g, '.');
-    const fakeEmail = `${normalizedUsername}@empenho.local`;
+    const fakeEmailOld = `${normalizedUsername}@empenho.local`;
+    const fakeEmailPattern = `${normalizedUsername}.%@empenho.local`;
 
-    // Busca o usuário pelo nome (email fake) ou pelo email exato
-    const dbUsers: any[] = await query(
-      'SELECT id, nome, email, senha_hash, perfil, ativo FROM usuarios WHERE email = ? OR email = ? LIMIT 1',
-      [fakeEmail, email]
+    // Busca o usuário pelo nome (email fake antigo, novo com sufixo UUID, ou email exato)
+    const dbUsers = await query<UsuarioDB[]>(
+      'SELECT id, nome, email, senha_hash, perfil, ativo FROM usuarios WHERE email = ? OR email = ? OR email LIKE ? LIMIT 1',
+      [fakeEmailOld, email, fakeEmailPattern]
     );
 
     const user = dbUsers && dbUsers.length > 0 ? dbUsers[0] : null;
@@ -89,7 +92,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    response.cookies.set('auth_token', token, {
+    response.cookies.set(AUTH_COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
