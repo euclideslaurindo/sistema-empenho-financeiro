@@ -7,8 +7,8 @@ vi.mock('@/lib/db', () => ({
   withTransaction: vi.fn(),
 }));
 
-vi.mock('bcryptjs', async (importOriginal: any) => {
-  const actual = await importOriginal<typeof import('bcryptjs')>();
+vi.mock('bcryptjs', async (importOriginal: () => Promise<typeof import('bcryptjs')>) => {
+  const actual = await importOriginal();
   return {
     ...actual,
     compare: vi.fn(),
