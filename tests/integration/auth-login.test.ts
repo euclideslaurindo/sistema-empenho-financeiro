@@ -1,13 +1,19 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { POST } from '@/app/api/auth/login/route';
 import { NextRequest } from 'next/server';
-import { createDbMock } from '@/tests/helpers/db-mock';
 
-vi.mock('@/lib/db', () => createDbMock());
-
-vi.mock('bcryptjs', () => ({
-  compare: vi.fn(),
+vi.mock('@/lib/db', () => ({
+  query: vi.fn(),
+  withTransaction: vi.fn(),
 }));
+
+vi.mock('bcryptjs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('bcryptjs')>();
+  return {
+    ...actual,
+    compare: vi.fn(),
+  };
+});
 
 vi.mock('@/lib/rate-limiter', () => ({
   checkRateLimit: vi.fn(),

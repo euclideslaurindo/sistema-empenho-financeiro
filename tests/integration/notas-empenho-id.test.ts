@@ -1,9 +1,11 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { PUT, DELETE } from '@/app/api/notas-empenho/[id]/route';
 import { NextRequest } from 'next/server';
-import { createDbMock } from '@/tests/helpers/db-mock';
 
-vi.mock('@/lib/db', () => createDbMock());
+vi.mock('@/lib/db', () => ({
+  query: vi.fn(),
+  withTransaction: vi.fn(),
+}));
 
 vi.mock('@/lib/auth', () => ({
   getAuthUser: vi.fn(),
@@ -42,7 +44,7 @@ describe('Integração API Notas de Empenho [id]', () => {
         }),
       });
 
-      const res: any = await PUT(req, { params: { id: 'ne-123' } });
+      const res: any = await PUT(req, { params: Promise.resolve({ id: 'ne-123' }) });
       expect(res.status).toBe(200);
     });
 
@@ -68,7 +70,7 @@ describe('Integração API Notas de Empenho [id]', () => {
         }),
       });
 
-      const res: any = await PUT(req, { params: { id: 'ne-123' } });
+      const res: any = await PUT(req, { params: Promise.resolve({ id: 'ne-123' }) });
       expect(res.status).toBe(409);
       const data = await res.json();
       expect(data.error).toContain('saldo');
@@ -95,7 +97,7 @@ describe('Integração API Notas de Empenho [id]', () => {
         }),
       });
 
-      const res: any = await PUT(req, { params: { id: 'ne-123' } });
+      const res: any = await PUT(req, { params: Promise.resolve({ id: 'ne-123' }) });
       expect(res.status).toBe(409);
     });
   });
@@ -119,7 +121,7 @@ describe('Integração API Notas de Empenho [id]', () => {
         method: 'DELETE',
       });
 
-      const res: any = await DELETE(req, { params: { id: 'ne-123' } });
+      const res: any = await DELETE(req, { params: Promise.resolve({ id: 'ne-123' }) });
       expect(res.status).toBe(200);
     });
 
@@ -140,7 +142,7 @@ describe('Integração API Notas de Empenho [id]', () => {
         method: 'DELETE',
       });
 
-      const res: any = await DELETE(req, { params: { id: 'ne-123' } });
+      const res: any = await DELETE(req, { params: Promise.resolve({ id: 'ne-123' }) });
       expect(res.status).toBe(409);
       const data = await res.json();
       expect(data.error).toContain('3'); // menciona a contagem de OPs
@@ -161,7 +163,7 @@ describe('Integração API Notas de Empenho [id]', () => {
         method: 'DELETE',
       });
 
-      const res: any = await DELETE(req, { params: { id: 'ne-inexistente' } });
+      const res: any = await DELETE(req, { params: Promise.resolve({ id: 'ne-inexistente' }) });
       expect(res.status).toBe(404);
     });
   });
