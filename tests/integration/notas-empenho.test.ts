@@ -13,6 +13,7 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 import { getAuthUser } from '@/lib/auth';
+import { withTransaction, query } from '@/lib/db';
 
 describe('Integração API Notas de Empenho', () => {
   beforeEach(() => {
@@ -24,7 +25,6 @@ describe('Integração API Notas de Empenho', () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
       (global.crypto.randomUUID as any) = () => 'ne-uuid-123';
 
-      const { withTransaction } = await import('@/lib/db');
       (withTransaction as any).mockImplementationOnce(async (cb: any) => {
         const conn = {
           execute: vi.fn()
@@ -72,7 +72,6 @@ describe('Integração API Notas de Empenho', () => {
     test('Número duplicado retorna 409', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { withTransaction } = await import('@/lib/db');
       (withTransaction as any).mockImplementationOnce(async (cb: any) => {
         const conn = {
           execute: vi.fn()
@@ -112,7 +111,6 @@ describe('Integração API Notas de Empenho', () => {
     test('GET sem parâmetros retorna lista paginada', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { query } = await import('@/lib/db');
       (query as any)
         .mockResolvedValueOnce([{ total: 50 }]) // COUNT total
         .mockResolvedValueOnce([
@@ -132,7 +130,6 @@ describe('Integração API Notas de Empenho', () => {
     test('GET com ?numero= retorna NE específica com saldoDisponivel', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { query } = await import('@/lib/db');
       (query as any).mockResolvedValueOnce([
         {
           id: 'ne-1',
@@ -153,7 +150,6 @@ describe('Integração API Notas de Empenho', () => {
     test('GET com ?numero= NE não existente retorna 404', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { query } = await import('@/lib/db');
       (query as any).mockResolvedValueOnce([]); // não encontrada
 
       const req = new NextRequest('http://localhost:3000/api/notas-empenho?numero=NE-INEXISTENTE');

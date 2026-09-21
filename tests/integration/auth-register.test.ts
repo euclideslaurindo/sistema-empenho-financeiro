@@ -8,7 +8,7 @@ vi.mock('@/lib/auth', () => ({
   forbiddenResponse: () => ({ status: 403, json: async () => ({ error: 'Acesso negado' }) })
 }));
 
-vi.mock('bcryptjs', async (importOriginal) => {
+vi.mock('bcryptjs', async (importOriginal: any) => {
   const actual = await importOriginal<typeof import('bcryptjs')>();
   return {
     ...actual,

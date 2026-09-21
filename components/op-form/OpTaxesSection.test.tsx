@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { useForm, FormProvider } from 'react-hook-form';
 import OpTaxesSection from './OpTaxesSection';
 
-vi.mock('@/lib/utils', async (importOriginal) => {
+vi.mock('@/lib/utils', async (importOriginal: any) => {
   const actual = await importOriginal<typeof import('@/lib/utils')>();
   return {
     ...actual,
@@ -46,7 +46,7 @@ describe('OpTaxesSection Component', () => {
     });
 
     const checkboxes = screen.getAllByRole('checkbox');
-    checkboxes.forEach((checkbox) => {
+    checkboxes.forEach((checkbox: any) => {
       expect((checkbox as HTMLInputElement).disabled).toBe(true);
     });
   });
@@ -70,7 +70,7 @@ describe('OpTaxesSection Component', () => {
     });
 
     const checkboxes = screen.getAllByRole('checkbox');
-    checkboxes.forEach((checkbox) => {
+    checkboxes.forEach((checkbox: any) => {
       expect((checkbox as HTMLInputElement).disabled).toBe(false);
     });
   });

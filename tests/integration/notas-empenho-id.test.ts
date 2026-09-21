@@ -13,6 +13,7 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 import { getAuthUser } from '@/lib/auth';
+import { withTransaction } from '@/lib/db';
 
 describe('Integração API Notas de Empenho [id]', () => {
   beforeEach(() => {
@@ -23,7 +24,6 @@ describe('Integração API Notas de Empenho [id]', () => {
     test('Atualização válida retorna 200', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { withTransaction } = await import('@/lib/db');
       (withTransaction as any).mockImplementationOnce(async (cb: any) => {
         const conn = {
           execute: vi.fn()
@@ -51,7 +51,6 @@ describe('Integração API Notas de Empenho [id]', () => {
     test('Reduzir valor abaixo do total já pago retorna 409', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { withTransaction } = await import('@/lib/db');
       (withTransaction as any).mockImplementationOnce(async (cb: any) => {
         const conn = {
           execute: vi.fn()
@@ -79,7 +78,6 @@ describe('Integração API Notas de Empenho [id]', () => {
     test('Número duplicado com outro registro retorna 409', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { withTransaction } = await import('@/lib/db');
       (withTransaction as any).mockImplementationOnce(async (cb: any) => {
         const conn = {
           execute: vi.fn()
@@ -106,7 +104,6 @@ describe('Integração API Notas de Empenho [id]', () => {
     test('Cancelar NE sem OPs vinculadas retorna 200', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { withTransaction } = await import('@/lib/db');
       (withTransaction as any).mockImplementationOnce(async (cb: any) => {
         const conn = {
           execute: vi.fn()
@@ -128,7 +125,6 @@ describe('Integração API Notas de Empenho [id]', () => {
     test('Cancelar NE com OPs vinculadas retorna 409', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { withTransaction } = await import('@/lib/db');
       (withTransaction as any).mockImplementationOnce(async (cb: any) => {
         const conn = {
           execute: vi.fn()
@@ -151,7 +147,6 @@ describe('Integração API Notas de Empenho [id]', () => {
     test('Cancelar NE inexistente retorna 404', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { withTransaction } = await import('@/lib/db');
       (withTransaction as any).mockImplementationOnce(async (cb: any) => {
         const conn = {
           execute: vi.fn().mockResolvedValueOnce([[]]), // não encontrada

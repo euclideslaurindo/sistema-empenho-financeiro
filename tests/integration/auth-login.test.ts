@@ -7,7 +7,7 @@ vi.mock('@/lib/db', () => ({
   withTransaction: vi.fn(),
 }));
 
-vi.mock('bcryptjs', async (importOriginal) => {
+vi.mock('bcryptjs', async (importOriginal: any) => {
   const actual = await importOriginal<typeof import('bcryptjs')>();
   return {
     ...actual,
@@ -18,6 +18,15 @@ vi.mock('bcryptjs', async (importOriginal) => {
 vi.mock('@/lib/rate-limiter', () => ({
   checkRateLimit: vi.fn(),
   resetRateLimit: vi.fn(),
+}));
+
+vi.mock('jose', () => ({
+  SignJWT: vi.fn().mockImplementation(() => ({
+    setProtectedHeader: vi.fn().mockReturnThis(),
+    setExpirationTime: vi.fn().mockReturnThis(),
+    setIssuedAt: vi.fn().mockReturnThis(),
+    sign: vi.fn().mockResolvedValue('fake-jwt-token'),
+  })),
 }));
 
 import { query } from '@/lib/db';
