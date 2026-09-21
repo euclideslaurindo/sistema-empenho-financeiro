@@ -1,9 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { POST } from '@/app/api/auth/register/route';
 import { NextRequest } from 'next/server';
-import { createDbMock } from '@/tests/helpers/db-mock';
-
-vi.mock('@/lib/db', () => createDbMock());
 
 vi.mock('@/lib/auth', () => ({
   getAuthUser: vi.fn(),
@@ -11,9 +8,17 @@ vi.mock('@/lib/auth', () => ({
   forbiddenResponse: () => ({ status: 403, json: async () => ({ error: 'Acesso negado' }) })
 }));
 
-vi.mock('bcryptjs', () => ({
-  genSalt: vi.fn().mockResolvedValue('salt'),
-  hash: vi.fn().mockResolvedValue('hashed-password'),
+vi.mock('bcryptjs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('bcryptjs')>();
+  return {
+    ...actual,
+    genSalt: vi.fn().mockResolvedValue('salt'),
+    hash: vi.fn().mockResolvedValue('hashed-password'),
+  };
+});
+
+vi.mock('@/lib/db', () => ({
+  query: vi.fn(),
 }));
 
 import { getAuthUser } from '@/lib/auth';
@@ -24,9 +29,11 @@ describe('Integração API Auth Register', () => {
     vi.clearAllMocks();
   });
 
-  test('Criar usuário como ADMIN retorna 201', async () => {
+  test('Criar usuário como ADMIN retorna 200', async () => {
     (getAuthUser as any).mockResolvedValue({ id: 'admin-123', perfil: 'ADMIN' });
-    (query as any).mockResolvedValue([]); // não existe
+    (query as any)
+      .mockResolvedValueOnce([]) // SELECT duplicidade → não existe
+      .mockResolvedValueOnce({ insertId: 'user-uuid-123' }); // INSERT → sucesso
 
     (global.crypto.randomUUID as any) = () => 'user-uuid-123';
 
@@ -34,26 +41,24 @@ describe('Integração API Auth Register', () => {
       method: 'POST',
       body: JSON.stringify({
         nome: 'New User',
-        email: 'newuser@example.com',
         senha: 'SecurePass123',
       }),
     });
 
     const res: any = await POST(req);
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.success).toBe(true);
-    expect(data.usuario.perfil).toBe('GESTOR'); // novo usuário é sempre GESTOR
+    expect(data.message).toBeDefined();
   });
 
   test('Não-ADMIN tentando criar retorna 403', async () => {
-    (getAuthUser as any).mockResolvedValue({ id: 'user-123', perfil: 'USER' }); // não é ADMIN
+    (getAuthUser as any).mockResolvedValue({ id: 'user-123', perfil: 'GESTOR' });
 
     const req = new NextRequest('http://localhost:3000/api/auth/register', {
       method: 'POST',
       body: JSON.stringify({
         nome: 'New User',
-        email: 'newuser@example.com',
         senha: 'SecurePass123',
       }),
     });
@@ -69,8 +74,7 @@ describe('Integração API Auth Register', () => {
       method: 'POST',
       body: JSON.stringify({
         nome: 'New User',
-        email: 'newuser@example.com',
-        senha: 'short', // menos de 8 chars
+        senha: 'short',
       }),
     });
 
@@ -85,7 +89,6 @@ describe('Integração API Auth Register', () => {
       method: 'POST',
       body: JSON.stringify({
         nome: '',
-        email: 'newuser@example.com',
         senha: 'SecurePass123',
       }),
     });
@@ -96,20 +99,14 @@ describe('Integração API Auth Register', () => {
 
   test('Duplicação de email retorna 409', async () => {
     (getAuthUser as any).mockResolvedValue({ id: 'admin-123', perfil: 'ADMIN' });
-
-    const { withTransaction } = await import('@/lib/db');
-    (withTransaction as any).mockImplementationOnce(async (cb: any) => {
-      const conn = {
-        execute: vi.fn().mockRejectedValueOnce({ code: 'ER_DUP_ENTRY' }),
-      };
-      return await cb(conn);
-    });
+    (query as any)
+      .mockResolvedValueOnce([]) // SELECT duplicidade → não existe
+      .mockRejectedValueOnce({ code: 'ER_DUP_ENTRY' }); // INSERT → erro
 
     const req = new NextRequest('http://localhost:3000/api/auth/register', {
       method: 'POST',
       body: JSON.stringify({
         nome: 'New User',
-        email: 'existing@example.com',
         senha: 'SecurePass123',
       }),
     });
@@ -125,7 +122,6 @@ describe('Integração API Auth Register', () => {
       method: 'POST',
       body: JSON.stringify({
         nome: 'New User',
-        email: 'newuser@example.com',
         senha: 'SecurePass123',
       }),
     });

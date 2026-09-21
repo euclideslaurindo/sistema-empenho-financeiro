@@ -1,9 +1,11 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { POST, GET } from '@/app/api/notas-empenho/route';
 import { NextRequest } from 'next/server';
-import { createDbMock } from '@/tests/helpers/db-mock';
 
-vi.mock('@/lib/db', () => createDbMock());
+vi.mock('@/lib/db', () => ({
+  query: vi.fn(),
+  withTransaction: vi.fn(),
+}));
 
 vi.mock('@/lib/auth', () => ({
   getAuthUser: vi.fn(),
@@ -22,6 +24,16 @@ describe('Integração API Notas de Empenho', () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
       (global.crypto.randomUUID as any) = () => 'ne-uuid-123';
 
+      const { withTransaction } = await import('@/lib/db');
+      (withTransaction as any).mockImplementationOnce(async (cb: any) => {
+        const conn = {
+          execute: vi.fn()
+            .mockResolvedValueOnce([]) // verificação de duplicidade
+            .mockResolvedValueOnce([{ affectedRows: 1 }]), // INSERT
+        };
+        return await cb(conn);
+      });
+
       const req = new NextRequest('http://localhost:3000/api/notas-empenho', {
         method: 'POST',
         body: JSON.stringify({
@@ -35,6 +47,9 @@ describe('Integração API Notas de Empenho', () => {
 
       const res: any = await POST(req);
       expect(res.status).toBe(201);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.id).toBeDefined();
     });
 
     test('Valor <= 0 retorna 400 (Zod validation)', async () => {
@@ -57,8 +72,14 @@ describe('Integração API Notas de Empenho', () => {
     test('Número duplicado retorna 409', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
-      const { query } = await import('@/lib/db');
-      (query as any).mockResolvedValueOnce([{ id: 'ne-existing' }]); // já existe
+      const { withTransaction } = await import('@/lib/db');
+      (withTransaction as any).mockImplementationOnce(async (cb: any) => {
+        const conn = {
+          execute: vi.fn()
+            .mockResolvedValueOnce([[{ id: 'ne-existing' }]]), // já existe
+        };
+        return await cb(conn);
+      });
 
       const req = new NextRequest('http://localhost:3000/api/notas-empenho', {
         method: 'POST',
@@ -70,6 +91,8 @@ describe('Integração API Notas de Empenho', () => {
 
       const res: any = await POST(req);
       expect(res.status).toBe(409);
+      const data = await res.json();
+      expect(data.error).toContain('já está cadastrada');
     });
 
     test('Sem autenticação retorna 401', async () => {
@@ -115,7 +138,7 @@ describe('Integração API Notas de Empenho', () => {
           id: 'ne-1',
           numero: 'NE-2026-001',
           valor: 10000,
-          saldoDisponivel: 5000, // 10k - 5k já pago em OPs
+          saldoDisponivel: 5000,
         },
       ]);
 
@@ -124,7 +147,7 @@ describe('Integração API Notas de Empenho', () => {
       const data = await res.json();
 
       expect(res.status).toBe(200);
-      expect(data.notas[0].saldoDisponivel).toBe(5000);
+      expect(data.ne.saldoDisponivel).toBe(5000);
     });
 
     test('GET com ?numero= NE não existente retorna 404', async () => {
