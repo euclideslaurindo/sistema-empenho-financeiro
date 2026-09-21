@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
   senha_hash VARCHAR(255) NOT NULL,
   perfil VARCHAR(50) DEFAULT 'ADMIN',
   ativo BOOLEAN DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ultimo_acesso TIMESTAMP NULL DEFAULT NULL
 );
 
 -- ============================================================

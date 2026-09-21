@@ -1,13 +1,14 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, User, AlertCircle, Loader2, ArrowRight, Landmark, CheckCircle2 } from "lucide-react";
+import { Lock, User, AlertCircle, Loader2, ArrowRight, Landmark, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Login() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [showSenha, setShowSenha] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -117,13 +118,21 @@ export default function Login() {
               <Lock className="w-[18px] h-[18px] absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors duration-200" />
               <input
                 id="login-senha"
-                type="password"
+                type={showSenha ? "text" : "password"}
                 required
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-11 pr-4 py-3 bg-slate-50/80 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 focus:bg-white transition-all duration-200 text-slate-800 placeholder:text-slate-400"
+                className="w-full pl-11 pr-11 py-3 bg-slate-50/80 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 focus:bg-white transition-all duration-200 text-slate-800 placeholder:text-slate-400"
               />
+              <button
+                type="button"
+                onClick={() => setShowSenha(!showSenha)}
+                aria-label={showSenha ? "Ocultar senha" : "Mostrar senha"}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {showSenha ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+              </button>
             </div>
             {!isRegistering && (
               <div className="flex justify-end mt-2">

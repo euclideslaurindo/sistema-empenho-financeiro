@@ -78,7 +78,7 @@ export function Sidebar() {
               key={item.name}
               href={item.href}
               className={cn(
-                "flex items-center px-4 py-3 rounded-xl text-sm transition-all duration-300 group relative overflow-hidden",
+                "flex items-center px-4 py-3 rounded-xl text-sm transition-all duration-300 group relative",
                 isActive
                   ? "bg-blue-600/20 text-white font-bold shadow-inner border border-blue-500/30"
                   : "text-slate-400 hover:bg-white/5 hover:text-slate-200 border border-transparent",

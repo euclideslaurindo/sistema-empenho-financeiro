@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useCallback } from "react";
 import { Search } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateOnlyBR } from "@/lib/utils";
 
 export default function OpRecentTable({ ops, onSearch }: { ops: any[], onSearch: (term: string) => void }) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -47,7 +47,7 @@ export default function OpRecentTable({ ops, onSearch }: { ops: any[], onSearch:
                 <td className="py-5 font-bold text-blue-900 rounded-l-lg pl-2">{op.numeroEmpenho || "-"}</td>
                 <td className="py-5 font-semibold text-slate-500">{op.numeroNe || "-"}</td>
                 <td className="py-5 font-semibold text-slate-700">{op.credorNome || "-"}</td>
-                <td className="py-5 font-medium text-slate-500">{op.dataPagamento ? new Date(op.dataPagamento).toLocaleDateString('pt-BR') : "-"}</td>
+                <td className="py-5 font-medium text-slate-500">{formatDateOnlyBR(op.dataPagamento)}</td>
                 <td className="py-5 font-black text-slate-800 text-right">{formatCurrency(Number(op.valorPagamento) || 0)}</td>
               </tr>
             ))}

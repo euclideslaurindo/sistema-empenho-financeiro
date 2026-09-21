@@ -6,6 +6,7 @@ export interface UsuarioDB {
   perfil: 'ADMIN' | 'USER' | string;
   ativo: number;
   created_at: Date;
+  ultimo_acesso: Date | string | null;
 }
 
 export interface CredorDB {

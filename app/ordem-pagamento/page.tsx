@@ -256,10 +256,28 @@ export default function OrdemPagamento() {
     }
   };
 
+  const CAMPO_LABELS: Record<string, string> = {
+    empenho: "Empenho",
+    nomeCredor: "Nome do Credor",
+    cpfCnpj: "CPF/CNPJ",
+    dataEmissao: "Data de Emissão",
+    valorPagamento: "Valor a Pagar",
+    itens: "Itens",
+  };
+
   const handleFormError = (erros: any) => {
-    const primeiroErro = Object.values(erros)[0] as any;
-    const msg = primeiroErro?.message || primeiroErro?.root?.message || 'Preencha todos os campos obrigatórios.';
-    toast.error(`Erro de validação: ${msg}`);
+    const campos = Object.keys(erros);
+    if (campos.length === 0) return;
+
+    if (campos.length === 1) {
+      const primeiroErro = Object.values(erros)[0] as any;
+      const msg = primeiroErro?.message || primeiroErro?.root?.message || 'Preencha todos os campos obrigatórios.';
+      toast.error(`Erro de validação: ${msg}`);
+      return;
+    }
+
+    const labels = campos.map((campo) => CAMPO_LABELS[campo] || campo).join(", ");
+    toast.error(`${campos.length} campos precisam de atenção: ${labels}`);
   };
 
   return (
@@ -294,7 +312,7 @@ export default function OrdemPagamento() {
           <form onSubmit={handleSubmit(onSubmit, handleFormError)}>
             <OpPaymentData errors={errors} />
             <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
-              <OpItemsTable />
+              <OpItemsTable errors={errors} />
             </div>
             <OpTaxesSection userRole={userRole} />
           </form>

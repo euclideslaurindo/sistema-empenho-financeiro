@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Plus,
   Save,
@@ -47,12 +48,23 @@ interface Credor {
 }
 
 export default function Credores() {
+  return (
+    <Suspense fallback={null}>
+      <CredoresContent />
+    </Suspense>
+  );
+}
+
+function CredoresContent() {
+  const searchParams = useSearchParams();
+  const buscaInicial = searchParams.get("busca") || "";
   const [credores, setCredores] = useState<Credor[]>([]);
   const [formData, setFormData] = useState<Partial<Credor>>({});
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(buscaInicial);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [credorParaExcluir, setCredorParaExcluir] = useState<string | null>(null);
 
   // carrega a lista de credores do banco
   const fetchCredores = useCallback(async (busca = "") => {
@@ -73,9 +85,10 @@ export default function Credores() {
 
   useEffect(() => {
     const init = async () => {
-      await fetchCredores();
+      await fetchCredores(buscaInicial);
     };
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchCredores]);
 
   // valida os campos antes de mandar pro servidor
@@ -200,15 +213,24 @@ export default function Credores() {
       toast.error("Nenhum credor selecionado para excluir. Clique em Editar na tabela primeiro.");
       return;
     }
+    setCredorParaExcluir(formData.id);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleExcluirDaTabela = (id: string) => {
+    setCredorParaExcluir(id);
     setShowDeleteConfirm(true);
   };
 
   const confirmExcluir = async () => {
+    const id = credorParaExcluir ?? formData.id;
+    if (!id) return;
     try {
-      await apiClient.delete(`/api/credores/${formData.id}`);
+      await apiClient.delete(`/api/credores/${id}`);
       toast.success("Credor excluído com sucesso!");
-      setFormData({});
-      await fetchCredores();
+      if (formData.id === id) setFormData({});
+      setCredorParaExcluir(null);
+      await fetchCredores(searchTerm);
     } catch (error: any) {
       toast.error(error.message || "Erro de conexão com o servidor.");
     }
@@ -551,6 +573,17 @@ export default function Credores() {
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
+                          <button
+                            title="Excluir"
+                            aria-label="Excluir credor"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExcluirDaTabela(c.id);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-white rounded-md transition-all"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -571,15 +604,21 @@ export default function Credores() {
         </div>
       </div>
 
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <AlertDialog
+        open={showDeleteConfirm}
+        onOpenChange={(open) => {
+          setShowDeleteConfirm(open);
+          if (!open) setCredorParaExcluir(null);
+        }}
+      >
         <AlertDialogContent>
-          <AlertDialogTitle>Desativar credor</AlertDialogTitle>
+          <AlertDialogTitle>Excluir credor</AlertDialogTitle>
           <AlertDialogDescription>
-            Tem certeza que deseja desativar este credor? Essa ação pode ser revertida apenas por um administrador.
+            Tem certeza que deseja excluir este credor? Essa ação pode ser revertida apenas por um administrador.
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmExcluir}>Desativar</AlertDialogAction>
+            <AlertDialogAction onClick={confirmExcluir}>Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

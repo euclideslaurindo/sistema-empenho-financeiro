@@ -13,7 +13,9 @@ export function Header() {
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && e.currentTarget.value.trim() !== '') {
-      toast.success(`Buscando por "${e.currentTarget.value}"...`);
+      const termo = e.currentTarget.value.trim();
+      toast.success(`Buscando por "${termo}"...`);
+      router.push(`/credores?busca=${encodeURIComponent(termo)}`);
       e.currentTarget.value = '';
     }
   };
@@ -24,7 +26,7 @@ export function Header() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } catch (err) {
-      // Ignora erro e continua com o logout
+      toast.warning('Não foi possível confirmar o encerramento da sessão no servidor. Você foi desconectado localmente.');
     }
     window.location.href = '/login';
   };
