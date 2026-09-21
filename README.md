@@ -39,10 +39,34 @@ npm start
 
 ---
 
-## Credenciais de Acesso Padrão
-| Matrícula | Senha    | Nível |
-|-----------|----------|-------|
-| admin     | admin123 | Admin |
+## Setup Inicial - Criando o Usuário Admin
+
+1. **Configure as variáveis de ambiente:**
+   Copy `.env.example` to `.env.local` and fill in your database credentials:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Edit `.env.local` and set:
+   - `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD` (your database details)
+   - `ENABLE_SETUP=true` (only for development)
+   - `ADMIN_INITIAL_PASSWORD=YourSecurePassword` (or leave empty for default `Mudar@123`)
+
+2. **Create initial admin user:**
+   Run the setup route once to create the database tables and admin user:
+   ```bash
+   curl http://localhost:3000/api/setup
+   # or open in browser: http://localhost:3000/api/setup
+   ```
+   This creates:
+   - Database tables (`usuarios`, `configuracoes_sistema`, etc.)
+   - Admin user with email `admin@admin.com` and password from `ADMIN_INITIAL_PASSWORD` (or `Mudar@123` as fallback)
+
+3. **Disable setup route:**
+   After initial setup, set `ENABLE_SETUP=false` in `.env.local` to prevent accidental re-runs.
+
+4. **Login:**
+   - **Email:** `admin@admin.com`
+   - **Password:** Value set in `ADMIN_INITIAL_PASSWORD` env var, or `Mudar@123` if not specified
 
 ---
 

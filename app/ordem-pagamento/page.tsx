@@ -118,7 +118,6 @@ export default function OrdemPagamento() {
   const { reset, handleSubmit, formState: { errors } } = methods;
 
   const fetchOps = useCallback(async (busca: string = "") => {
-    setIsLoading(true);
     try {
       const url = busca ? `/api/ordens-pagamento?busca=${encodeURIComponent(busca)}` : "/api/ordens-pagamento";
       const data = await apiClient.get(url);
@@ -142,6 +141,7 @@ export default function OrdemPagamento() {
   }, []);
 
   useEffect(() => {
+    setIsLoading(true);
     fetchOps();
     fetchUserRole();
   }, [fetchOps, fetchUserRole]);

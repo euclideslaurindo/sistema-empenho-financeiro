@@ -23,10 +23,6 @@ export default function UsuariosPage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const PAGE_SIZE = 10;
 
-  useEffect(() => {
-    fetchUsuarios();
-  }, []);
-
   const fetchUsuarios = async () => {
     try {
       const data = await apiClient.get<{ usuarios: any[] }>("/api/usuarios");
@@ -37,6 +33,10 @@ export default function UsuariosPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchUsuarios();
+  }, []);
 
   const handleCreate = async () => {
     if (!formData.nome || !formData.email || !formData.senha) {

@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { numeroPorExtenso } from '@/lib/utils';
 
 export const EmpenhoVia = ({
@@ -17,10 +18,12 @@ export const EmpenhoVia = ({
         <div className="flex justify-between items-start pt-2 px-2 pb-1 relative">
           <div className="w-[84px] h-[84px] flex items-center justify-center">
             { }
-            <img
+            <Image
               src="/brasao_pernambuco.png"
               alt="Brasão do Estado de Pernambuco"
-              className="w-[74px] h-auto object-contain mx-auto"
+              width={74}
+              height={74}
+              className="object-contain mx-auto"
             />
           </div>
           <div className="flex flex-col text-center flex-1 tracking-wide font-sans mt-2">

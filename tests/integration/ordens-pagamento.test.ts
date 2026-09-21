@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server';
 // Mocks
 vi.mock('@/lib/db', () => ({
   query: vi.fn(),
-  withTransaction: vi.fn(async (callback) => {
+  withTransaction: vi.fn(async (callback: any) => {
     // Simula a injeção da conexão de transação (passando um mock)
     const connectionMock = {
       execute: vi.fn()
