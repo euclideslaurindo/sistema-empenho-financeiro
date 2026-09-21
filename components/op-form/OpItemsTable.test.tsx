@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { useForm, FormProvider, UseFormReturn } from 'react-hook-form';
 import OpItemsTable from './OpItemsTable';
 
-vi.mock('@/lib/utils', async (importOriginal) => {
+vi.mock('@/lib/utils', async (importOriginal: any) => {
   const actual = await importOriginal<typeof import('@/lib/utils')>();
   return {
     ...actual,

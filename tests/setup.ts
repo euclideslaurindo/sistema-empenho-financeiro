@@ -28,13 +28,20 @@ vi.mock('next/server', () => {
     NextResponse: {
       json: (body: any, init?: any) => {
         const cookies = new MockCookies();
+        const headers = new Map<string, string>();
+        if (init?.headers) {
+          Object.entries(init.headers).forEach(([k, v]) => headers.set(k, String(v)));
+        }
         return {
           status: init?.status || 200,
           json: async () => body,
+          headers: {
+            get: (name: string): string | null => headers.get(name) || null,
+          },
           cookies: {
-            set: vi.fn((name, value, options) => cookies.set(name, value, options)),
-            delete: vi.fn((name) => cookies.delete(name)),
-            get: vi.fn((name) => cookies.get(name)),
+            set: vi.fn((name: string, value: string, options?: any) => cookies.set(name, value, options)),
+            delete: vi.fn((name: string) => cookies.delete(name)),
+            get: vi.fn((name: string) => cookies.get(name)),
           },
         };
       },
