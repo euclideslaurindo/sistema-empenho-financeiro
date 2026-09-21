@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "lint:types": "tsc --noEmit",
     "clean": "next clean",
     "prepare": "husky",
     "test": "vitest run",
