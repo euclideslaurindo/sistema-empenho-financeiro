@@ -25,11 +25,6 @@ export default function Configuracoes() {
     aviso_manutencao: true,
   });
 
-  useEffect(() => {
-    setMounted(true);
-    fetchConfig();
-  }, []);
-
   const fetchConfig = async () => {
     setIsLoading(true);
     try {
@@ -54,6 +49,11 @@ export default function Configuracoes() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    setMounted(true);
+    fetchConfig();
+  }, []);
 
   const handleAction = async (action: string) => {
     if (action === "Salvar") {

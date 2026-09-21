@@ -5,7 +5,7 @@ import { OrdemPagamentoService } from '@/lib/services/ordem-pagamento.service';
 vi.mock('@/lib/db', () => {
   return {
     query: vi.fn(),
-    withTransaction: vi.fn(async (callback) => {
+    withTransaction: vi.fn(async (callback: any) => {
       // Mock the connection object
       const conn = {
         execute: vi.fn()

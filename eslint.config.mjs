@@ -10,10 +10,10 @@ export default defineConfig([
   {
     extends: [...next],
     rules: {
-      "react-hooks/set-state-in-effect": "off",
-      "react-hooks/immutability": "off",
-      "react-hooks/incompatible-library": "off",
-      "@next/next/no-img-element": "off"
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/immutability": "warn",
+      "react-hooks/incompatible-library": "warn",
+      "@next/next/no-img-element": "warn"
     }
   }
 ]);

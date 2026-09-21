@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { Search, LogOut, Bell, LayoutDashboard, Users, FileText, Banknote, FileStack, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -45,7 +46,7 @@ export function Header() {
       {/* Left: Logo */}
       <Link href="/" className="flex items-center gap-3 mr-12 group">
         <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300">
-          <img src="/brasao_pernambuco.png" alt="Brasão de Pernambuco" className="w-full h-full object-contain" />
+          <Image src="/brasao_pernambuco.png" alt="Brasão de Pernambuco" width={56} height={56} className="object-contain" />
         </div>
         <span className="font-bold text-lg text-slate-800 tracking-tight">EMPENHO GRE</span>
       </Link>

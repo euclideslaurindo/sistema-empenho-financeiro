@@ -50,7 +50,7 @@ export default function NotasEmpenho() {
   const [duplicatedNe, setDuplicatedNe] = useState<NotaEmpenho | null>(null);
 
   // estado do formulario
-  const { register, handleSubmit, watch, reset, setValue, formState: { errors } } = useForm<NotaEmpenhoFormValues>({
+  const { register, handleSubmit, reset, setValue, control, formState: { errors } } = useForm<NotaEmpenhoFormValues>({
     resolver: zodResolver(notaEmpenhoSchema),
     defaultValues: {
       numeroNE: "",
@@ -98,7 +98,7 @@ export default function NotasEmpenho() {
 
   // avisa quando a data ta passada de 60 dias
   let showAlerta = false;
-  const dataPagamentoWatch = watch("dataPagamento");
+  const dataPagamentoWatch = useWatch({ control, name: "dataPagamento" });
   if (dataPagamentoWatch) {
     const parts = dataPagamentoWatch.split("-");
     if (parts.length === 3) {
@@ -119,9 +119,9 @@ export default function NotasEmpenho() {
 
   // detecta se ja tem uma NE com o mesmo valor no banco (possivel duplicata)
   // Debounce API check para duplicidade
-  const valorNEWatch = watch("valorNE");
-  const credorNomeWatch = watch("credorNome");
-  const subelementoWatch = watch("subelemento");
+  const valorNEWatch = useWatch({ control, name: "valorNE" });
+  const credorNomeWatch = useWatch({ control, name: "credorNome" });
+  const subelementoWatch = useWatch({ control, name: "subelemento" });
   
   useEffect(() => {
     if (!valorNEWatch) {

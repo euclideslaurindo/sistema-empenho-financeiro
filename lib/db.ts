@@ -9,6 +9,8 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 1, // coloquei 1 pra nao explodir conexoes no XAMPP
   queueLimit: 0,
+  // Hardcoded to -03:00 because Brazil abolished daylight saving time in 2019
+  // mysql2 only accepts 'local' or a fixed offset here (not named IANA zones like America/Sao_Paulo)
   timezone: '-03:00',
 };
 
