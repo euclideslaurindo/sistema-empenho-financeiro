@@ -1,8 +1,10 @@
 "use client";
+import { useState } from "react";
 import { useFormContext, useFieldArray, useWatch } from "react-hook-form";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { maskCurrency, parseFormNumber, formatCurrency } from "@/lib/utils";
+import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 // Componente isolado para calcular e exibir o total (evita re-render da tabela inteira)
 function TotalItensInfo({ control, setValue }: { control: any, setValue: any }) {
@@ -48,10 +50,12 @@ function TotalItensInfo({ control, setValue }: { control: any, setValue: any }) 
 }
 
 // Componente de Linha Isolado (evita que a digitação de um item re-renderize os outros)
-function ItemRow({ field, index, remove, control, register, setValue }: any) {
+function ItemRow({ field, index, remove, control, register, setValue, onRemoveClick, itemErrors }: any) {
   const qty = useWatch({ control, name: `itens.${index}.quantidade` }) || 0;
   const unitVal = useWatch({ control, name: `itens.${index}.valorUnitario` }) || 0;
   const total = Number(qty) * parseFormNumber(unitVal);
+  const especificacaoError = itemErrors?.especificacao;
+  const unidadeError = itemErrors?.unidade;
 
   return (
     <tr className="border-b border-slate-50 last:border-0">
@@ -61,8 +65,11 @@ function ItemRow({ field, index, remove, control, register, setValue }: any) {
           type="text"
           {...register(`itens.${index}.especificacao` as const)}
           placeholder="Descrição do item"
-          className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:border-blue-800 transition-colors text-sm"
+          aria-invalid={!!especificacaoError}
+          aria-describedby={especificacaoError ? `item-${index}-especificacao-error` : undefined}
+          className={`w-full px-3 py-2 rounded-lg border bg-slate-50 focus:border-blue-800 transition-colors text-sm ${especificacaoError ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
         />
+        {especificacaoError && <p id={`item-${index}-especificacao-error`} className="text-red-500 text-xs mt-1 font-semibold">{especificacaoError.message}</p>}
       </td>
       <td className="py-3 pr-2">
         <input
@@ -78,8 +85,11 @@ function ItemRow({ field, index, remove, control, register, setValue }: any) {
         <input
           type="text"
           {...register(`itens.${index}.unidade` as const)}
-          className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:border-blue-800 transition-colors text-sm"
+          aria-invalid={!!unidadeError}
+          aria-describedby={unidadeError ? `item-${index}-unidade-error` : undefined}
+          className={`w-full px-3 py-2 rounded-lg border bg-slate-50 focus:border-blue-800 transition-colors text-sm ${unidadeError ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
         />
+        {unidadeError && <p id={`item-${index}-unidade-error`} className="text-red-500 text-xs mt-1 font-semibold">{unidadeError.message}</p>}
       </td>
       <td className="py-3 pr-2">
         <input
@@ -100,7 +110,7 @@ function ItemRow({ field, index, remove, control, register, setValue }: any) {
       <td className="py-3 text-right">
         <button
           type="button"
-          onClick={() => remove(index)}
+          onClick={() => onRemoveClick(index)}
           aria-label="Remover item"
           className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
         >
@@ -111,13 +121,21 @@ function ItemRow({ field, index, remove, control, register, setValue }: any) {
   );
 }
 
-export default function OpItemsTable() {
+export default function OpItemsTable({ errors }: { errors?: any } = {}) {
   const { register, control, setValue } = useFormContext<any>();
+  const [indexParaRemover, setIndexParaRemover] = useState<number | null>(null);
 
   const { fields, append, remove } = useFieldArray({
     control,
     name: "itens"
   });
+
+  const handleConfirmRemove = () => {
+    if (indexParaRemover !== null) {
+      remove(indexParaRemover);
+      setIndexParaRemover(null);
+    }
+  };
 
 
 
@@ -157,6 +175,8 @@ export default function OpItemsTable() {
                 control={control}
                 register={register}
                 setValue={setValue}
+                onRemoveClick={setIndexParaRemover}
+                itemErrors={errors?.itens?.[index]}
               />
             ))}
           </tbody>
@@ -164,6 +184,19 @@ export default function OpItemsTable() {
 
         <TotalItensInfo control={control} setValue={setValue} />
       </div>
+
+      <AlertDialog open={indexParaRemover !== null} onOpenChange={(open) => !open && setIndexParaRemover(null)}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Remover item</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tem certeza que deseja remover este item da ordem de pagamento?
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmRemove}>Remover</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

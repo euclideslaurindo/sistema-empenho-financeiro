@@ -216,3 +216,13 @@ export function isValidCpfCnpj(val: string): boolean {
   
   return false;
 }
+
+export function formatDateOnlyBR(dateStr: string | null | undefined): string {
+  if (!dateStr) return "-";
+  const trimmed = dateStr.trim();
+  if (!trimmed) return "-";
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return "-";
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}

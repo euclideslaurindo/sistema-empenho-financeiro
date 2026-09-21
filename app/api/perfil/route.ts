@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   try {
     // busca os dados do usuario logado pelo email que veio do token
     const rows = await query<UsuarioDB[]>(
-      'SELECT id, nome, email, perfil, ativo, created_at FROM usuarios WHERE email = ? LIMIT 1',
+      'SELECT id, nome, email, perfil, ativo, created_at, ultimo_acesso FROM usuarios WHERE email = ? LIMIT 1',
       [user.email]
     );
     if (!rows || rows.length === 0) {

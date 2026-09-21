@@ -103,6 +103,8 @@ export async function POST(request: NextRequest) {
     // Login bem-sucedido: limpa o contador de tentativas para este usuário
     resetRateLimit(rateKey);
 
+    await query('UPDATE usuarios SET ultimo_acesso = NOW() WHERE id = ?', [user.id]);
+
     return response;
   } catch (error) {
     console.error('[API Auth] Erro interno:', error);

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { numeroPorExtenso } from "@/lib/utils";
+import { numeroPorExtenso, formatDateOnlyBR } from "@/lib/utils";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import * as htmlToImage from "html-to-image";
@@ -366,9 +366,9 @@ export default function ConsultaImpressao() {
         valorUnitario: op.itemValorUnitario2 ? `${op.itemValorUnitario}\n\n${op.itemValorUnitario2}` : op.itemValorUnitario,
         valorTotal: op.itemValorUnitario2 && op.itemQuantidade2 ? `${Number(op.itemValorUnitario * op.itemQuantidade).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n\n${Number(op.itemValorUnitario2 * op.itemQuantidade2).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : valorF,
         totalEspecificacao: valorF,
-        deduzidoData: op.dataPagamento ? new Date(op.dataPagamento).toLocaleDateString("pt-BR") : "",
-        provisaoData: op.dataEmissao ? new Date(op.dataEmissao).toLocaleDateString("pt-BR") : "",
-        pagamentoData: op.dataPagamento ? new Date(op.dataPagamento).toLocaleDateString("pt-BR") : "",
+        deduzidoData: formatDateOnlyBR(op.dataPagamento),
+        provisaoData: formatDateOnlyBR(op.dataEmissao),
+        pagamentoData: formatDateOnlyBR(op.dataPagamento),
       },
       verso: {
         ...versoData,

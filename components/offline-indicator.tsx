@@ -1,10 +1,11 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { WifiOff, RefreshCw } from 'lucide-react';
+import { WifiOff, RefreshCw, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function OfflineIndicator() {
   const [isOffline, setIsOffline] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     // Only set inline after mount
@@ -15,6 +16,7 @@ export function OfflineIndicator() {
 
     const handleOffline = () => {
       setIsOffline(true);
+      setDismissed(false);
       toast.warning('Você está offline. As alterações serão guardadas e sincronizadas depois.');
     };
 
@@ -32,14 +34,14 @@ export function OfflineIndicator() {
     };
   }, []);
 
-  if (!isOffline) return null;
+  if (!isOffline || dismissed) return null;
 
   return (
     <div role="alert" className="fixed bottom-6 right-6 bg-slate-800 border border-zinc-700 text-white p-4 rounded-xl shadow-2xl flex items-start text-sm z-50 animate-in slide-in-from-bottom-5 max-w-sm">
       <div className="bg-indigo-500/20 p-2 rounded-lg mr-4 border border-indigo-500/50">
         <WifiOff className="w-5 h-5 text-indigo-500 shrink-0 relative" />
       </div>
-      <div className="flex flex-col">
+      <div className="flex flex-col flex-1">
         <div className="flex items-center gap-2 mb-1">
           <span className="font-bold text-base tracking-tight">Modo Offline Ativo</span>
           <RefreshCw className="w-3.5 h-3.5 text-zinc-400 animate-spin" />
@@ -48,6 +50,13 @@ export function OfflineIndicator() {
           Sem conexão à internet. O sistema continuará funcionando normalmente através do cache. Suas ações serão sincronizadas automaticamente quando reconectar.
         </p>
       </div>
+      <button
+        onClick={() => setDismissed(true)}
+        aria-label="Fechar aviso"
+        className="ml-4 text-zinc-400 hover:text-white transition-colors flex-shrink-0"
+      >
+        <X className="w-4 h-4" />
+      </button>
     </div>
   );
 }

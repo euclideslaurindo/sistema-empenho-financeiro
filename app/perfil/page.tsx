@@ -16,7 +16,7 @@ export default function PerfilGestor() {
     email: "",
     nivel_acesso: 1,
     ativo: 1,
-    ultimoAcesso: "Hoje, 08:30"
+    ultimoAcesso: null as string | null
   });
 
   const [isLoading, setIsLoading] = useState(true);
@@ -30,7 +30,9 @@ export default function PerfilGestor() {
           setPerfil((prev) => ({
             ...prev,
             ...data.usuario,
-            ultimoAcesso: new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})
+            ultimoAcesso: data.usuario.ultimo_acesso
+              ? new Date(data.usuario.ultimo_acesso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : null
           }));
         }
       } catch (e) {
@@ -124,7 +126,7 @@ export default function PerfilGestor() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[#a1a1aa]">Último Acesso</span>
-                  <span className="font-semibold text-white">Hoje, {perfil.ultimoAcesso}</span>
+                  <span className="font-semibold text-white">{perfil.ultimoAcesso || "Nunca acessado"}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[#a1a1aa]">Status</span>

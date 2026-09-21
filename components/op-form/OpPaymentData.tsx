@@ -216,7 +216,14 @@ export default function OpPaymentData({ errors }: { errors: any }) {
         </div>
         <div className="col-span-12 md:col-span-3">
           <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Data Emissão OP</label>
-          <input type="date" {...register("dataEmissao")} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" />
+          <input
+            type="date"
+            {...register("dataEmissao")}
+            aria-invalid={!!errors?.dataEmissao}
+            aria-describedby={errors?.dataEmissao ? "op-data-emissao-error" : undefined}
+            className={`w-full px-4 py-3 rounded-xl border bg-slate-50 focus:border-blue-800 transition-all duration-300 ${errors?.dataEmissao ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
+          />
+          {errors?.dataEmissao && <p id="op-data-emissao-error" className="text-red-500 text-xs mt-1 font-semibold">{errors.dataEmissao.message}</p>}
         </div>
         <div className="col-span-12 md:col-span-3">
           <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nº do Cheque</label>
@@ -242,10 +249,13 @@ export default function OpPaymentData({ errors }: { errors: any }) {
               aria-expanded={showNeSuggestions && neSuggestions.length > 0}
               aria-controls="ne-suggestions-listbox"
               aria-activedescendant={neNav.highlightedIndex >= 0 ? `ne-option-${neNav.highlightedIndex}` : undefined}
-              className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300"
+              aria-invalid={!!errors?.empenho}
+              aria-describedby={errors?.empenho ? "op-empenho-error" : undefined}
+              className={`w-full pl-4 pr-12 py-3 rounded-xl border bg-slate-50 focus:border-blue-800 transition-all duration-300 ${errors?.empenho ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
             />
             <button onClick={() => loadNe()} type="button" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><Search className="w-4 h-4" /></button>
           </div>
+          {errors?.empenho && <p id="op-empenho-error" className="text-red-500 text-xs mt-1 font-semibold">{errors.empenho.message}</p>}
           {showNeSuggestions && neSuggestions.length > 0 && (
             <div id="ne-suggestions-listbox" role="listbox" className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto">
               {neSuggestions.map((ne, i) => (

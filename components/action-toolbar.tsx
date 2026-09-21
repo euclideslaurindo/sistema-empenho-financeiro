@@ -44,7 +44,7 @@ export function ActionButton({
 
     setTimeout(() => {
       setStatus('idle');
-    }, 2000);
+    }, 900);
   };
 
   let currentColorClasses = '';
