@@ -23,12 +23,22 @@ export async function POST(request: NextRequest) {
 
   const { email, senha } = body;
 
-  // Rate Limiting: max 10 tentativas em 15 minutos, por combinação IP+email
-  // Isso evita o problema de LAN (IP compartilhado) sem bloquear outros usuários
-  const rateKey = `${ip}:${String(email || '').trim().toLowerCase()}`;
+  // Rate Limiting: max 10 tentativas em 15 minutos, por combinação IP+email.
+  // Isso evita o problema de LAN (IP compartilhado) sem bloquear outros usuários.
+  const emailNormalizado = String(email || '').trim().toLowerCase();
+  const rateKey = `${ip}:${emailNormalizado}`;
   const rateCheck = checkRateLimit(rateKey);
-  if (!rateCheck.allowed) {
-    const retryAfterSec = Math.ceil((rateCheck.retryAfterMs || 0) / 1000);
+
+  // Segunda checagem por email sozinho (sem IP): o header x-forwarded-for é
+  // controlável pelo cliente, então alguém pode forjar um IP diferente a
+  // cada tentativa para contornar o limite por ip:email. Essa chave extra
+  // não depende do IP, então continua bloqueando o mesmo email mesmo se o
+  // IP mudar a cada requisição.
+  const emailRateCheck = emailNormalizado ? checkRateLimit(`email:${emailNormalizado}`) : { allowed: true };
+
+  if (!rateCheck.allowed || !emailRateCheck.allowed) {
+    const retryAfterMs = Math.max(rateCheck.retryAfterMs || 0, emailRateCheck.retryAfterMs || 0);
+    const retryAfterSec = Math.ceil(retryAfterMs / 1000);
     return NextResponse.json(
       { error: `Muitas tentativas de login. Tente novamente em ${retryAfterSec} segundos.` },
       { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
@@ -102,6 +112,7 @@ export async function POST(request: NextRequest) {
 
     // Login bem-sucedido: limpa o contador de tentativas para este usuário
     resetRateLimit(rateKey);
+    resetRateLimit(`email:${emailNormalizado}`);
 
     await query('UPDATE usuarios SET ultimo_acesso = NOW() WHERE id = ?', [user.id]);
 
