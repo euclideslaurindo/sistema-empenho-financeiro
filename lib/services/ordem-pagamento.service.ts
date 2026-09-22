@@ -171,8 +171,11 @@ export class OrdemPagamentoService {
           });
         }
         totalItensCalc = Math.round(totalItensCalc * 100) / 100;
-        // Tolerância de 1 centavo para evitar falso positivo por imprecisão IEEE 754
-        if (totalItensCalc > 0 && Math.abs(totalItensCalc - vPagamentoArredondado) > 0.01) {
+        // Tolerância de 1 centavo para evitar falso positivo por imprecisão IEEE 754.
+        // A diferença também é arredondada antes de comparar, pois mesmo dois valores
+        // já arredondados podem subtrair para algo como 0.010000000000005 em vez de 0.01.
+        const diferencaItens = Math.round(Math.abs(totalItensCalc - vPagamentoArredondado) * 100) / 100;
+        if (totalItensCalc > 0 && diferencaItens > 0.01) {
           throw { status: 400, error: `A soma dos itens (R$ ${totalItensCalc.toFixed(2)}) não bate com o valor a pagar da OP (R$ ${vPagamentoArredondado.toFixed(2)}). Fraude detectada.` };
         }
 

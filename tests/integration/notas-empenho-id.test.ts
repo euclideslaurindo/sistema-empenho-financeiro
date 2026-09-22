@@ -26,12 +26,14 @@ describe('Integração API Notas de Empenho [id]', () => {
 
       (withTransaction as any).mockImplementationOnce(async (cb: any) => {
         const conn = {
-          execute: vi.fn()
-            .mockResolvedValueOnce([[{ numero: 'NE-001', valor: 10000, status: 'EMITIDO' }]]) // SELECT for UPDATE
-            .mockResolvedValueOnce([]) // verificação número duplicado
-            .mockResolvedValueOnce([[{ total_pago: 3000 }]]) // OPs já pagas
-            .mockResolvedValueOnce([{ affectedRows: 1 }]) // UPDATE
-            .mockResolvedValueOnce([{ affectedRows: 1 }]), // INSERT auditoria
+          execute: vi.fn().mockImplementation(async (sql: string) => {
+            if (sql.includes('FOR UPDATE')) return [[{ numero: 'NE-001', valor: 10000, status: 'EMITIDO' }]];
+            if (sql.includes('SELECT id FROM notas_empenho WHERE numero')) return [[]];
+            if (sql.includes('SUM(op.valor_pagamento)')) return [[{ total_pago: 3000 }]];
+            if (sql.includes('SELECT id FROM usuarios')) return [[{ id: '123' }]];
+            if (sql.includes('UPDATE notas_empenho')) return [{ affectedRows: 1 }];
+            return [[]];
+          }),
         };
         return await cb(conn);
       });
@@ -53,10 +55,13 @@ describe('Integração API Notas de Empenho [id]', () => {
 
       (withTransaction as any).mockImplementationOnce(async (cb: any) => {
         const conn = {
-          execute: vi.fn()
-            .mockResolvedValueOnce([[{ numero: 'NE-001', valor: 10000, status: 'EMITIDO' }]]) // SELECT for UPDATE
-            .mockResolvedValueOnce([]) // número check
-            .mockResolvedValueOnce([[{ total_pago: 5000 }]]), // OPs já pagas (5k)
+          execute: vi.fn().mockImplementation(async (sql: string) => {
+            if (sql.includes('FOR UPDATE')) return [[{ numero: 'NE-001', valor: 10000, status: 'EMITIDO' }]];
+            if (sql.includes('SELECT id FROM notas_empenho WHERE numero')) return [[]];
+            if (sql.includes('SUM(op.valor_pagamento)')) return [[{ total_pago: 5000 }]];
+            if (sql.includes('SELECT id FROM usuarios')) return [[{ id: '123' }]];
+            return [[]];
+          }),
         };
         return await cb(conn);
       });
@@ -72,7 +77,7 @@ describe('Integração API Notas de Empenho [id]', () => {
       const res: any = await PUT(req, { params: Promise.resolve({ id: 'ne-123' }) });
       expect(res.status).toBe(409);
       const data = await res.json();
-      expect(data.error).toContain('saldo');
+      expect(data.error).toContain('Não é possível reduzir');
     });
 
     test('Número duplicado com outro registro retorna 409', async () => {
@@ -129,7 +134,7 @@ describe('Integração API Notas de Empenho [id]', () => {
         const conn = {
           execute: vi.fn()
             .mockResolvedValueOnce([[{ numero: 'NE-001' }]]) // SELECT for UPDATE
-            .mockResolvedValueOnce([[{ total_pago: 3 }]]), // 3 OPs vinculadas
+            .mockResolvedValueOnce([[{ total: 3 }]]), // 3 OPs vinculadas
         };
         return await cb(conn);
       });
