@@ -1,5 +1,14 @@
 // rate limiter em memoria pra nao deixar alguem ficar tentando login infinitamente
 // otimizado com lazy/timeout delete para evitar O(N) cleanup
+//
+// LIMITAÇÃO CONHECIDA: o Map abaixo é local ao processo Node. Se a aplicação
+// rodar em múltiplas instâncias simultâneas (vários pods, serverless com
+// concorrência, etc.), cada instância tem seu próprio contador e o limite
+// real efetivo passa a ser (MAX_ATTEMPTS × número de instâncias). Para
+// single-instance (um VPS/container único) isso não é um problema. Se o
+// deploy migrar para multi-instância, trocar este Map por um store
+// compartilhado (Redis/Upstash) antes de depender do rate limit para
+// segurança real.
 
 interface AttemptRecord {
   count: number;
