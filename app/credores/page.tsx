@@ -55,6 +55,8 @@ export default function Credores() {
   );
 }
 
+const PAGE_SIZE = 20;
+
 function CredoresContent() {
   const searchParams = useSearchParams();
   const buscaInicial = searchParams.get("busca") || "";
@@ -65,16 +67,20 @@ function CredoresContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [credorParaExcluir, setCredorParaExcluir] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCredores, setTotalCredores] = useState(0);
 
-  // carrega a lista de credores do banco
-  const fetchCredores = useCallback(async (busca = "") => {
+  // carrega a lista de credores do banco, paginada no servidor
+  const fetchCredores = useCallback(async (busca = "", page = 1) => {
     setIsLoading(true);
     try {
-      const url = busca
-        ? `/api/credores?busca=${encodeURIComponent(busca)}`
-        : "/api/credores";
+      const url = `/api/credores?busca=${encodeURIComponent(busca)}&page=${page}&limit=${PAGE_SIZE}`;
       const data = await apiClient.get(url);
       setCredores(data.credores || []);
+      setTotalPages(data.pagination?.totalPages || 1);
+      setTotalCredores(data.pagination?.total || 0);
+      setCurrentPage(page);
     } catch (error: any) {
       toast.error(error.message || "Erro de conexão com o servidor.");
       setCredores([]);
@@ -85,13 +91,14 @@ function CredoresContent() {
 
   useEffect(() => {
     const init = async () => {
-      await fetchCredores(buscaInicial);
+      await fetchCredores(buscaInicial, 1);
     };
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchCredores]);
 
-  // valida os campos antes de mandar pro servidor
+  // aviso antecipado de duplicidade — só cobre a página atual (20 credores),
+  // a validação real e definitiva acontece no servidor (ER_DUP_ENTRY em POST/PUT)
   const checkDuplicateCpfCnpj = (cpfCnpj: string, currentId?: string) => {
     if (!cpfCnpj) return null;
     const clean = cpfCnpj.replace(/\D/g, "");
@@ -199,7 +206,7 @@ function CredoresContent() {
       }
 
       toast.success(formData.id ? "Credor atualizado!" : "Credor salvo com sucesso!");
-      await fetchCredores();
+      await fetchCredores(searchTerm, currentPage);
     } catch (err: any) {
       console.error("Erro ao salvar credor:", err);
       toast.error(err?.message || "Erro de conexão com o servidor.");
@@ -230,7 +237,9 @@ function CredoresContent() {
       toast.success("Credor excluído com sucesso!");
       if (formData.id === id) setFormData({});
       setCredorParaExcluir(null);
-      await fetchCredores(searchTerm);
+      // se era o único credor da página e não é a primeira, volta uma página
+      const novaPagina = credores.length === 1 && currentPage > 1 ? currentPage - 1 : currentPage;
+      await fetchCredores(searchTerm, novaPagina);
     } catch (error: any) {
       toast.error(error.message || "Erro de conexão com o servidor.");
     }
@@ -243,12 +252,6 @@ function CredoresContent() {
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  const filteredCredores = credores.filter(
-    (c) =>
-      c.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.cpfCnpj.includes(searchTerm)
-  );
 
   return (
     <div className="flex flex-col h-full bg-transparent">
@@ -489,7 +492,7 @@ function CredoresContent() {
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
-                  fetchCredores(e.target.value);
+                  fetchCredores(e.target.value, 1);
                 }}
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm font-medium focus:outline-none focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
               />
@@ -515,14 +518,14 @@ function CredoresContent() {
                        Carregando...
                     </td>
                   </tr>
-                ) : filteredCredores.length === 0 ? (
+                ) : credores.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-slate-400 font-bold">
                       Nenhum credor encontrado.
                     </td>
                   </tr>
                 ) : (
-                  filteredCredores.map((c, index) => (
+                  credores.map((c, index) => (
                     <tr
                       key={c.id}
                       onClick={() => handleLoadCredor(c)}
@@ -592,6 +595,31 @@ function CredoresContent() {
               </tbody>
             </table>
           </div>
+
+          {/* Paginação */}
+          {!isLoading && totalPages > 1 && (
+            <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-100">
+              <span className="text-sm font-semibold text-slate-500">
+                Página {currentPage} de {totalPages} — {totalCredores} credores
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => fetchCredores(searchTerm, currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+                >
+                  Anterior
+                </button>
+                <button
+                  onClick={() => fetchCredores(searchTerm, currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-8 pt-4 flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest pb-8">
