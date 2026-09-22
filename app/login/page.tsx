@@ -70,7 +70,7 @@ export default function Login() {
       {/* Background decorations */}
       <div className="absolute top-[-200px] left-[-200px] w-[500px] h-[500px] bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 rounded-full blur-[120px] opacity-[0.12]"></div>
       <div className="absolute bottom-[-200px] right-[-200px] w-[500px] h-[500px] bg-blue-800 rounded-full blur-[120px] opacity-[0.12]"></div>
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600 rounded-full blur-[200px] opacity-[0.04]"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600 rounded-full blur-[100px] opacity-[0.04]"></div>
 
       {/* Subtle grid pattern */}
       <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#1e293b 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
