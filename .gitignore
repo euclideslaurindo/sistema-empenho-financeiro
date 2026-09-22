@@ -21,6 +21,8 @@ update-db.ts
 *.csv
 RESUMO_IA.md
 CONTEXTO_PROJETO.md
+PENDENCIAS_ATUAIS.md
+varredura_completa_melhorias.md
 scripts/tests/
 test*.js
 test*.ts

@@ -37,8 +37,8 @@ describe('OpItemsTable Component', () => {
 
   test('Renderiza tabela com itens', () => {
     renderWithForm(<OpItemsTable errors={undefined} />, defaultValues);
-    expect(screen.getByText('Item 1')).toBeInTheDocument();
-    expect(screen.getByText('Item 2')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Item 1')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Item 2')).toBeInTheDocument();
   });
 
   test('Exibe erros inline para campos', () => {
@@ -56,7 +56,7 @@ describe('OpItemsTable Component', () => {
   test('AlertDialog aparece ao clicar remover', async () => {
     renderWithForm(<OpItemsTable errors={undefined} />, defaultValues);
 
-    const removerBtn = screen.getByLabelText('Remover item');
+    const removerBtn = screen.getAllByLabelText('Remover item')[0];
     fireEvent.click(removerBtn);
 
     const titulo = await screen.findByText(/Remover item/);
@@ -66,25 +66,25 @@ describe('OpItemsTable Component', () => {
   test('Cancelar no AlertDialog não remove item', async () => {
     renderWithForm(<OpItemsTable errors={undefined} />, defaultValues);
 
-    const removerBtn = screen.getByLabelText('Remover item');
+    const removerBtn = screen.getAllByLabelText('Remover item')[0];
     fireEvent.click(removerBtn);
 
     const cancelarBtn = await screen.findByRole('button', { name: /Cancelar/i });
     fireEvent.click(cancelarBtn);
 
-    expect(screen.getByText('Item 1')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Item 1')).toBeInTheDocument();
   });
 
   test('Confirmar no AlertDialog remove item', async () => {
     renderWithForm(<OpItemsTable errors={undefined} />, defaultValues);
 
-    const removerBtn = screen.getByLabelText('Remover item');
+    const removerBtn = screen.getAllByLabelText('Remover item')[0];
     fireEvent.click(removerBtn);
 
-    const removerDialog = await screen.findByRole('button', { name: /Remover/i });
+    const removerDialog = await screen.findByRole('button', { name: 'Remover' });
     fireEvent.click(removerDialog);
 
     // Item deve desaparecer após confirmação
-    expect(screen.queryByText('Item 1')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Item 1')).not.toBeInTheDocument();
   });
 });

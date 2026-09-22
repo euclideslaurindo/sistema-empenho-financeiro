@@ -1,9 +1,14 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { OrdemPagamentoService } from '@/lib/services/ordem-pagamento.service';
-import { createDbMock } from '@/tests/helpers/db-mock';
 
 // Mock DB
-vi.mock('@/lib/db', () => createDbMock());
+vi.mock('@/lib/db', () => ({
+  query: vi.fn(),
+  withTransaction: vi.fn(async (callback: any) => {
+    const conn = { execute: vi.fn() };
+    return await callback(conn);
+  }),
+}));
 
 import { withTransaction } from '@/lib/db';
 
@@ -18,16 +23,16 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
         execute: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('numero_cheque')) return [[]]; // sem cheque duplicado
           if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
-            return [[{ 0: { id: 'ne-1', valor: 1000, status: 'EMITIDO' } }]];
+            return [[{ id: 'ne-1', valor: 1000, status: 'EMITIDO' }]];
           }
           if (sql.includes('SELECT COALESCE(SUM(valor_pagamento)')) {
-            return [[{ 0: { total_pago: 0 } }]];
+            return [[{ total_pago: 0 }]];
           }
           if (sql.includes('SELECT CAST(SUBSTRING_INDEX(numero_empenho')) {
-            return [[{ 0: { seq: 5 } }]];
+            return [[{ seq: 5 }]];
           }
           if (sql.includes('SELECT CAST(sub AS UNSIGNED)')) {
-            return [[{ 0: { seq: 1 } }]];
+            return [[{ seq: 1 }]];
           }
           if (sql.includes('INSERT INTO ordens_pagamento')) {
             return [{ affectedRows: 1 }];
@@ -67,13 +72,13 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
         execute: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('numero_cheque')) return [[]];
           if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
-            return [[{ 0: { id: 'ne-1', valor: 500, status: 'EMITIDO' } }]];
+            return [[{ id: 'ne-1', valor: 500, status: 'EMITIDO' }]];
           }
           if (sql.includes('SELECT COALESCE(SUM(valor_pagamento)')) {
-            return [[{ 0: { total_pago: 0 } }]];
+            return [[{ total_pago: 0 }]];
           }
-          if (sql.includes('SUBSTRING_INDEX')) return [[{ 0: { seq: 5 } }]];
-          if (sql.includes('sub AS UNSIGNED')) return [[{ 0: { seq: 1 } }]];
+          if (sql.includes('SUBSTRING_INDEX')) return [[{ seq: 5 }]];
+          if (sql.includes('sub AS UNSIGNED')) return [[{ seq: 1 }]];
           if (sql.includes('INSERT')) return [{ affectedRows: 1 }];
           if (sql.includes('UPDATE notas_empenho')) return [{ affectedRows: 1 }];
           return [[]];
@@ -103,10 +108,10 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
         execute: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('numero_cheque')) return [[]];
           if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
-            return [[{ 0: { id: 'ne-1', valor: 500, status: 'EMITIDO' } }]];
+            return [[{ id: 'ne-1', valor: 500, status: 'EMITIDO' }]];
           }
           if (sql.includes('SELECT COALESCE(SUM(valor_pagamento)')) {
-            return [[{ 0: { total_pago: 0 } }]];
+            return [[{ total_pago: 0 }]];
           }
           return [[]];
         }),
@@ -136,13 +141,13 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
         execute: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('numero_cheque')) return [[]];
           if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
-            return [[{ 0: { id: 'ne-1', valor: 1000, status: 'EMITIDO' } }]];
+            return [[{ id: 'ne-1', valor: 1000, status: 'EMITIDO' }]];
           }
           if (sql.includes('SELECT COALESCE(SUM(valor_pagamento)')) {
-            return [[{ 0: { total_pago: 0 } }]];
+            return [[{ total_pago: 0 }]];
           }
-          if (sql.includes('SUBSTRING_INDEX')) return [[{ 0: { seq: 5 } }]];
-          if (sql.includes('sub AS UNSIGNED')) return [[{ 0: { seq: 1 } }]];
+          if (sql.includes('SUBSTRING_INDEX')) return [[{ seq: 5 }]];
+          if (sql.includes('sub AS UNSIGNED')) return [[{ seq: 1 }]];
           if (sql.includes('INSERT')) return [{ affectedRows: 1 }];
           if (sql.includes('UPDATE notas_empenho')) return [{ affectedRows: 1 }];
           return [[]];
@@ -172,10 +177,10 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
         execute: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('numero_cheque')) return [[]];
           if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
-            return [[{ 0: { id: 'ne-1', valor: 1000, status: 'EMITIDO' } }]];
+            return [[{ id: 'ne-1', valor: 1000, status: 'EMITIDO' }]];
           }
           if (sql.includes('SELECT COALESCE(SUM(valor_pagamento)')) {
-            return [[{ 0: { total_pago: 0 } }]];
+            return [[{ total_pago: 0 }]];
           }
           return [[]];
         }),
@@ -198,7 +203,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     expect(resultado.success).toBe(false);
     if (!resultado.success) {
       expect(resultado.status).toBe(400);
-      expect(resultado.error).toContain('fraude');
+      expect(resultado.error).toMatch(/fraude/i);
     }
   });
 
@@ -208,13 +213,13 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
         execute: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('numero_cheque')) return [[]];
           if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
-            return [[{ 0: { id: 'ne-1', valor: 10000, status: 'EMITIDO' } }]];
+            return [[{ id: 'ne-1', valor: 10000, status: 'EMITIDO' }]];
           }
           if (sql.includes('SELECT COALESCE(SUM(valor_pagamento)')) {
-            return [[{ 0: { total_pago: 0 } }]];
+            return [[{ total_pago: 0 }]];
           }
-          if (sql.includes('SUBSTRING_INDEX')) return [[{ 0: { seq: 5 } }]];
-          if (sql.includes('sub AS UNSIGNED')) return [[{ 0: { seq: 1 } }]];
+          if (sql.includes('SUBSTRING_INDEX')) return [[{ seq: 5 }]];
+          if (sql.includes('sub AS UNSIGNED')) return [[{ seq: 1 }]];
           if (sql.includes('INSERT')) return [{ affectedRows: 1 }];
           if (sql.includes('UPDATE notas_empenho')) return [{ affectedRows: 1 }];
           return [[]];
@@ -247,7 +252,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
       const conn = {
         execute: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('numero_cheque')) {
-            return [[{ 0: { id: 'op-1' } }]]; // cheque já existe
+            return [[{ id: 'op-1' }]]; // cheque já existe
           }
           return [[]];
         }),
@@ -278,7 +283,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
         execute: vi.fn().mockImplementation(async (sql: string) => {
           if (sql.includes('numero_cheque')) return [[]];
           if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
-            return [[{ 0: { id: 'ne-1', valor: 1000, status: 'CANCELADO' } }]];
+            return [[{ id: 'ne-1', valor: 1000, status: 'CANCELADO' }]];
           }
           return [[]];
         }),

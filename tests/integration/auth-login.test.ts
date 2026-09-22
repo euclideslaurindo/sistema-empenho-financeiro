@@ -1,19 +1,12 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { POST } from '@/app/api/auth/login/route';
 import { NextRequest } from 'next/server';
+import bcrypt from 'bcryptjs';
 
 vi.mock('@/lib/db', () => ({
   query: vi.fn(),
   withTransaction: vi.fn(),
 }));
-
-vi.mock('bcryptjs', async (importOriginal: () => Promise<typeof import('bcryptjs')>) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    compare: vi.fn(),
-  };
-});
 
 vi.mock('@/lib/rate-limiter', () => ({
   checkRateLimit: vi.fn(),
@@ -30,12 +23,12 @@ vi.mock('jose', () => ({
 }));
 
 import { query } from '@/lib/db';
-import { compare } from 'bcryptjs';
 import { checkRateLimit, resetRateLimit } from '@/lib/rate-limiter';
 
 describe('Integração API Auth Login', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(bcrypt, 'compare').mockResolvedValue(true as any);
   });
 
   test('Login bem-sucedido retorna 200 com cookie JWT', async () => {
@@ -50,7 +43,7 @@ describe('Integração API Auth Login', () => {
         ativo: 1,
       },
     ]);
-    (compare as any).mockResolvedValue(true);
+    (bcrypt.compare as any).mockResolvedValue(true);
 
     const req = new NextRequest('http://localhost:3000/api/auth/login', {
       method: 'POST',
@@ -68,11 +61,11 @@ describe('Integração API Auth Login', () => {
     expect(data.user.id).toBe('user-123');
     expect(data.user.email).toBe('john@example.com');
 
-    // Verifica que o cookie foi setado
+    // Verifica que o cookie foi setado (rota chama cookies.set(name, value, options))
     expect(res.cookies.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: expect.stringContaining('auth'),
-      })
+      expect.stringContaining('auth'),
+      expect.any(String),
+      expect.objectContaining({ httpOnly: true })
     );
 
     // Verifica que rate limit foi resetado
@@ -97,7 +90,7 @@ describe('Integração API Auth Login', () => {
         ativo: 1,
       },
     ]);
-    (compare as any).mockResolvedValue(false); // senha não bate
+    (bcrypt.compare as any).mockResolvedValue(false); // senha não bate
 
     const req = new NextRequest('http://localhost:3000/api/auth/login', {
       method: 'POST',
@@ -141,7 +134,7 @@ describe('Integração API Auth Login', () => {
         ativo: 0, // desativado
       },
     ]);
-    (compare as any).mockResolvedValue(true);
+    (bcrypt.compare as any).mockResolvedValue(true);
 
     const req = new NextRequest('http://localhost:3000/api/auth/login', {
       method: 'POST',
