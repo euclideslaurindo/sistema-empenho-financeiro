@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { maskCurrency, parseFormNumber } from "@/lib/utils";
 import { useListboxKeyboardNav } from "@/hooks/use-listbox-keyboard-nav";
+import { useDebouncedCallback } from "@/hooks/use-debounce";
 
 function IndicadorSaldo({ control }: { control: any }) {
   const empenho = useWatch({ control, name: "empenho" });
@@ -63,11 +64,9 @@ export default function OpPaymentData({ errors }: { errors: any }) {
 
   const [neSuggestions, setNeSuggestions] = useState<any[]>([]);
   const [showNeSuggestions, setShowNeSuggestions] = useState(false);
-  const [searchNeTimeout, setSearchNeTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const [credorSuggestions, setCredorSuggestions] = useState<any[]>([]);
   const [showCredorSuggestions, setShowCredorSuggestions] = useState(false);
-  const [searchCredorTimeout, setSearchCredorTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const [cpfSuggestions, setCpfSuggestions] = useState<any[]>([]);
   const [showCpfSuggestions, setShowCpfSuggestions] = useState(false);
@@ -110,19 +109,20 @@ export default function OpPaymentData({ errors }: { errors: any }) {
     toast.error('NE não encontrada.');
   };
 
+  const buscarNeSugestoes = useDebouncedCallback(async (val: string) => {
+    try {
+      const data = await apiClient.get(`/api/notas-empenho?busca=${encodeURIComponent(val)}&limit=10`);
+      if (data && data.notas) {
+        setNeSuggestions(data.notas);
+        setShowNeSuggestions(true);
+      }
+    } catch (err) {}
+  }, 400);
+
   const handleNeSearchChange = (val: string) => {
     setValue("empenho", val);
-    if (searchNeTimeout) clearTimeout(searchNeTimeout);
     if (val.length >= 2) {
-      setSearchNeTimeout(setTimeout(async () => {
-        try {
-          const data = await apiClient.get(`/api/notas-empenho?busca=${encodeURIComponent(val)}&limit=10`);
-          if (data && data.notas) {
-            setNeSuggestions(data.notas);
-            setShowNeSuggestions(true);
-          }
-        } catch (err) {}
-      }, 400));
+      buscarNeSugestoes(val);
     } else {
       setNeSuggestions([]);
       setShowNeSuggestions(false);
@@ -136,41 +136,43 @@ export default function OpPaymentData({ errors }: { errors: any }) {
     loadNe(ne.numero);
   };
 
+  const buscarCpfSugestoes = useDebouncedCallback(async (val: string) => {
+    try {
+      const data = await apiClient.get(`/api/credores?busca=${encodeURIComponent(val)}&limit=8`);
+      if (data?.credores?.length > 0) {
+        setCpfSuggestions(data.credores);
+        setShowCpfSuggestions(true);
+      }
+    } catch {}
+  }, 350);
+
   const handleCpfChange = (val: string) => {
     setValue("cpfCnpj", val);
     setCpfSuggestions([]);
     setShowCpfSuggestions(false);
-    if (searchCredorTimeout) clearTimeout(searchCredorTimeout);
     const digits = val.replace(/\D/g, '');
     if (digits.length >= 4) {
-      setSearchCredorTimeout(setTimeout(async () => {
-        try {
-          const data = await apiClient.get(`/api/credores?busca=${encodeURIComponent(val)}&limit=8`);
-          if (data?.credores?.length > 0) {
-            setCpfSuggestions(data.credores);
-            setShowCpfSuggestions(true);
-          }
-        } catch {}
-      }, 350));
+      buscarCpfSugestoes(val);
     }
   };
 
+  const buscarCredorSugestoes = useDebouncedCallback(async (val: string) => {
+    try {
+      const data = await apiClient.get(`/api/credores?busca=${encodeURIComponent(val)}&limit=8`);
+      if (data && data.credores && data.credores.length > 0) {
+        setCredorSuggestions(data.credores);
+        setShowCredorSuggestions(true);
+      } else {
+        setCredorSuggestions([]);
+        setShowCredorSuggestions(false);
+      }
+    } catch (err) {}
+  }, 350);
+
   const handleCredorNameChange = (val: string) => {
     setValue("nomeCredor", val);
-    if (searchCredorTimeout) clearTimeout(searchCredorTimeout);
     if (val.length >= 2) {
-      setSearchCredorTimeout(setTimeout(async () => {
-        try {
-          const data = await apiClient.get(`/api/credores?busca=${encodeURIComponent(val)}&limit=8`);
-          if (data && data.credores && data.credores.length > 0) {
-            setCredorSuggestions(data.credores);
-            setShowCredorSuggestions(true);
-          } else {
-            setCredorSuggestions([]);
-            setShowCredorSuggestions(false);
-          }
-        } catch (err) {}
-      }, 350));
+      buscarCredorSugestoes(val);
     } else {
       setCredorSuggestions([]);
       setShowCredorSuggestions(false);
