@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
-import { hash } from 'bcryptjs';
 import { UsuarioDB } from '@/lib/types/db';
+import { criarUsuario } from '@/lib/services/usuario.service';
 
 // GET /api/usuarios - Lista usuários
 export async function GET(request: NextRequest) {
@@ -33,26 +33,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nome, e-mail e senha são obrigatórios' }, { status: 400 });
     }
 
-    const hashed = await hash(senha, 10);
-    const id = crypto.randomUUID();
-    const roleValue = perfil === 'ADMIN' ? 'ADMIN' : 'USER';
+    // ADMIN só é permitido se explicitamente escolhido; qualquer outro valor cai em GESTOR
+    const roleValue = perfil === 'ADMIN' ? 'ADMIN' : 'GESTOR';
 
-    // check se ja existe
-    const [existing] = await query<{id: string}[]>(
-      'SELECT id FROM usuarios WHERE email = ?',
-      [email]
-    );
-
-    if (existing) {
-      return NextResponse.json({ error: 'E-mail já cadastrado' }, { status: 409 });
+    const result = await criarUsuario({ nome, email, senha, perfil: roleValue });
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    await query(
-      `INSERT INTO usuarios (id, nome, email, senha_hash, perfil, ativo) VALUES (?, ?, ?, ?, ?, 1)`,
-      [id, nome, email, hashed, roleValue]
-    );
-
-    return NextResponse.json({ success: true, id }, { status: 201 });
+    return NextResponse.json({ success: true, id: result.id }, { status: 201 });
   } catch (error: any) {
     console.error('[POST /api/usuarios] Erro:', error);
     return NextResponse.json({ error: 'Erro ao criar usuário' }, { status: 500 });

@@ -1,19 +1,17 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import { Search } from "lucide-react";
 import { formatCurrency, formatDateOnlyBR } from "@/lib/utils";
+import { useDebouncedCallback } from "@/hooks/use-debounce";
 
 export default function OpRecentTable({ ops, onSearch }: { ops: any[], onSearch: (term: string) => void }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const debouncedOnSearch = useDebouncedCallback(onSearch, 400);
 
-  const handleSearch = useCallback((val: string) => {
+  const handleSearch = (val: string) => {
     setSearchTerm(val);
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => {
-      onSearch(val);
-    }, 400);
-  }, [onSearch]);
+    debouncedOnSearch(val);
+  };
 
   return (
     <div className="pb-12 mt-8">
