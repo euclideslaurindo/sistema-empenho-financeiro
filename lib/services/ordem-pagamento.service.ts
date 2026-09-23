@@ -56,7 +56,7 @@ export class OrdemPagamentoService {
                 unidade_orcamentaria as unidadeOrcamentaria, elemento, subelemento, gestao, historico,
                 itens_json as itensJson,
                 saldo_anterior as saldoAnterior, valor_empenho as valorEmpenho, valor_pagamento as valorPagamento,
-                irrf, iss, inss, sest_senat as sestSenat, patronal, outros_descontos as outrosDescontos, total_descontos as total_descontos, valor_liquido as valorLiquido,
+                irrf, iss, inss, sest_senat as sestSenat, patronal, outros_descontos as outrosDescontos, total_descontos as totalDescontos, valor_liquido as valorLiquido,
                 numero_cheque as numeroCheque,
                 DATE_FORMAT(data_emissao, '%Y-%m-%d') as dataEmissao,
                 DATE_FORMAT(data_pagamento, '%Y-%m-%d') as dataPagamento,
