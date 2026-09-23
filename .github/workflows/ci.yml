@@ -44,7 +44,14 @@ jobs:
 
     - name: Check Health Endpoint
       run: |
-        npm run start &
+        # O build usa output: 'standalone' (next.config.ts), pensado pro Dockerfile.
+        # "next start" não funciona com standalone — precisa rodar o server.js
+        # gerado, com public/ e .next/static copiados pra dentro dele, igual
+        # o Dockerfile já faz na etapa de runner.
+        cp -r public .next/standalone/public
+        cp -r .next/static .next/standalone/.next/static
+
+        node .next/standalone/server.js &
         for i in $(seq 1 30); do
           if curl -sf http://localhost:3000/api/health > /dev/null; then
             echo "Health check passed."
@@ -57,3 +64,5 @@ jobs:
       env:
         JWT_SECRET: "ci-test-secret"
         APP_URL: "http://localhost:3000"
+        PORT: "3000"
+        HOSTNAME: "0.0.0.0"
