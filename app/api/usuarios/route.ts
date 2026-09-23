@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
-import { UsuarioDB } from '@/lib/types/db';
-import { criarUsuario } from '@/lib/services/usuario.service';
+import { criarUsuario, listarUsuarios } from '@/lib/services/usuario.service';
 
 // GET /api/usuarios - Lista usuários
 export async function GET(request: NextRequest) {
@@ -10,9 +8,7 @@ export async function GET(request: NextRequest) {
   if (!user || user.perfil !== 'ADMIN') return unauthorizedResponse();
 
   try {
-    const usuarios = await query<UsuarioDB[]>(
-      `SELECT id, nome, email, perfil, ativo, created_at FROM usuarios ORDER BY nome ASC`
-    );
+    const usuarios = await listarUsuarios();
     return NextResponse.json({ usuarios });
   } catch (error: any) {
     console.error('[GET /api/usuarios] Erro:', error);
