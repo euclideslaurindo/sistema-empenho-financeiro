@@ -62,35 +62,35 @@ export default function OpTaxesSection({ userRole }: { userRole: string }) {
         </div>
         <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
           <label className="flex items-center cursor-pointer">
-            <input type="checkbox" disabled={userRole !== 'ADMIN'} {...register("autoCalculate")} className="mr-2 rounded text-indigo-600 focus:ring-indigo-500 disabled:opacity-50" /> Cálculo Automático
+            <input type="checkbox" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("autoCalculate")} className="mr-2 rounded text-indigo-600 focus:ring-indigo-500 disabled:opacity-50" /> Cálculo Automático
           </label>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
         <div>
-          <label className="flex items-center text-sm font-black text-slate-500 uppercase tracking-widest mb-2"><input type="checkbox" disabled={userRole !== 'ADMIN'} {...register("appliedTax_irrf")} className="mr-1.5 rounded text-blue-900 disabled:opacity-50" /> IRRF</label>
-          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} {...register("irrf", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
+          <label className="flex items-center text-sm font-black text-slate-500 uppercase tracking-widest mb-2"><input type="checkbox" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("appliedTax_irrf")} className="mr-1.5 rounded text-blue-900 disabled:opacity-50" /> IRRF</label>
+          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("irrf", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
         </div>
         <div>
-          <label className="flex items-center text-sm font-black text-slate-500 uppercase tracking-widest mb-2"><input type="checkbox" disabled={userRole !== 'ADMIN'} {...register("appliedTax_iss")} className="mr-1.5 rounded text-blue-900 disabled:opacity-50" /> ISS (5%)</label>
-          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} {...register("iss", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
+          <label className="flex items-center text-sm font-black text-slate-500 uppercase tracking-widest mb-2"><input type="checkbox" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("appliedTax_iss")} className="mr-1.5 rounded text-blue-900 disabled:opacity-50" /> ISS (5%)</label>
+          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("iss", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
         </div>
         <div>
-          <label className="flex items-center text-sm font-black text-slate-500 uppercase tracking-widest mb-2"><input type="checkbox" disabled={userRole !== 'ADMIN'} {...register("appliedTax_inss")} className="mr-1.5 rounded text-blue-900 disabled:opacity-50" /> INSS</label>
-          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} {...register("inss", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
+          <label className="flex items-center text-sm font-black text-slate-500 uppercase tracking-widest mb-2"><input type="checkbox" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("appliedTax_inss")} className="mr-1.5 rounded text-blue-900 disabled:opacity-50" /> INSS</label>
+          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("inss", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
         </div>
         <div>
-          <label className="flex items-center text-sm font-black text-slate-500 uppercase tracking-widest mb-2"><input type="checkbox" disabled={userRole !== 'ADMIN'} {...register("appliedTax_patronal")} className="mr-1.5 rounded text-blue-900 disabled:opacity-50" /> PATRONAL</label>
-          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} {...register("patronal", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
+          <label className="flex items-center text-sm font-black text-slate-500 uppercase tracking-widest mb-2"><input type="checkbox" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("appliedTax_patronal")} className="mr-1.5 rounded text-blue-900 disabled:opacity-50" /> PATRONAL</label>
+          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("patronal", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
         </div>
         <div>
-          <label className="flex items-center text-sm font-black text-slate-500 uppercase tracking-widest mb-2"><input type="checkbox" disabled={userRole !== 'ADMIN'} {...register("appliedTax_sestSenat")} className="mr-1.5 rounded text-blue-900 disabled:opacity-50" /> SEST/SENAT</label>
-          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} {...register("sestSenat", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
+          <label className="flex items-center text-sm font-black text-slate-500 uppercase tracking-widest mb-2"><input type="checkbox" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("appliedTax_sestSenat")} className="mr-1.5 rounded text-blue-900 disabled:opacity-50" /> SEST/SENAT</label>
+          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("sestSenat", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
         </div>
         <div>
           <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Outros</label>
-          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} {...register("outrosDescontos", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
+          <input type="text" placeholder="0,00" disabled={userRole !== 'ADMIN'} aria-disabled={userRole !== 'ADMIN'} {...register("outrosDescontos", { onChange: (e: any) => e.target.value = maskCurrency(e.target.value) })} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:border-indigo-400 disabled:opacity-70 disabled:cursor-not-allowed" />
         </div>
       </div>
 

@@ -76,6 +76,7 @@ export function ActionButton({
     <button
       onClick={handleClick}
       disabled={status !== 'idle'}
+      aria-disabled={status !== 'idle'}
       aria-busy={status === 'loading'}
       className={`flex items-center text-sm font-bold px-5 py-2.5 rounded-xl transition-all duration-300 disabled:pointer-events-none cursor-pointer ${currentColorClasses}`}>
       {IconToRender && <IconToRender className={`h-4 w-4 mr-2.5 ${status === 'loading' ? 'animate-spin' : ''} ${iconColorClass}`} />}
