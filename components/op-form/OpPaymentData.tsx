@@ -44,17 +44,21 @@ function InputValorPagamento({ register, control, errors }: { register: any, con
 
   return (
     <div className="col-span-12 md:col-span-4 mt-4">
-      <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Valor a Pagar R$</label>
-      <input 
-        type="text" 
-        placeholder="0,00" 
+      <label htmlFor="op-valor-pagamento" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Valor a Pagar R$</label>
+      <input
+        id="op-valor-pagamento"
+        type="text"
+        placeholder="0,00"
         {...register("valorPagamento", {
           onChange: (e: any) => {
             e.target.value = maskCurrency(e.target.value);
           }
-        })} 
-        className={`w-full px-4 py-3 rounded-xl border text-lg font-black focus:outline-none focus:ring-4 transition-all duration-300 ${ultrapassouSaldo ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-emerald-700 focus:border-emerald-400 focus:ring-emerald-500/10'}`} 
+        })}
+        aria-invalid={!!errors?.valorPagamento}
+        aria-describedby={errors?.valorPagamento ? "op-valor-pagamento-error" : undefined}
+        className={`w-full px-4 py-3 rounded-xl border text-lg font-black focus:outline-none focus:ring-4 transition-all duration-300 ${errors?.valorPagamento || ultrapassouSaldo ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-emerald-700 focus:border-emerald-400 focus:ring-emerald-500/10'}`}
       />
+      {errors?.valorPagamento && <p id="op-valor-pagamento-error" className="text-red-500 text-xs mt-1 font-semibold">{errors.valorPagamento.message}</p>}
     </div>
   );
 }
