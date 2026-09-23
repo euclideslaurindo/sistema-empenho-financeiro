@@ -14,7 +14,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/api/setup');
+    pathname.startsWith('/api/setup') ||
+    pathname === '/api/health';
 
   if (isPublicPath) {
     return NextResponse.next();
