@@ -16,12 +16,33 @@ import jsPDF from "jspdf";
 import * as htmlToImage from "html-to-image";
 import { apiClient } from "@/lib/api-client";
 
-// dados de exemplo removidos, agora carrega do banco mesmo
-
 import { EmpenhoVia } from "@/components/consulta-impressao/EmpenhoVia";
 import { ReciboVia } from "@/components/consulta-impressao/ReciboVia";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// dados de exemplo removidos, agora carrega do banco mesmo
+
+// Decodifica itens_json (array {especificacao, quantidade, unidade, valorUnitario})
+// e formata unidade/quantidade/valor para as células de impressão, que aceitam
+// múltiplas linhas (whitespace-pre-wrap) — um item por linha, sem limite de N.
+function formatarItensParaImpressao(itensJson: string | null | undefined) {
+  const vazio = { unidade: "", quantidade: "", valorUnitario: "", valorTotal: "" };
+  if (!itensJson) return vazio;
+  try {
+    const itens = JSON.parse(itensJson);
+    if (!Array.isArray(itens) || itens.length === 0) return vazio;
+    const fmt = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+    return {
+      unidade: itens.map((i: any) => i.unidade || "").join("\n"),
+      quantidade: itens.map((i: any) => String(i.quantidade ?? "")).join("\n"),
+      valorUnitario: itens.map((i: any) => fmt(Number(i.valorUnitario) || 0)).join("\n"),
+      valorTotal: itens.map((i: any) => fmt((Number(i.quantidade) || 0) * (Number(i.valorUnitario) || 0))).join("\n"),
+    };
+  } catch {
+    return vazio;
+  }
+}
 
 export default function ConsultaImpressao() {
   const [view, setView] = useState<"search" | "document">("search");
@@ -344,6 +365,7 @@ export default function ConsultaImpressao() {
   const gerarDocFormatado = (op: any, formattedNe: string, ano: string, i: number) => {
     const valorF = Number(op.valorPagamento || op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     const liquidoF = Number(op.valorLiquido || op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+    const itensFormatados = formatarItensParaImpressao(op.itensJson);
     return {
       frente: {
         ...frenteData,
@@ -358,13 +380,14 @@ export default function ConsultaImpressao() {
         saldoAtual: Number((op.saldoAnterior || 0) - (op.valorPagamento || 0)).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
         gestaoUE: op.gestao || "",
         unidadeOrcamentaria: op.unidadeOrcamentaria || "",
-        elementoSubelemento: op.elementoSubelemento || "",
+        elementoSubelemento: [op.elemento, op.subelemento].filter(Boolean).join(' / '),
         especificacao: op.historico || "",
         chequeNo: op.numeroCheque || "",
-        unidade: op.itemUnidade2 ? `${op.itemUnidade}\n\n${op.itemUnidade2}` : op.itemUnidade,
-        quantidade: op.itemQuantidade2 ? `${op.itemQuantidade}\n\n${op.itemQuantidade2}` : op.itemQuantidade,
-        valorUnitario: op.itemValorUnitario2 ? `${op.itemValorUnitario}\n\n${op.itemValorUnitario2}` : op.itemValorUnitario,
-        valorTotal: op.itemValorUnitario2 && op.itemQuantidade2 ? `${Number(op.itemValorUnitario * op.itemQuantidade).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}\n\n${Number(op.itemValorUnitario2 * op.itemQuantidade2).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : valorF,
+        numeroCheque: op.numeroCheque || "",
+        unidade: itensFormatados.unidade,
+        quantidade: itensFormatados.quantidade,
+        valorUnitario: itensFormatados.valorUnitario,
+        valorTotal: itensFormatados.valorTotal || valorF,
         totalEspecificacao: valorF,
         deduzidoData: formatDateOnlyBR(op.dataPagamento),
         provisaoData: formatDateOnlyBR(op.dataEmissao),
@@ -421,13 +444,15 @@ export default function ConsultaImpressao() {
           console.error("Erro na busca da NE", e);
         }
 
-        const finalNome = frenteData.credorNome;
-        const finalCpf = frenteData.credorCpfCnpj;
-        const finalEndereco = frenteData.credorEndereco;
+        const finalNome = neDB?.credorNome || frenteData.credorNome;
+        const finalCpf = neDB?.cpfCnpj || frenteData.credorCpfCnpj;
+        const finalEndereco = frenteData.credorEndereco; // API de NE não retorna endereço do credor
         const finalValor = neDB ? neDB.valor : parseFloat(frenteData.valorEmpenho.replace(',','.'));
         const finalGestao = neDB ? neDB.gestao : frenteData.gestaoUE;
         const finalUnidade = neDB ? neDB.unidadeOrcamentaria : frenteData.unidadeOrcamentaria;
-        const finalElemento = neDB ? neDB.elementoSubelemento : frenteData.elementoSubelemento;
+        const finalElemento = neDB
+          ? [neDB.elemento, neDB.subelemento].filter(Boolean).join(' / ')
+          : frenteData.elementoSubelemento;
         const finalHistorico = neDB ? neDB.historico : frenteData.especificacao;
 
         const valorFormatado = Number(finalValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
