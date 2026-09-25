@@ -16,13 +16,20 @@ export interface CredorDB {
   cpf_cnpj: string;
   pis: string | null;
   rg: string | null;
+  orgao_emissor: string | null;
   data_expedicao: Date | string | null;
   cidade: string | null;
   uf: string | null;
   telefone: string | null;
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  bairro: string | null;
   banco: string | null;
   agencia: string | null;
   conta_corrente: string | null;
+  pix: string | null;
+  is_mei: number;
   usuario_id: string | null;
   ativo: number;
   created_at: Date;
@@ -39,10 +46,13 @@ export interface NotaEmpenhoDB {
   data_provisao_concedida: Date | string | null;
   data_emissao: Date | string | null;
   unidade_orcamentaria: string | null;
-  elemento_subelemento: string | null;
+  elemento: string | null;
+  subelemento: string | null;
   gestao: string | null;
   status: string | null;
   historico: string | null;
+  credor_nome: string | null;
+  cpf_cnpj: string | null;
   usuario_id: string | null;
   created_at: Date;
   updated_at: Date;
@@ -59,9 +69,11 @@ export interface OrdemPagamentoDB {
   credor_rg: string | null;
   credor_endereco: string | null;
   unidade_orcamentaria: string | null;
-  elemento_subelemento: string | null;
+  elemento: string | null;
+  subelemento: string | null;
   gestao: string | null;
   historico: string | null;
+  itens_json: string | null;
   item_unidade: string | null;
   item_quantidade: number | string | null;
   item_valor_unitario: number | string | null;
@@ -82,6 +94,31 @@ export interface OrdemPagamentoDB {
   numero_cheque: string | null;
   data_emissao: Date | string | null;
   data_pagamento: Date | string | null;
+  usuario_id: string | null;
+  created_at: Date;
+}
+
+export interface LiquidacaoDB {
+  id: string;
+  numero_liquidacao: string;
+  notas_empenho_id: string;
+  valor_liquidado: number | string;
+  data_liquidacao: Date | string;
+  responsavel_atesto: string | null;
+  documento_fiscal: string | null;
+  created_at: Date;
+  updated_at: Date;
+  created_by: string | null;
+  deleted_at: Date | null;
+}
+
+export interface AuditoriaFinanceiraDB {
+  id: string;
+  entidade: string;
+  entidade_id: string;
+  acao: 'CREATE' | 'UPDATE' | 'DELETE' | string;
+  dados_anteriores: string | null;
+  dados_novos: string | null;
   usuario_id: string | null;
   created_at: Date;
 }
