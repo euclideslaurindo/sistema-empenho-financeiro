@@ -60,6 +60,7 @@ describe('Integração OrdemPagamentoService', () => {
 
     const rawData = {
       numeroEmpenho: '2026.NE.0001',
+      credorCpfCnpj: '12345678900',
       valorPagamento: 500 // Tenta pagar R$ 500 num saldo de R$ 200
     };
 
@@ -100,6 +101,7 @@ describe('Integração OrdemPagamentoService', () => {
     // Usuário hacker tenta enviar uma OP de R$ 100 com impostos fraudulentos (R$ 0,01 cada)
     const rawData = {
       numeroEmpenho: '2026.NE.0001',
+      credorCpfCnpj: '12345678900',
       valorPagamento: 100,
       irrf: 0.01,
       iss: 0.01,

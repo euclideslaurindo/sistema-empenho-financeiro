@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getAuthUser, unauthorizedResponse, forbiddenResponse } from '@/lib/auth';
+import { configuracoesSchema } from '@/lib/schemas';
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser(request);
@@ -28,20 +29,17 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const data = await request.json();
+    const rawData = await request.json();
+
+    const parsed = configuracoesSchema.safeParse(rawData);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+    }
     const {
       nome_completo, email_corporativo, unidade_padrao, gestao_padrao,
       auto_preencher_credor, notifica_email_empenho, exigir_2fa_op,
       alerta_integracao, aviso_manutencao
-    } = data;
-
-    // Valida formato do e-mail corporativo se fornecido
-    if (email_corporativo && email_corporativo.trim() !== '') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email_corporativo.trim())) {
-        return NextResponse.json({ error: 'Formato de e-mail corporativo inválido.' }, { status: 400 });
-      }
-    }
+    } = parsed.data;
 
     await query(
       `UPDATE configuracoes_sistema SET

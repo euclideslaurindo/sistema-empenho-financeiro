@@ -48,6 +48,7 @@ describe('Integração API Ordens de Pagamento', () => {
 
     const opData = {
       numeroEmpenho: '2026NE0001',
+      credorCpfCnpj: '12345678900',
       valorPagamento: 15000 // Tenta pagar R$ 15.000 numa NE de 10.000
     };
     
@@ -89,7 +90,8 @@ describe('Integração API Ordens de Pagamento', () => {
     
     const opData = {
       numeroEmpenho: '2026NE0001',
-      valorPagamento: 5000 
+      credorCpfCnpj: '12345678900',
+      valorPagamento: 5000
     };
     
     const req = new NextRequest('http://localhost:3000/api/ordens-pagamento', {

@@ -2,6 +2,7 @@ import { query, withTransaction } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 import { NotaEmpenhoDB } from '@/lib/types/db';
+import { parseFormNumber } from '@/lib/utils';
 
 export type ServiceResult<T = any> =
   | { success: true; data: T; status?: number }
@@ -118,7 +119,11 @@ export class NotasEmpenhoService {
     return { success: true, data: rows[0] };
   }
 
-  static async criar(rawData: any, usuarioIdSolicitante: string): Promise<ServiceResult> {
+  static async criar(rawData: any, usuarioIdSolicitante: string, perfilSolicitante: string): Promise<ServiceResult> {
+    if (perfilSolicitante === 'CONSULTA') {
+      return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+    }
+
     const parsed = criarNotaEmpenhoSchema.parse(rawData);
     const { numero, valor: valorDecimal, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao, credorNome, cpfCnpj } = parsed;
 
@@ -149,10 +154,14 @@ export class NotasEmpenhoService {
     return { success: true, data: { id: result.id }, status: result.status };
   }
 
-  static async atualizar(id: string, body: any, usuarioIdSolicitante: string): Promise<ServiceResult> {
+  static async atualizar(id: string, body: any, usuarioIdSolicitante: string, perfilSolicitante: string): Promise<ServiceResult> {
+    if (perfilSolicitante === 'CONSULTA') {
+      return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+    }
+
     const { numero, valor, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao, credorNome, cpfCnpj } = body;
 
-    const valorDecimal = parseFloat(String(valor).replace(',', '.')) || 0;
+    const valorDecimal = parseFormNumber(valor);
     if (valorDecimal <= 0) {
       return { success: false, error: 'O valor da NE deve ser maior que zero.', status: 400 };
     }
@@ -216,7 +225,11 @@ export class NotasEmpenhoService {
     return { success: true, data: null };
   }
 
-  static async cancelar(id: string): Promise<ServiceResult> {
+  static async cancelar(id: string, perfilSolicitante: string): Promise<ServiceResult> {
+    if (perfilSolicitante === 'CONSULTA') {
+      return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+    }
+
     try {
       await withTransaction(async (conn: PoolConnection) => {
         const [neRows]: any = await conn.execute('SELECT valor, unidade_orcamentaria FROM notas_empenho WHERE id = ? FOR UPDATE', [id]);

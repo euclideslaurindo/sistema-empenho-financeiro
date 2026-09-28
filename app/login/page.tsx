@@ -1,11 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, User, AlertCircle, Loader2, ArrowRight, Landmark, CheckCircle2, Eye, EyeOff } from "lucide-react";
-import { toast } from "sonner";
+import { Lock, User, AlertCircle, Loader2, ArrowRight, Landmark, Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
-  const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [showSenha, setShowSenha] = useState(false);
@@ -25,38 +23,11 @@ export default function Login() {
         body: JSON.stringify({ email, senha }),
       });
       const data = await res.json();
-      
+
       if (res.ok) {
         router.push("/");
       } else {
         setError(data.error || "Credenciais inválidas");
-      }
-    } catch (e) {
-      setError("Erro de conexão com o servidor.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsLoading(true);
-
-    try {
-      const res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nome: email, senha }),
-      });
-      const data = await res.json();
-      
-      if (res.ok) {
-        toast.success("Conta criada com sucesso! Você já pode entrar.");
-        setIsRegistering(false);
-        setSenha("");
-      } else {
-        setError(data.error || "Erro ao criar conta.");
       }
     } catch (e) {
       setError("Erro de conexão com o servidor.");
@@ -74,7 +45,7 @@ export default function Login() {
 
       {/* Subtle grid pattern */}
       <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#1e293b 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
-      
+
       <div className="bg-white/90 backdrop-blur-xl p-10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.08)] w-full max-w-md relative z-10 border border-white/80 animate-scale-in">
         <div className="mb-10 text-center">
           <div className="w-16 h-16 bg-gradient-to-br from-[#1e293b] to-[#0f172a] rounded-2xl mx-auto flex items-center justify-center shadow-xl shadow-slate-900/20 mb-5 ring-1 ring-white/10">
@@ -91,10 +62,10 @@ export default function Login() {
           </div>
         )}
 
-        <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-5">
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
             <label htmlFor="login-email" className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">
-              {isRegistering ? "Nome de Usuário" : "E-mail ou Usuário"}
+              E-mail ou Usuário
             </label>
             <div className="relative group">
               <User className="w-[18px] h-[18px] absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors duration-200" />
@@ -104,7 +75,7 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={isRegistering ? "ex: joao.silva" : "admin@admin.com"}
+                placeholder="admin@admin.com"
                 className="w-full pl-11 pr-4 py-3 bg-slate-50/80 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 focus:bg-white transition-all duration-200 text-slate-800 placeholder:text-slate-400"
               />
             </div>
@@ -134,25 +105,15 @@ export default function Login() {
                 {showSenha ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
               </button>
             </div>
-            {!isRegistering && (
-              <div className="flex justify-end mt-2">
-                <a href="#" className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors">Esqueceu a senha?</a>
-              </div>
-            )}
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-full bg-gradient-to-b text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 mt-6 shadow-lg shadow-slate-900/15 group disabled:opacity-70 ${isRegistering ? 'from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900' : 'from-[#1e293b] to-[#0f172a] hover:from-[#334155] hover:to-[#1e293b]'}`}
+            className="w-full bg-gradient-to-b from-[#1e293b] to-[#0f172a] hover:from-[#334155] hover:to-[#1e293b] text-white font-bold py-3.5 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 mt-6 shadow-lg shadow-slate-900/15 group disabled:opacity-70"
           >
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
-            ) : isRegistering ? (
-              <>
-                <CheckCircle2 className="w-4 h-4" />
-                Criar Nova Conta
-              </>
             ) : (
               <>
                 Acessar Sistema
@@ -161,21 +122,6 @@ export default function Login() {
             )}
           </button>
         </form>
-
-        <div className="mt-6 text-center">
-          <button 
-            type="button"
-            onClick={() => {
-              setIsRegistering(!isRegistering);
-              setError("");
-              setEmail("");
-              setSenha("");
-            }}
-            className="text-sm text-blue-600 hover:text-blue-800 font-bold transition-colors"
-          >
-            {isRegistering ? "Já tem uma conta? Fazer Login" : "Criar novo usuário (Gestor)"}
-          </button>
-        </div>
 
         <div className="mt-6 pt-6 border-t border-slate-100 text-center">
           <p className="text-xs text-slate-400">© 2026 — Departamento Financeiro · v2.0</p>
