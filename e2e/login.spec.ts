@@ -4,10 +4,12 @@ import { test, expect } from '@playwright/test';
  * Smoke test de login → dashboard
  *
  * REQUISITOS:
- * - Banco de dados rodando com as tabelas criadas
- * - Usuário de teste existente com email: admin@admin.com e senha: Mudar@123
- *   (use a rota GET /api/setup com ENABLE_SETUP=true para criar)
- * - Servidor dev rodando em http://localhost:3000
+ * - Banco de dados MySQL acessível (local ou o serviço `mysql` do CI, ver
+ *   .github/workflows/ci.yml, job `e2e`)
+ * - ENABLE_SETUP=true no ambiente — o usuário admin@admin.com / Mudar@123
+ *   (ou ADMIN_INITIAL_PASSWORD) é criado automaticamente por
+ *   e2e/global-setup.ts, que roda antes da suíte (ver playwright.config.ts)
+ * - Servidor dev é subido automaticamente pelo Playwright (webServer)
  *
  * Este teste NÃO usa mocks — é um teste E2E real que valida o fluxo completo.
  */
@@ -19,10 +21,10 @@ test.describe('Auth Flow — Login → Dashboard', () => {
     expect(page).toHaveURL('/login');
 
     // Preenche email
-    await page.fill('input[type="email"]', 'admin@admin.com');
+    await page.fill('#login-email', 'admin@admin.com');
 
     // Preenche senha
-    await page.fill('input[type="password"]', 'Mudar@123');
+    await page.fill('#login-senha', 'Mudar@123');
 
     // Submete formulário
     await page.click('button[type="submit"]');
@@ -43,8 +45,8 @@ test.describe('Auth Flow — Login → Dashboard', () => {
   test('Login com senha inválida mostra erro', async ({ page }) => {
     await page.goto('/login');
 
-    await page.fill('input[type="email"]', 'admin@admin.com');
-    await page.fill('input[type="password"]', 'WrongPassword');
+    await page.fill('#login-email', 'admin@admin.com');
+    await page.fill('#login-senha', 'WrongPassword');
 
     await page.click('button[type="submit"]');
 
@@ -60,8 +62,8 @@ test.describe('Auth Flow — Login → Dashboard', () => {
   test('Login com email não registrado mostra erro', async ({ page }) => {
     await page.goto('/login');
 
-    await page.fill('input[type="email"]', 'nonexistent@example.com');
-    await page.fill('input[type="password"]', 'SomePassword123');
+    await page.fill('#login-email', 'nonexistent@example.com');
+    await page.fill('#login-senha', 'SomePassword123');
 
     await page.click('button[type="submit"]');
 
@@ -74,8 +76,8 @@ test.describe('Auth Flow — Login → Dashboard', () => {
   test('Logout redireciona para login', async ({ page }) => {
     // Faz login primeiro
     await page.goto('/login');
-    await page.fill('input[type="email"]', 'admin@admin.com');
-    await page.fill('input[type="password"]', 'Mudar@123');
+    await page.fill('#login-email', 'admin@admin.com');
+    await page.fill('#login-senha', 'Mudar@123');
     await page.click('button[type="submit"]');
     await page.waitForURL('/');
 

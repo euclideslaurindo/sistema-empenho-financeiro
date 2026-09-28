@@ -1,57 +1,81 @@
 "use client";
 import React, { useEffect } from "react";
-import { useFormContext } from "react-hook-form";
+import { useFormContext, useWatch } from "react-hook-form";
 import { Calculator } from "lucide-react";
 import { maskCurrency, parseFormNumber, formatCurrency } from "@/lib/utils";
 
-export default function OpTaxesSection({ userRole }: { userRole: string }) {
-  const { register, watch, setValue } = useFormContext<any>();
-
-  const wValorPagamento = watch("valorPagamento");
-  const wAutoCalculate = watch("autoCalculate");
-  const wApplied = {
-    irrf: watch("appliedTax_irrf"),
-    iss: watch("appliedTax_iss"),
-    inss: watch("appliedTax_inss"),
-    sestSenat: watch("appliedTax_sestSenat"),
-    patronal: watch("appliedTax_patronal"),
-  };
-
-  const wDesc = {
-    irrf: watch("irrf") || 0,
-    iss: watch("iss") || 0,
-    inss: watch("inss") || 0,
-    sestSenat: watch("sestSenat") || 0,
-    patronal: watch("patronal") || 0,
-    outrosDescontos: watch("outrosDescontos") || 0
-  };
-
-  const wItens = watch("itens") || [];
-  const totalItens = wItens.reduce((acc: number, item: any) => {
-    return acc + (Number(item?.quantidade) || 0) * parseFormNumber(item?.valorUnitario);
-  }, 0);
+// Isolado do resto do formulário: só este componente re-renderiza quando
+// valorPagamento/autoCalculate/appliedTax_* mudam. Retorna null (sem DOM),
+// então o custo do re-render é praticamente zero.
+function AutoCalcEffect() {
+  const { control, setValue } = useFormContext<any>();
+  const wValorPagamento = useWatch({ control, name: "valorPagamento" });
+  const wAutoCalculate = useWatch({ control, name: "autoCalculate" });
+  const appliedIrrf = useWatch({ control, name: "appliedTax_irrf" });
+  const appliedIss = useWatch({ control, name: "appliedTax_iss" });
+  const appliedInss = useWatch({ control, name: "appliedTax_inss" });
+  const appliedSestSenat = useWatch({ control, name: "appliedTax_sestSenat" });
+  const appliedPatronal = useWatch({ control, name: "appliedTax_patronal" });
 
   useEffect(() => {
     const timer = setTimeout(() => {
       const vp = parseFormNumber(wValorPagamento);
       if (wAutoCalculate && vp > 0) {
-        setValue("irrf",      wApplied.irrf      ? maskCurrency(vp * 0.015)  : "");
-        setValue("iss",       wApplied.iss       ? maskCurrency(Math.round(vp * 0.05 * 100) / 100)   : "");
-        setValue("inss",      wApplied.inss      ? maskCurrency(Math.round(vp * 0.11 * 100) / 100)   : "");
-        setValue("sestSenat", wApplied.sestSenat ? maskCurrency(Math.round(vp * 0.025 * 100) / 100)  : "");
-        setValue("patronal",  wApplied.patronal  ? maskCurrency(Math.round(vp * 0.20 * 100) / 100)   : "");
+        setValue("irrf",      appliedIrrf      ? maskCurrency(vp * 0.015)  : "");
+        setValue("iss",       appliedIss       ? maskCurrency(Math.round(vp * 0.05 * 100) / 100)   : "");
+        setValue("inss",      appliedInss      ? maskCurrency(Math.round(vp * 0.11 * 100) / 100)   : "");
+        setValue("sestSenat", appliedSestSenat ? maskCurrency(Math.round(vp * 0.025 * 100) / 100)  : "");
+        setValue("patronal",  appliedPatronal  ? maskCurrency(Math.round(vp * 0.20 * 100) / 100)   : "");
       } else {
         setValue("irrf", ""); setValue("iss", ""); setValue("inss", "");
         setValue("sestSenat", ""); setValue("patronal", "");
       }
     }, 350);
     return () => clearTimeout(timer);
-  }, [wValorPagamento, wAutoCalculate, wApplied.irrf, wApplied.iss, wApplied.inss, wApplied.sestSenat, wApplied.patronal, setValue]);
+  }, [wValorPagamento, wAutoCalculate, appliedIrrf, appliedIss, appliedInss, appliedSestSenat, appliedPatronal, setValue]);
 
-  const totalDescontos = parseFormNumber(wDesc.irrf) + parseFormNumber(wDesc.iss) + parseFormNumber(wDesc.inss) + parseFormNumber(wDesc.sestSenat) + parseFormNumber(wDesc.patronal) + parseFormNumber(wDesc.outrosDescontos);
+  return null;
+}
+
+// Isolado do resto do formulário: só este componente re-renderiza quando os
+// campos de desconto/itens/valorPagamento mudam — os inputs de imposto (que
+// usam register, não watch) não são afetados.
+function TaxesTotalSummary() {
+  const { control } = useFormContext<any>();
+  const wValorPagamento = useWatch({ control, name: "valorPagamento" });
+  const wIrrf = useWatch({ control, name: "irrf" });
+  const wIss = useWatch({ control, name: "iss" });
+  const wInss = useWatch({ control, name: "inss" });
+  const wSestSenat = useWatch({ control, name: "sestSenat" });
+  const wPatronal = useWatch({ control, name: "patronal" });
+  const wOutrosDescontos = useWatch({ control, name: "outrosDescontos" });
+  const wItens = useWatch({ control, name: "itens" }) || [];
+
+  const totalItens = wItens.reduce((acc: number, item: any) => {
+    return acc + (Number(item?.quantidade) || 0) * parseFormNumber(item?.valorUnitario);
+  }, 0);
+
+  const totalDescontos = parseFormNumber(wIrrf) + parseFormNumber(wIss) + parseFormNumber(wInss) + parseFormNumber(wSestSenat) + parseFormNumber(wPatronal) + parseFormNumber(wOutrosDescontos);
   const valorPg = parseFormNumber(wValorPagamento);
   const baseCalculo = totalItens > 0 ? totalItens : valorPg;
   const liquidoOrdem = baseCalculo - totalDescontos;
+
+  return (
+    <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end gap-8">
+      <div className="text-right">
+        <p className="text-sm font-black text-slate-500 uppercase tracking-widest mb-1">Total de Descontos</p>
+        <p className="text-lg font-bold text-slate-600">- {formatCurrency(totalDescontos)}</p>
+      </div>
+      <div className="text-right pl-8 border-l border-slate-100">
+        <p className="text-xs font-black text-emerald-500 uppercase tracking-widest mb-1">Valor Líquido a Pagar</p>
+        <p className="text-2xl font-black text-emerald-600">{formatCurrency(liquidoOrdem)}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function OpTaxesSection({ userRole }: { userRole: string }) {
+  const { register } = useFormContext<any>();
 
   return (
     <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
@@ -94,16 +118,8 @@ export default function OpTaxesSection({ userRole }: { userRole: string }) {
         </div>
       </div>
 
-      <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end gap-8">
-        <div className="text-right">
-          <p className="text-sm font-black text-slate-500 uppercase tracking-widest mb-1">Total de Descontos</p>
-          <p className="text-lg font-bold text-slate-600">- {formatCurrency(totalDescontos)}</p>
-        </div>
-        <div className="text-right pl-8 border-l border-slate-100">
-          <p className="text-xs font-black text-emerald-500 uppercase tracking-widest mb-1">Valor Líquido a Pagar</p>
-          <p className="text-2xl font-black text-emerald-600">{formatCurrency(liquidoOrdem)}</p>
-        </div>
-      </div>
+      <AutoCalcEffect />
+      <TaxesTotalSummary />
     </div>
   );
 }

@@ -3,9 +3,10 @@ import type {NextConfig} from 'next';
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['localhost'],
   reactStrictMode: true,
-  eslint: {
-    ignoreDuringBuilds: false,
-  },
+  // Next.js 16 removeu a integração de ESLint do `next build` (não existe
+  // mais a chave `eslint` no NextConfig) — o lint já roda como etapa própria
+  // no CI (.github/workflows/ci.yml) e no Dockerfile, então a proteção
+  // continua existindo, só que fora do `next build` em si.
   typescript: {
     ignoreBuildErrors: false,
   },

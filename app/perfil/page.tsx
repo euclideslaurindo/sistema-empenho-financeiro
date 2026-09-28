@@ -176,10 +176,11 @@ export default function PerfilGestor() {
                   </label>
                   <input
                     type="text"
-                    defaultValue="(00) 0000-0000"
-                    disabled={!isEditing}
-                    className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${!isEditing ? "bg-slate-50/50 border-transparent text-[#1e293b]/60 cursor-not-allowed" : "bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border-slate-200/80 text-[#1e293b]"}`}
+                    placeholder="Não disponível nesta versão"
+                    disabled
+                    className="w-full px-4 py-2.5 bg-slate-50/50 border-transparent rounded-lg text-[#1e293b]/60 cursor-not-allowed"
                   />
+                  <p className="text-xs text-[#1e293b]/40 mt-1.5">Este campo ainda não é editável.</p>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[#1e293b]/70 mb-2">
@@ -187,10 +188,11 @@ export default function PerfilGestor() {
                   </label>
                   <input
                     type="text"
-                    defaultValue="Órgão de Lotação"
+                    placeholder="Não disponível nesta versão"
                     disabled
                     className="w-full px-4 py-2.5 bg-slate-50/50 border-transparent rounded-lg text-[#1e293b]/60 cursor-not-allowed"
                   />
+                  <p className="text-xs text-[#1e293b]/40 mt-1.5">Este campo ainda não é editável.</p>
                 </div>
               </div>
 
