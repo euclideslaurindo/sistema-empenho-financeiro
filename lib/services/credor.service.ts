@@ -79,7 +79,11 @@ export class CredorService {
     };
   }
 
-  static async criar(body: any, usuarioIdSolicitante: string): Promise<ServiceResult> {
+  static async criar(body: any, usuarioIdSolicitante: string, perfilSolicitante: string): Promise<ServiceResult> {
+    if (perfilSolicitante === 'CONSULTA') {
+      return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+    }
+
     const { cpfCnpj, nome, rg, orgaoEmissor, pis, dataExpedicao, cep, logradouro, numero, bairro, cidade, uf, telefone, banco, agencia, contaCorrente, pix, isMei } = body;
 
     if (!cpfCnpj || !nome) {
@@ -116,7 +120,11 @@ export class CredorService {
     return { success: true, data: { id }, status: 201 };
   }
 
-  static async atualizar(id: string, body: any, usuarioIdSolicitante: string): Promise<ServiceResult> {
+  static async atualizar(id: string, body: any, usuarioIdSolicitante: string, perfilSolicitante: string): Promise<ServiceResult> {
+    if (perfilSolicitante === 'CONSULTA') {
+      return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+    }
+
     const { nome, cpfCnpj, pis, rg, orgaoEmissor, dataExpedicao, banco, agencia, contaCorrente, telefone, cidade, uf, cep, logradouro, numero, bairro, pix, isMei } = body;
 
     if (!nome || !cpfCnpj) {

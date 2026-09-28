@@ -23,6 +23,7 @@ RESUMO_IA.md
 CONTEXTO_PROJETO.md
 PENDENCIAS_ATUAIS.md
 varredura_completa_melhorias.md
+PLANO_IMPLEMENTACAO_PENDENCIAS.md
 GUIA_DEPLOY_SERVIDOR.md
 scripts/tests/
 test*.js
@@ -32,3 +33,4 @@ get_ip.js
 setup_db.js
 remove-mocks.js
 update_colors*.js
+CLAUDE.md

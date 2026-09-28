@@ -49,6 +49,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     const resultado = await OrdemPagamentoService.criar(
       {
         numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
         valorPagamento: 33.333, // arredonda para 33.33
         irrf: 0,
         iss: 0,
@@ -90,6 +91,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     const resultado = await OrdemPagamentoService.criar(
       {
         numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
         valorPagamento: 500, // = saldo disponível exato
       },
       'user-123',
@@ -122,6 +124,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     const resultado = await OrdemPagamentoService.criar(
       {
         numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
         valorPagamento: 500.01, // 1 centavo acima
       },
       'user-123',
@@ -159,6 +162,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     const resultado = await OrdemPagamentoService.criar(
       {
         numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
         valorPagamento: 100.00,
         itens: [
           { quantidade: 3, valorUnitario: 33.33 }, // 3 * 33.33 = 99.99 (diferença de 0.01)
@@ -191,6 +195,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     const resultado = await OrdemPagamentoService.criar(
       {
         numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
         valorPagamento: 100.00,
         itens: [
           { quantidade: 1, valorUnitario: 97.00 }, // diferença de 3 centavos
@@ -231,6 +236,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     const resultado = await OrdemPagamentoService.criar(
       {
         numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
         valorPagamento: 1000,
         irrf: 0,
         iss: 0,
@@ -263,6 +269,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     const resultado = await OrdemPagamentoService.criar(
       {
         numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
         valorPagamento: 100,
         numeroCheque: 'CHQ-12345',
       },
@@ -294,6 +301,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     const resultado = await OrdemPagamentoService.criar(
       {
         numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
         valorPagamento: 100,
       },
       'user-123',
@@ -307,10 +315,111 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     }
   });
 
+  test('#10: Colisão de numero_empenho (UNIQUE KEY) — tenta de novo e cria com sucesso', async () => {
+    let tentativa = 0;
+    (withTransaction as any).mockImplementation(async (callback: any) => {
+      tentativa++;
+      const conn = {
+        execute: vi.fn().mockImplementation(async (sql: string) => {
+          // Checagem do INSERT precisa vir ANTES de 'numero_cheque': a própria
+          // lista de colunas do INSERT contém a palavra "numero_cheque", então
+          // um includes() genérico pegaria o INSERT por engano.
+          if (sql.includes('INSERT INTO ordens_pagamento')) {
+            if (tentativa === 1) {
+              const err: any = new Error("Duplicate entry '2026.OP.0006' for key 'ordens_pagamento.uq_numero_empenho'");
+              err.code = 'ER_DUP_ENTRY';
+              err.sqlMessage = err.message;
+              throw err; // simula outra requisição concorrente pegando o mesmo número
+            }
+            return [{ affectedRows: 1 }];
+          }
+          if (sql.includes('numero_cheque')) return [[]];
+          if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
+            return [[{ id: 'ne-1', valor: 1000, status: 'EMITIDO' }]];
+          }
+          if (sql.includes('SELECT COALESCE(SUM(valor_pagamento)')) {
+            return [[{ total_pago: 0 }]];
+          }
+          if (sql.includes('SELECT CAST(SUBSTRING_INDEX(numero_empenho')) {
+            return [[{ seq: 5 }]];
+          }
+          if (sql.includes('SELECT CAST(sub AS UNSIGNED)')) {
+            return [[{ seq: 1 }]];
+          }
+          if (sql.includes('UPDATE notas_empenho SET status')) {
+            return [{ affectedRows: 1 }];
+          }
+          return [[]];
+        }),
+      };
+      return await callback(conn);
+    });
+
+    const resultado = await OrdemPagamentoService.criar(
+      {
+        numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
+        valorPagamento: 100,
+      },
+      'user-123',
+      'GESTOR'
+    );
+
+    expect(tentativa).toBe(2); // falhou na 1ª, teve sucesso na 2ª
+    expect(resultado.success).toBe(true);
+  });
+
+  test('#11: Erro de duplicidade que NÃO é de numero_empenho não deve disparar retry', async () => {
+    let tentativa = 0;
+    (withTransaction as any).mockImplementation(async (callback: any) => {
+      tentativa++;
+      const conn = {
+        execute: vi.fn().mockImplementation(async (sql: string) => {
+          if (sql.includes('INSERT INTO ordens_pagamento')) {
+            const err: any = new Error("Duplicate entry '123' for key 'ordens_pagamento.uq_cheque'");
+            err.code = 'ER_DUP_ENTRY';
+            err.sqlMessage = err.message;
+            throw err;
+          }
+          if (sql.includes('numero_cheque')) return [[]];
+          if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
+            return [[{ id: 'ne-1', valor: 1000, status: 'EMITIDO' }]];
+          }
+          if (sql.includes('SELECT COALESCE(SUM(valor_pagamento)')) {
+            return [[{ total_pago: 0 }]];
+          }
+          if (sql.includes('SELECT CAST(SUBSTRING_INDEX(numero_empenho')) {
+            return [[{ seq: 5 }]];
+          }
+          if (sql.includes('SELECT CAST(sub AS UNSIGNED)')) {
+            return [[{ seq: 1 }]];
+          }
+          return [[]];
+        }),
+      };
+      return await callback(conn);
+    });
+
+    const resultado = await OrdemPagamentoService.criar(
+      {
+        numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
+        valorPagamento: 100,
+        numeroCheque: 'CHQ-999',
+      },
+      'user-123',
+      'GESTOR'
+    );
+
+    expect(tentativa).toBe(1); // não deve tentar de novo, erro não é de numero_empenho
+    expect(resultado.success).toBe(false);
+  });
+
   test('#9: Validação Zod — valor 0 (deve falhar 400)', async () => {
     const resultado = await OrdemPagamentoService.criar(
       {
         numeroEmpenho: 'NE-001',
+        credorCpfCnpj: '12345678900',
         valorPagamento: 0, // inválido
       },
       'user-123',

@@ -20,7 +20,8 @@ const ordemPagamentoSchema = z.object({
   numeroEmpenho: z.string().min(1, 'O número da Nota de Empenho é obrigatório.'), // Frontend envia como numeroEmpenho, mas é a NE
   sub: z.string().optional(),
   credorNome: z.string().optional(),
-  credorCpfCnpj: z.string().optional(),
+  // Obrigatório: ordens_pagamento.credor_cpf_cnpj referencia credores.cpf_cnpj (fk_op_credor).
+  credorCpfCnpj: z.string().min(1, 'O CPF/CNPJ do credor é obrigatório.'),
   credorRg: z.string().optional(),
   credorEndereco: z.string().optional(),
   unidadeOrcamentaria: z.string().optional(),
@@ -109,6 +110,10 @@ export class OrdemPagamentoService {
   }
 
   static async criar(rawData: any, usuarioId: string, perfil: string = 'GESTOR'): Promise<ServiceResult> {
+    if (perfil === 'CONSULTA') {
+      return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+    }
+
     try {
       const parsedData = ordemPagamentoSchema.parse(rawData);
 
@@ -117,7 +122,16 @@ export class OrdemPagamentoService {
         return parseFloat(String(v)) || 0;
       };
 
-      const result = await withTransaction(async (conn: PoolConnection) => {
+      // Retry em caso de colisão no numero_empenho: o SELECT MAX() FOR UPDATE não
+      // trava nada quando é a primeira OP do ano (sem linhas pra travar), então duas
+      // requisições concorrentes podem calcular o mesmo número. A UNIQUE KEY no banco
+      // (uq_numero_empenho) é quem realmente impede a duplicata; aqui só recalculamos
+      // e tentamos de novo se ela disparar.
+      const MAX_TENTATIVAS_NUMERO_OP = 5;
+      let result: any;
+      for (let tentativa = 1; tentativa <= MAX_TENTATIVAS_NUMERO_OP; tentativa++) {
+      try {
+      result = await withTransaction(async (conn: PoolConnection) => {
         const {
           liquidacao_id, numeroEmpenho: neReal, sub, credorNome, credorCpfCnpj, credorRg, credorEndereco,
           unidadeOrcamentaria, elemento, subelemento, gestao, historico, itens,
@@ -255,6 +269,15 @@ export class OrdemPagamentoService {
 
         return { success: true as const, data: { id, saldoRestante }, status: 201 };
       });
+      break;
+      } catch (err: any) {
+        const ehColisaoNumeroOp = err.code === 'ER_DUP_ENTRY' && String(err.sqlMessage || err.message || '').includes('numero_empenho');
+        if (ehColisaoNumeroOp && tentativa < MAX_TENTATIVAS_NUMERO_OP) {
+          continue;
+        }
+        throw err;
+      }
+      }
 
       return result;
 
@@ -271,6 +294,10 @@ export class OrdemPagamentoService {
   }
 
   static async atualizar(id: string, rawData: any, usuarioId: string, perfil: string = 'GESTOR'): Promise<ServiceResult> {
+    if (perfil === 'CONSULTA') {
+      return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+    }
+
     try {
       // Correção 1: Forçamos a validação Zod no PUT também! Bypass resolvido.
       const parsedData = ordemPagamentoSchema.parse(rawData);
@@ -329,7 +356,10 @@ export class OrdemPagamentoService {
           });
         }
         totalItensCalc = Math.round(totalItensCalc * 100) / 100;
-        if (totalItensCalc > 0 && Math.abs(totalItensCalc - vPagamentoArredondado) > 0) {
+        // Tolerância de 1 centavo para evitar falso positivo por imprecisão IEEE 754
+        // (mesmo critério usado em criar(), ver comentário lá).
+        const diferencaItens = Math.round(Math.abs(totalItensCalc - vPagamentoArredondado) * 100) / 100;
+        if (totalItensCalc > 0 && diferencaItens > 0.01) {
           throw { status: 400, error: `A soma dos itens (R$ ${totalItensCalc.toFixed(2)}) não bate com o valor a pagar da OP (R$ ${vPagamentoArredondado.toFixed(2)}). Fraude detectada.` };
         }
 
@@ -354,7 +384,12 @@ export class OrdemPagamentoService {
           finalLiquido = Math.round((vPagamentoArredondado - finalTotalDescontos) * 100) / 100;
         }
 
-        // tava dando erro no itens_json antes, agr ta passando certo
+        // Guarda de tamanho: evita estouro do max_allowed_packet do MySQL (~16MB padrão)
+        const itensJson = itens ? JSON.stringify(itens) : null;
+        if (itensJson && itensJson.length > 65535) {
+          throw { status: 400, error: 'A lista de itens é muito grande. Reduza a quantidade de itens ou o tamanho das descrições.' };
+        }
+
         await conn.execute(
           `UPDATE ordens_pagamento SET
             sub = ?, credor_nome = ?, credor_cpf_cnpj = ?, credor_rg = ?, credor_endereco = ?,
@@ -365,7 +400,7 @@ export class OrdemPagamentoService {
            WHERE id = ?`,
           [
             sub || '01', credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
-            itens ? JSON.stringify(itens) : null,
+            itensJson,
             toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamento,
             finalIrrf, finalIss, finalInss, finalSestSenat, finalPatronal,
             finalOutros, finalTotalDescontos, finalLiquido,
@@ -425,7 +460,11 @@ export class OrdemPagamentoService {
     }
   }
 
-  static async excluir(id: string, usuarioId: string): Promise<ServiceResult> {
+  static async excluir(id: string, usuarioId: string, perfilSolicitante: string): Promise<ServiceResult> {
+    if (perfilSolicitante === 'CONSULTA') {
+      return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+    }
+
     try {
       const result = await withTransaction(async (conn: PoolConnection) => {
         const [ordens] = await conn.execute<any[]>('SELECT * FROM ordens_pagamento WHERE id = ?', [id]);

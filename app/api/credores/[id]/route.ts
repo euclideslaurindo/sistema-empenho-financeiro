@@ -11,7 +11,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
     const body = await request.json();
-    const result = await CredorService.atualizar(id, body, user.id);
+    const result = await CredorService.atualizar(id, body, user.id, user.perfil);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

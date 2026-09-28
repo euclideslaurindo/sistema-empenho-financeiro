@@ -11,7 +11,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
     const body = await request.json();
-    const result = await NotasEmpenhoService.atualizar(id, body, user.id);
+    const result = await NotasEmpenhoService.atualizar(id, body, user.id, user.perfil);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
@@ -26,7 +26,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!user) return unauthorizedResponse();
 
     const { id } = await params;
-    const result = await NotasEmpenhoService.cancelar(id);
+    const result = await NotasEmpenhoService.cancelar(id, user.perfil);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

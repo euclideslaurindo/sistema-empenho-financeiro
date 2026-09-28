@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     if (!user) return unauthorizedResponse();
     const body = await request.json();
 
-    const result = await NotasEmpenhoService.criar(body, user.id);
+    const result = await NotasEmpenhoService.criar(body, user.id, user.perfil);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
