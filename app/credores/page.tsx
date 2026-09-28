@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
-import { formatCpfCnpj, formatTelefone } from "@/lib/utils";
+import { formatCpfCnpj, formatTelefone, maskCep } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -154,7 +154,7 @@ function CredoresContent() {
           if (!data.erro) {
             setFormData(prev => ({
               ...prev,
-              cep: val,
+              cep: maskCep(val),
               logradouro: data.logradouro,
               bairro: data.bairro,
               cidade: data.localidade,
@@ -173,6 +173,7 @@ function CredoresContent() {
     let val = value;
     if (field === 'cpfCnpj') val = formatCpfCnpj(val);
     if (field === 'telefone') val = formatTelefone(val);
+    if (field === 'cep') val = maskCep(val);
     setFormData((prev) => ({ ...prev, [field]: val }));
   };
 
@@ -313,28 +314,32 @@ function CredoresContent() {
           </div>
 
           <form className="grid grid-cols-1 md:grid-cols-12 gap-6">
-            
+
             {/* Row 1 */}
             <div className="col-span-12 md:col-span-3">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+              <label htmlFor="credor-cpfcnpj" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 CNPJ/CPF
               </label>
               <input
+                id="credor-cpfcnpj"
                 type="text"
                 placeholder="00.000.000/0000-00"
                 value={formData.cpfCnpj || ""}
                 onChange={(e) => handleChange("cpfCnpj", e.target.value)}
                 onBlur={handleCnpjBlur}
+                aria-invalid={!!dupCpfCnpj}
+                aria-describedby={dupCpfCnpj ? "credor-cpfcnpj-error" : undefined}
                 className={`w-full px-4 py-3 rounded-xl border text-sm font-bold focus:outline-none focus:ring-4 transition-all duration-300 ${dupCpfCnpj ? 'border-amber-300 bg-amber-50/50 focus:border-amber-500 focus:ring-amber-500/20 text-amber-900' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700'}`}
               />
-              {dupCpfCnpj && <p className="text-amber-600 text-xs mt-1.5 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> CPF/CNPJ já cadastrado.</p>}
+              {dupCpfCnpj && <p id="credor-cpfcnpj-error" className="text-amber-600 text-xs mt-1.5 font-bold flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> CPF/CNPJ já cadastrado.</p>}
             </div>
 
-            <div className="col-span-12 md:col-span-9">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+            <div className="col-span-12 md:col-span-7">
+              <label htmlFor="credor-nome" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Nome/Razão Social
               </label>
               <input
+                id="credor-nome"
                 type="text"
                 placeholder="Razão Social do Credor"
                 value={formData.nome || ""}
@@ -343,90 +348,80 @@ function CredoresContent() {
               />
             </div>
 
+            <div className="col-span-12 md:col-span-2 flex items-end pb-3">
+              <label htmlFor="credor-is-mei" className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+                <input
+                  id="credor-is-mei"
+                  type="checkbox"
+                  checked={formData.isMei || false}
+                  onChange={(e) => setFormData({ ...formData, isMei: e.target.checked })}
+                  className="w-5 h-5 rounded border-slate-300 text-blue-900 focus:ring-blue-900"
+                />
+                <span className="text-sm font-bold text-slate-700">Sou MEI</span>
+              </label>
+            </div>
+
             {/* Row 2: RG, Órgão, Data Emissão, PIS */}
             <div className="col-span-12 md:col-span-3">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">PIS</label>
-              <input type="text" placeholder="Número PIS" value={formData.pis || ""} onChange={(e) => handleChange("pis", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+              <label htmlFor="credor-pis" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">PIS</label>
+              <input id="credor-pis" type="text" placeholder="Número PIS" value={formData.pis || ""} onChange={(e) => handleChange("pis", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
             <div className="col-span-12 md:col-span-3">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">RG</label>
-              <input type="text" placeholder="Número RG" value={formData.rg || ""} onChange={(e) => handleChange("rg", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+              <label htmlFor="credor-rg" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">RG</label>
+              <input id="credor-rg" type="text" placeholder="Número RG" value={formData.rg || ""} onChange={(e) => handleChange("rg", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
             <div className="col-span-12 md:col-span-3">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Órgão Emissor / IE</label>
-              <input type="text" placeholder="Órgão/IE" value={formData.orgaoEmissor || ""} onChange={(e) => handleChange("orgaoEmissor", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+              <label htmlFor="credor-orgao-emissor" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Órgão Emissor / IE</label>
+              <input id="credor-orgao-emissor" type="text" placeholder="Órgão/IE" value={formData.orgaoEmissor || ""} onChange={(e) => handleChange("orgaoEmissor", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
             <div className="col-span-12 md:col-span-3">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Data de Emissão</label>
-              <input type="date" value={formData.dataExpedicao || ""} onChange={(e) => handleChange("dataExpedicao", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+              <label htmlFor="credor-data-expedicao" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Data de Emissão</label>
+              <input id="credor-data-expedicao" type="date" value={formData.dataExpedicao || ""} onChange={(e) => handleChange("dataExpedicao", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
 
             {/* Row 3: Endereço completo */}
             <div className="col-span-12 md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">CEP</label>
-              <input type="text" placeholder="00000-000" maxLength={9} value={formData.cep || ""} onChange={(e) => handleChange("cep", e.target.value)} onBlur={handleCepBlur} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+              <label htmlFor="credor-cep" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">CEP</label>
+              <input id="credor-cep" type="text" placeholder="00000-000" maxLength={9} value={formData.cep || ""} onChange={(e) => handleChange("cep", e.target.value)} onBlur={handleCepBlur} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
             <div className="col-span-12 md:col-span-4">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Logradouro</label>
-              <input type="text" placeholder="Rua, Avenida..." value={formData.logradouro || ""} onChange={(e) => handleChange("logradouro", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+              <label htmlFor="credor-logradouro" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Logradouro</label>
+              <input id="credor-logradouro" type="text" placeholder="Rua, Avenida..." value={formData.logradouro || ""} onChange={(e) => handleChange("logradouro", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
             <div className="col-span-12 md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nº</label>
-              <input type="text" placeholder="Número" value={formData.numero || ""} onChange={(e) => handleChange("numero", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+              <label htmlFor="credor-numero" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nº</label>
+              <input id="credor-numero" type="text" placeholder="Número" value={formData.numero || ""} onChange={(e) => handleChange("numero", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
             <div className="col-span-12 md:col-span-4">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Bairro</label>
-              <input type="text" placeholder="Bairro" value={formData.bairro || ""} onChange={(e) => handleChange("bairro", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+              <label htmlFor="credor-bairro" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Bairro</label>
+              <input id="credor-bairro" type="text" placeholder="Bairro" value={formData.bairro || ""} onChange={(e) => handleChange("bairro", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
 
             {/* Row 4: Localidade e Contato */}
             <div className="col-span-12 md:col-span-4">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Município</label>
-              <input type="text" placeholder="Cidade" value={formData.cidade || ""} onChange={(e) => handleChange("cidade", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+              <label htmlFor="credor-cidade" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Município</label>
+              <input id="credor-cidade" type="text" placeholder="Cidade" value={formData.cidade || ""} onChange={(e) => handleChange("cidade", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
             <div className="col-span-12 md:col-span-2">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">UF</label>
-              <select value={formData.uf || ""} onChange={(e) => handleChange("uf", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300">
+              <label htmlFor="credor-uf" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">UF</label>
+              <select id="credor-uf" value={formData.uf || ""} onChange={(e) => handleChange("uf", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-600 focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300">
                 <option value="">UF</option>
                 <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option><option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option><option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
               </select>
             </div>
 
             {/* Row 5 */}
-            <div className="col-span-12 md:col-span-3">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Telefone</label>
-              <input type="text" placeholder="(00) 00000-0000" value={formData.telefone || ""} onChange={(e) => handleChange("telefone", e.target.value)} maxLength={15} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
-            </div>
-
-            <div className="col-span-12 md:col-span-5">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">CPF / CNPJ</label>
-              <div className="flex gap-4 items-center">
-                <input
-                  type="text"
-                  value={formData.cpfCnpj || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, cpfCnpj: e.target.value })
-                  }
-                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
-                  placeholder="Somente números"
-                />
-                <label className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
-                  <input
-                    type="checkbox"
-                    checked={formData.isMei || false}
-                    onChange={(e) => setFormData({ ...formData, isMei: e.target.checked })}
-                    className="w-5 h-5 rounded border-slate-300 text-blue-900 focus:ring-blue-900"
-                  />
-                  <span className="text-sm font-bold text-slate-700">Sou MEI</span>
-                </label>
-              </div>
+            <div className="col-span-12 md:col-span-4">
+              <label htmlFor="credor-telefone" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Telefone</label>
+              <input id="credor-telefone" type="text" placeholder="(00) 00000-0000" value={formData.telefone || ""} onChange={(e) => handleChange("telefone", e.target.value)} maxLength={15} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
 
             <div className="col-span-12 md:col-span-4">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+              <label htmlFor="credor-banco" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Banco
               </label>
               <input
+                id="credor-banco"
                 type="text"
                 placeholder="001 - Banco do Brasil"
                 value={formData.banco || ""}
@@ -435,11 +430,12 @@ function CredoresContent() {
               />
             </div>
 
-            <div className="col-span-12 md:col-span-3">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+            <div className="col-span-12 md:col-span-2">
+              <label htmlFor="credor-agencia" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Agência
               </label>
               <input
+                id="credor-agencia"
                 type="text"
                 placeholder="0000-0"
                 value={formData.agencia || ""}
@@ -448,11 +444,12 @@ function CredoresContent() {
               />
             </div>
 
-            <div className="col-span-12 md:col-span-3">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+            <div className="col-span-12 md:col-span-2">
+              <label htmlFor="credor-conta-corrente" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Conta Corrente
               </label>
               <input
+                id="credor-conta-corrente"
                 type="text"
                 placeholder="00000-0"
                 value={formData.contaCorrente || ""}
@@ -460,12 +457,13 @@ function CredoresContent() {
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
               />
             </div>
-            
+
             <div className="col-span-12 md:col-span-4">
-              <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+              <label htmlFor="credor-pix" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Chave Pix
               </label>
               <input
+                id="credor-pix"
                 type="text"
                 placeholder="CPF, CNPJ, E-mail ou Celular"
                 value={formData.pix || ""}

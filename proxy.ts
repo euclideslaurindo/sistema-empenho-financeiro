@@ -4,7 +4,7 @@ import * as jose from 'jose';
 import { JWT_SECRET } from '@/lib/jwt-secret';
 import { AUTH_COOKIE_NAME } from '@/lib/constants';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const { pathname } = request.nextUrl;
 
@@ -15,7 +15,14 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/api/setup') ||
-    pathname === '/api/health';
+    pathname === '/api/health' ||
+    // Arquivos estáticos servidos direto de public/ (imagens, manifest, etc).
+    // Sem isso, o brasão de Pernambuco no header (via next/image) quebra:
+    // o otimizador de imagem do Next busca /brasao_pernambuco.png por baixo
+    // dos panos, cai aqui, é redirecionado pro /login (sem cookie de auth
+    // nessa busca interna), e o Next recebe uma resposta que não é imagem
+    // ("The requested resource isn't a valid image ... received null").
+    /\.(png|jpe?g|svg|gif|webp|ico|json|css|js|txt|woff2?)$/i.test(pathname);
 
   if (isPublicPath) {
     return NextResponse.next();
@@ -49,4 +56,3 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ['/((?!api/auth|_next/static|_next/image|favicon.ico).*)'],
 };
-

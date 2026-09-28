@@ -19,7 +19,7 @@ import {
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
-import { maskCurrency } from "@/lib/utils";
+import { maskCurrency, formatCpfCnpj } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
 
 interface NotaEmpenho {
@@ -260,21 +260,6 @@ export default function NotasEmpenho() {
     toast.error("Preencha os campos obrigatórios corretamente.");
   };
 
-  const maskCpfCnpj = (v: string) => {
-    v = v.replace(/\D/g, "");
-    if (v.length <= 11) {
-      v = v.replace(/(\d{3})(\d)/, "$1.$2");
-      v = v.replace(/(\d{3})(\d)/, "$1.$2");
-      v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-    } else {
-      v = v.replace(/^(\d{2})(\d)/, "$1.$2");
-      v = v.replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3");
-      v = v.replace(/\.(\d{3})(\d)/, ".$1/$2");
-      v = v.replace(/(\d{4})(\d)/, "$1-$2");
-    }
-    return v;
-  };
-
   const handleSalvar = handleSubmit(onSubmit, onError);
 
   return (
@@ -438,7 +423,7 @@ export default function NotasEmpenho() {
                 placeholder="000.000.000-00"
                 {...register("cpfCnpj", {
                   onChange: (e) => {
-                    e.target.value = maskCpfCnpj(e.target.value);
+                    e.target.value = formatCpfCnpj(e.target.value);
                   }
                 })}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold text-slate-700 focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 transition-all duration-300"

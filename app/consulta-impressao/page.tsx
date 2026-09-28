@@ -18,7 +18,7 @@ import { apiClient } from "@/lib/api-client";
 
 import { EmpenhoVia } from "@/components/consulta-impressao/EmpenhoVia";
 import { ReciboVia } from "@/components/consulta-impressao/ReciboVia";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // dados de exemplo removidos, agora carrega do banco mesmo
@@ -913,6 +913,9 @@ export default function ConsultaImpressao() {
             <DialogTitle className="text-lg font-bold text-slate-800">
               Consultar NE Cadastrada
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Busque uma Nota de Empenho por número, CPF/CNPJ ou nome do credor para carregar os dados na tela de impressão.
+            </DialogDescription>
           </div>
           <div className="p-4 border-b border-zinc-100">
             <div className="flex">

@@ -10,3 +10,7 @@ Dockerfile
 README.md
 vitest.config.ts
 tests/
+e2e/
+playwright.config.ts
+scripts/
+coverage/

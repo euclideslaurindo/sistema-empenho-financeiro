@@ -202,11 +202,15 @@ export default function Dashboard() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {statsLoading ? (
-                  <tr>
-                    <td colSpan={5} className="py-12 text-center text-slate-400 font-bold">
-                       Carregando movimentações...
-                    </td>
-                  </tr>
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}>
+                      <td className="py-4 pl-2"><span className="inline-block w-24 h-4 bg-slate-100 rounded animate-pulse" /></td>
+                      <td className="py-4"><span className="inline-block w-20 h-4 bg-slate-100 rounded animate-pulse" /></td>
+                      <td className="py-4"><span className="inline-block w-32 h-4 bg-slate-100 rounded animate-pulse" /></td>
+                      <td className="py-4"><span className="inline-block w-24 h-4 bg-slate-100 rounded animate-pulse" /></td>
+                      <td className="py-4 pr-2 flex justify-end"><span className="inline-block w-20 h-6 bg-slate-100 rounded-full animate-pulse" /></td>
+                    </tr>
+                  ))
                 ) : stats?.ultimasNes && stats.ultimasNes.length > 0 ? (
                   stats.ultimasNes.map((ne, i) => (
                     <tr key={i} className="group hover:bg-blue-50/50 transition-colors cursor-pointer">

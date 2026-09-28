@@ -170,6 +170,14 @@ export function formatTelefone(value: string): string {
   }
 }
 
+/**
+ * Formata CEP no padrão 00000-000 enquanto o usuário digita.
+ */
+export function maskCep(value: string): string {
+  const v = value.replace(/\D/g, "").slice(0, 8);
+  return v.replace(/(\d{5})(\d)/, "$1-$2");
+}
+
 export function isValidCpfCnpj(val: string): boolean {
   if (!val) return false;
   const numbers = val.replace(/\D/g, '');

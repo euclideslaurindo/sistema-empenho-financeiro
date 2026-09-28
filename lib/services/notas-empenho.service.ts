@@ -48,6 +48,9 @@ export class NotasEmpenhoService {
     const { busca = '', page = 1, limit = 50 } = params;
     const offset = (page - 1) * limit;
 
+    // LEFT JOIN com subquery pré-agregada (GROUP BY), em vez de subquery
+    // correlacionada por linha — mesmo padrão já usado em buscarPorNumero()
+    // logo abaixo. Evita recalcular o SUM uma vez por linha da página inteira.
     let sql = `
       SELECT
         ne.id, ne.codigo, ne.numero, ne.valor,
@@ -58,12 +61,15 @@ export class NotasEmpenhoService {
         ne.elemento, ne.subelemento,
         ne.gestao, ne.status, ne.historico, ne.created_at,
         ne.credor_nome as credorNome, ne.cpf_cnpj as cpfCnpj,
-        (ne.valor - COALESCE(
-          (SELECT SUM(op.valor_pagamento) FROM ordens_pagamento op WHERE op.numero_ne = ne.numero),
-        0)) as saldoDisponivel,
+        (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel,
         u.nome as quemAtualizou
       FROM notas_empenho ne
       LEFT JOIN usuarios u ON ne.usuario_id = u.id
+      LEFT JOIN (
+        SELECT numero_ne, SUM(valor_pagamento) as total_pago
+        FROM ordens_pagamento
+        GROUP BY numero_ne
+      ) op_sum ON op_sum.numero_ne = ne.numero
       WHERE 1=1`;
     const sqlParams: any[] = [];
 

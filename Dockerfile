@@ -13,6 +13,12 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# Gate de qualidade: builda só se lint/tipos/testes passarem, mesmo se alguém
+# rodar `docker build` manualmente fora do CI (que já roda essas mesmas
+# checagens em .github/workflows/ci.yml).
+ENV JWT_SECRET="build-time-only-not-used-in-prod"
+ENV APP_URL="http://localhost:3000"
+RUN npm run lint:types && npm run lint && npm test
 RUN npm run build
 
 # ---- Etapa 3: Executar ----
