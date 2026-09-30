@@ -24,16 +24,25 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 // dados de exemplo removidos, agora carrega do banco mesmo
 
 // Decodifica itens_json (array {especificacao, quantidade, unidade, valorUnitario})
-// e formata unidade/quantidade/valor para as células de impressão, que aceitam
-// múltiplas linhas (whitespace-pre-wrap) — um item por linha, sem limite de N.
-function formatarItensParaImpressao(itensJson: string | null | undefined) {
-  const vazio = { unidade: "", quantidade: "", valorUnitario: "", valorTotal: "" };
+// e formata especificacao/unidade/quantidade/valor para as células de impressão,
+// que aceitam múltiplas linhas (whitespace-pre-wrap) — um item por linha, sem
+// limite de N, todas as colunas alinhadas linha a linha.
+//
+// A coluna `itens_json` no banco é do tipo JSON nativo do MySQL — o driver
+// (mysql2) já entrega um array/objeto JS pronto, NUNCA uma string. Por isso
+// aqui só chamamos JSON.parse() se realmente vier como string (ex: valor
+// veio de outro lugar serializado); passar um array pro JSON.parse() força
+// a coerção pra "[object Object]", que quebra o parse e derrubava
+// silenciosamente todo o bloco pro `catch`, zerando Unidade/Quantidade/Valor.
+function formatarItensParaImpressao(itensJson: string | any[] | null | undefined) {
+  const vazio = { especificacao: "", unidade: "", quantidade: "", valorUnitario: "", valorTotal: "" };
   if (!itensJson) return vazio;
   try {
-    const itens = JSON.parse(itensJson);
+    const itens = typeof itensJson === "string" ? JSON.parse(itensJson) : itensJson;
     if (!Array.isArray(itens) || itens.length === 0) return vazio;
     const fmt = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     return {
+      especificacao: itens.map((i: any) => i.especificacao || "").join("\n"),
       unidade: itens.map((i: any) => i.unidade || "").join("\n"),
       quantidade: itens.map((i: any) => String(i.quantidade ?? "")).join("\n"),
       valorUnitario: itens.map((i: any) => fmt(Number(i.valorUnitario) || 0)).join("\n"),
@@ -192,87 +201,8 @@ export default function ConsultaImpressao() {
   >([{ frente: frenteData, verso: versoData }]);
 
   useEffect(() => {
-     
     setMounted(true);
-
-    try {
-      const orcJson = localStorage.getItem("ultimaOrdemImpressao");
-      if (orcJson) {
-        const orcData = JSON.parse(orcJson);
-        setDocumentList((prev) => {
-          const newList = [...prev];
-          newList[0] = {
-            ...newList[0],
-            frente: {
-              ...newList[0].frente,
-              numeroEmpenho:
-                orcData.numeroEmpenho || newList[0].frente.numeroEmpenho,
-              gestaoUE: orcData.gestaoUE || newList[0].frente.gestaoUE,
-              credorNome: orcData.credorNome || newList[0].frente.credorNome,
-              credorCpfCnpj: orcData.cpfCnpj || newList[0].frente.credorCpfCnpj,
-              credorEndereco:
-                orcData.endereco || newList[0].frente.credorEndereco,
-              especificacao:
-                orcData.especificacao || newList[0].frente.especificacao,
-              unidade: orcData.unidade2
-                ? `${orcData.unidade}\n\n${orcData.unidade2}`
-                : orcData.unidade || newList[0].frente.unidade,
-              quantidade: orcData.quantidade2
-                ? `${orcData.quantidade}\n\n${orcData.quantidade2}`
-                : orcData.quantidade || newList[0].frente.quantidade,
-              valorUnitario: orcData.valorUnitario2
-                ? `${orcData.valorUnitario}\n\n${orcData.valorUnitario2}`
-                : orcData.valorUnitario || newList[0].frente.valorUnitario,
-              valorTotal:
-                orcData.valorTotal2 && orcData.valorTotal2 !== "0,00"
-                  ? `${orcData.valorTotal1}\n\n${orcData.valorTotal2}`
-                  : orcData.valorTotal1 || newList[0].frente.valorTotal,
-              totalEspecificacao:
-                orcData.valorTotal || newList[0].frente.totalEspecificacao,
-              saldoAnterior:
-                orcData.saldoAnterior || newList[0].frente.saldoAnterior,
-              valorEmpenho:
-                orcData.valorEmpenho || newList[0].frente.valorEmpenho,
-              saldoAtual: orcData.saldoAtual || newList[0].frente.saldoAtual,
-              deduzidoData:
-                orcData.deduzidoData || newList[0].frente.deduzidoData,
-              chequeNo: orcData.chequeNo || newList[0].frente.chequeNo,
-            },
-            verso: {
-              ...newList[0].verso,
-              numeroCheque: orcData.chequeNo || newList[0].verso.numeroCheque,
-              referenteA: orcData.especificacao || newList[0].verso.referenteA,
-              valorBase: orcData.valorTotal || newList[0].verso.valorBase,
-              irrf: orcData.irrf !== undefined ? String(orcData.irrf).replace('R$', '').trim() : newList[0].verso.irrf,
-              iss: orcData.iss !== undefined ? String(orcData.iss).replace('R$', '').trim() : newList[0].verso.iss,
-              inss: orcData.inss !== undefined ? String(orcData.inss).replace('R$', '').trim() : newList[0].verso.inss,
-              sestSenat: orcData.sestSenat !== undefined ? String(orcData.sestSenat).replace('R$', '').trim() : newList[0].verso.sestSenat,
-              patronal: orcData.patronal !== undefined ? String(orcData.patronal).replace('R$', '').trim() : newList[0].verso.patronal,
-              outrosDescontos: orcData.outrosDescontos !== undefined ? String(orcData.outrosDescontos).replace('R$', '').trim() : newList[0].verso.outrosDescontos,
-              totalDescontos: orcData.totalDescontos || newList[0].verso.totalDescontos,
-              valorRecibo: orcData.valorLiquido || newList[0].verso.valorRecibo,
-            },
-          };
-          return newList;
-        });
-      }
-    } catch (e) {
-      console.error("No base data on localstorage");
-    }
   }, []);
-
-  const handleAction = (action: string) => {
-    if (action === "Salvar Documento") {
-      setIsEditing(false);
-      toast.success("Documentos salvos com sucesso!");
-      return;
-    }
-    if (action === "Imprimir") {
-      window.print();
-      return;
-    }
-    toast.success(`Ação "${action}" realizada com sucesso!`);
-  };
 
   const handleFrenteChange = (index: number, field: string, value: any) => {
     setDocumentList((prev) =>
@@ -381,7 +311,7 @@ export default function ConsultaImpressao() {
         gestaoUE: op.gestao || "",
         unidadeOrcamentaria: op.unidadeOrcamentaria || "",
         elementoSubelemento: [op.elemento, op.subelemento].filter(Boolean).join(' / '),
-        especificacao: op.historico || "",
+        especificacao: itensFormatados.especificacao || op.historico || "",
         chequeNo: op.numeroCheque || "",
         numeroCheque: op.numeroCheque || "",
         unidade: itensFormatados.unidade,

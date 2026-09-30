@@ -58,6 +58,13 @@ export interface NotaEmpenhoDB {
   updated_at: Date;
 }
 
+export interface OrdemPagamentoItemDB {
+  especificacao: string;
+  unidade: string;
+  quantidade: number;
+  valorUnitario: number;
+}
+
 export interface OrdemPagamentoDB {
   id: string;
   liquidacao_id: string | null;
@@ -73,7 +80,10 @@ export interface OrdemPagamentoDB {
   subelemento: string | null;
   gestao: string | null;
   historico: string | null;
-  itens_json: string | null;
+  // Coluna JSON nativa do MySQL — o driver (mysql2) já entrega um array
+  // JS pronto na leitura, nunca uma string (diferente de outros bancos
+  // onde JSON é armazenado como TEXT/VARCHAR e precisa de JSON.parse()).
+  itens_json: OrdemPagamentoItemDB[] | null;
   item_unidade: string | null;
   item_quantidade: number | string | null;
   item_valor_unitario: number | string | null;
