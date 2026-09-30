@@ -36,3 +36,4 @@ setup_db.js
 remove-mocks.js
 update_colors*.js
 CLAUDE.md
+deploy-pacote/
