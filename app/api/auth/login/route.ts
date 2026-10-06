@@ -5,7 +5,7 @@ import { SignJWT } from 'jose';
 import { checkRateLimit, resetRateLimit } from '@/lib/rate-limiter';
 import { UsuarioDB } from '@/lib/types/db';
 import { JWT_SECRET } from '@/lib/jwt-secret';
-import { AUTH_COOKIE_NAME } from '@/lib/constants';
+import { AUTH_COOKIE_NAME, AUTH_COOKIE_SECURE } from '@/lib/constants';
 
 export async function POST(request: NextRequest) {
   // Prioriza headers padrão de proxy reverso, fallback para request.ip
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
 
     response.cookies.set(AUTH_COOKIE_NAME, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: AUTH_COOKIE_SECURE,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 8 // 8 horas

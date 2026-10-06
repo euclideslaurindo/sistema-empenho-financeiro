@@ -360,11 +360,12 @@ export default function NotasEmpenho() {
                 id="ne-valor"
                 type="text"
                 placeholder="0,00"
-                {...register("valorNE", {
-                  onChange: (e) => {
-                    e.target.value = maskCurrency(e.target.value);
-                  }
-                })}
+                {...register("valorNE")}
+                onChange={(e) => {
+                  const masked = maskCurrency(e.target.value);
+                  e.target.value = masked;
+                  setValue("valorNE", masked, { shouldValidate: true, shouldDirty: true });
+                }}
                 aria-invalid={!!errors.valorNE}
                 aria-describedby={errors.valorNE ? "ne-valor-error" : undefined}
                 className={`w-full px-4 py-3 rounded-xl border text-sm font-black focus:outline-none focus:ring-4 transition-all duration-300 ${errors.valorNE ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20 text-red-700' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-800'}`}
