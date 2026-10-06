@@ -34,7 +34,7 @@ function IndicadorSaldo({ control }: { control: any }) {
   );
 }
 
-function InputValorPagamento({ register, control, errors }: { register: any, control: any, errors: any }) {
+function InputValorPagamento({ register, control, errors, setValue }: { register: any, control: any, errors: any, setValue: any }) {
   const saldoAnterior = useWatch({ control, name: "saldoAnterior" });
   const valorPagamento = useWatch({ control, name: "valorPagamento" });
 
@@ -49,11 +49,20 @@ function InputValorPagamento({ register, control, errors }: { register: any, con
         id="op-valor-pagamento"
         type="text"
         placeholder="0,00"
-        {...register("valorPagamento", {
-          onChange: (e: any) => {
-            e.target.value = maskCurrency(e.target.value);
-          }
-        })}
+        {...register("valorPagamento")}
+        onChange={(e: any) => {
+          const masked = maskCurrency(e.target.value);
+          e.target.value = masked;
+          // setValue explícito (em vez de só mutar e.target.value): o
+          // onChange passado como opção do register() roda DEPOIS do
+          // react-hook-form já ter capturado o valor bruto (sem máscara)
+          // do evento, então o estado interno do form ficava sempre um
+          // dígito atrasado em relação ao que aparecia na tela (R$ 150,00
+          // exibido, mas R$ 15,00 usado nos cálculos de useWatch, como
+          // "Saldo Restante Após Pagamento"). setValue corrige o estado
+          // do form direto, sem essa defasagem.
+          setValue("valorPagamento", masked, { shouldValidate: true, shouldDirty: true });
+        }}
         aria-invalid={!!errors?.valorPagamento}
         aria-describedby={errors?.valorPagamento ? "op-valor-pagamento-error" : undefined}
         className={`w-full px-4 py-3 rounded-xl border text-lg font-black focus:outline-none focus:ring-4 transition-all duration-300 ${errors?.valorPagamento || ultrapassouSaldo ? 'border-red-400 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-emerald-700 focus:border-emerald-400 focus:ring-emerald-500/10'}`}
@@ -93,16 +102,18 @@ export default function OpPaymentData({ errors }: { errors: any }) {
         setValue("elemento", ne.elemento || '');
         setValue("subelemento", ne.subelemento || '');
 
-        const saldoFormatado = maskCurrency(Number(ne.saldoDisponivel) || 0);
-        setValue("valorPagamento", saldoFormatado as any);
-
+        // Valor a Pagar e o valor unitário do item NÃO são preenchidos
+        // automaticamente: a OP pode ser um pagamento parcial do saldo da
+        // NE, então o usuário precisa digitar o valor real que vai pagar.
+        // Preencher com o saldo total fazia "Saldo Restante Após Pagamento"
+        // sempre mostrar R$ 0,00, já que valorPagamento = saldoAnterior.
         const currentItens = getValues("itens") || [];
         const newItens = [...currentItens];
         newItens[0] = {
           especificacao: ne.historico || 'Pagamento referente ao empenho ' + ne.numero,
           quantidade: 1,
           unidade: 'UN',
-          valorUnitario: saldoFormatado as any
+          valorUnitario: ''
         };
         setValue("itens", newItens);
 
@@ -390,7 +401,7 @@ export default function OpPaymentData({ errors }: { errors: any }) {
           <input type="text" {...register("enderecoCredor")} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" />
         </div>
 
-          <InputValorPagamento register={register} control={control} errors={errors} />
+          <InputValorPagamento register={register} control={control} errors={errors} setValue={setValue} />
 
       </div>
     </div>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import * as jose from 'jose';
 import { JWT_SECRET } from '@/lib/jwt-secret';
-import { AUTH_COOKIE_NAME } from '@/lib/constants';
+import { AUTH_COOKIE_NAME, AUTH_COOKIE_SECURE } from '@/lib/constants';
 import { PerfilService } from '@/lib/services/perfil.service';
 
 export async function GET(request: NextRequest) {
@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest) {
       value: jwt,
       httpOnly: true,
       path: '/',
-      secure: process.env.NODE_ENV === 'production',
+      secure: AUTH_COOKIE_SECURE,
       sameSite: 'lax',
       maxAge: 60 * 60 * 8, // 8 horas
     });
