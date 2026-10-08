@@ -28,6 +28,18 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const userProfile = useAppStore((state) => state.userProfile);
+  const navigationBlocked = useAppStore((state) => state.navigationBlocked);
+
+  // Confirma antes de sair de uma tela com alterações não salvas (ex.:
+  // /configuracoes/retencoes). Só cobre navegação via <Link> (cliques no
+  // próprio menu) — fechar a aba/atualizar é tratado à parte por um
+  // beforeunload na própria página. Ver node_modules/next/dist/docs
+  // (padrão oficial para esta versão do Next, onNavigate existe desde 15.3.0).
+  const confirmarSeNavegacaoBloqueada = (e: { preventDefault: () => void }) => {
+    if (navigationBlocked && !window.confirm('Você tem alterações não salvas. Sair mesmo assim?')) {
+      e.preventDefault();
+    }
+  };
 
   const handleAction = (action: string) => {
     if (action === "Novo Empenho") {
@@ -77,6 +89,7 @@ export function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
+              onNavigate={confirmarSeNavegacaoBloqueada}
               className={cn(
                 "flex items-center px-4 py-3 rounded-xl text-sm transition-all duration-300 group relative",
                 isActive
@@ -107,6 +120,7 @@ export function Sidebar() {
       <div className="w-full space-y-1.5 px-4 mt-8">
         <Link
           href="/configuracoes"
+          onNavigate={confirmarSeNavegacaoBloqueada}
           className={cn(
             "flex items-center px-4 py-3 rounded-xl text-sm transition-all duration-300 group relative",
             pathname === "/configuracoes"

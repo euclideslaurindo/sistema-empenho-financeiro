@@ -4,7 +4,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
-import { ELEMENTOS, SUBELEMENTOS } from "@/lib/constants";
+import { useElementos } from "@/hooks/use-elementos";
 import { notaEmpenhoSchema, type NotaEmpenhoFormValues } from "@/lib/schemas";
 import {
   Plus,
@@ -66,6 +66,8 @@ export default function NotasEmpenho() {
     }
   });
 
+  const { elementos, loading: elementosLoading, erro: elementosErro, recarregar: recarregarElementos } = useElementos();
+
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
   const [formEnabled, setFormEnabled] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -122,7 +124,18 @@ export default function NotasEmpenho() {
   const valorNEWatch = useWatch({ control, name: "valorNE" });
   const credorNomeWatch = useWatch({ control, name: "credorNome" });
   const subelementoWatch = useWatch({ control, name: "subelemento" });
-  
+  const elementoWatch = useWatch({ control, name: "elemento" });
+
+  // Cascata elemento -> subelemento: o subelemento oferecido depende do
+  // elemento escolhido. Valores "legado" (texto gravado em NE antiga que
+  // não bate com nenhuma opção atual) ganham uma opção extra "(legado) ..."
+  // pra não serem perdidos ao salvar de novo (D9).
+  const elementoAtual = elementos.find((el) => el.valor === elementoWatch);
+  const subelementosDisponiveis = elementoAtual?.subelementos ?? [];
+  const subelementoReconhecido = subelementosDisponiveis.some((s) => s.valor === subelementoWatch);
+  const mostrarCampoSubelemento = subelementosDisponiveis.length > 0 || (!!subelementoWatch && !subelementoReconhecido);
+  const elementoReconhecido = !!elementoAtual;
+
   useEffect(() => {
     if (!valorNEWatch) {
       setDuplicatedNe(null);
@@ -464,27 +477,52 @@ export default function NotasEmpenho() {
               <select
                 id="ne-elemento"
                 {...register("elemento")}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+                onChange={(e) => {
+                  setValue("elemento", e.target.value, { shouldValidate: true, shouldDirty: true });
+                  // Só limpa o subelemento numa troca manual do usuário (onChange
+                  // real do select) — nunca num reset() programático de edição,
+                  // que carrega elemento e subelemento juntos.
+                  setValue("subelemento", "", { shouldValidate: true, shouldDirty: true });
+                }}
+                disabled={elementosLoading}
+                aria-describedby={elementosErro ? "ne-elemento-erro" : undefined}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300 disabled:opacity-60 disabled:cursor-wait"
               >
-                <option value="">Selecione o Elemento</option>
-                {ELEMENTOS.map((el) => (
-                  <option key={el} value={el}>{el}</option>
+                <option value="">{elementosLoading ? "Carregando elementos..." : "Selecione o Elemento"}</option>
+                {elementos.map((el) => (
+                  <option key={el.codigo} value={el.valor}>
+                    {el.valor}{el.legado ? " (legado)" : ""}
+                  </option>
                 ))}
+                {!!elementoWatch && !elementoReconhecido && (
+                  <option value={elementoWatch}>(legado) {elementoWatch}</option>
+                )}
               </select>
+              {elementosErro && (
+                <p id="ne-elemento-erro" className="text-red-500 text-xs mt-1.5 font-bold">
+                  Erro ao carregar elementos: {elementosErro}{" "}
+                  <button type="button" onClick={recarregarElementos} className="underline">Tentar de novo</button>
+                </p>
+              )}
             </div>
-            <div className="md:col-span-2">
-              <label htmlFor="ne-subelemento" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Subelemento</label>
-              <select
-                id="ne-subelemento"
-                {...register("subelemento")}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
-              >
-                <option value="">Selecione o Subelemento</option>
-                {SUBELEMENTOS.map((sub) => (
-                  <option key={sub} value={sub}>{sub}</option>
-                ))}
-              </select>
-            </div>
+            {mostrarCampoSubelemento && (
+              <div className="md:col-span-2">
+                <label htmlFor="ne-subelemento" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Subelemento</label>
+                <select
+                  id="ne-subelemento"
+                  {...register("subelemento")}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+                >
+                  <option value="">Selecione o Subelemento</option>
+                  {subelementosDisponiveis.map((sub) => (
+                    <option key={sub.codigo} value={sub.valor}>{sub.valor}</option>
+                  ))}
+                  {!!subelementoWatch && !subelementoReconhecido && (
+                    <option value={subelementoWatch}>(legado) {subelementoWatch}</option>
+                  )}
+                </select>
+              </div>
+            )}
             <div className="md:col-span-1">
               <label htmlFor="ne-data-pagamento" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
                 Data de Pagamento

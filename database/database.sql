@@ -2,6 +2,11 @@
 -- Sistema de Empenho - Gestão Financeira
 -- Script de criação do banco de dados
 -- Execute este script no MySQL antes de iniciar o sistema
+--
+-- AVISO: este arquivo está desatualizado em vários pontos (ex.: não
+-- reflete as colunas elemento/subelemento separadas, nem a tabela
+-- schema_migrations, criadas por migrations posteriores). Para o
+-- schema de elementos/subelementos de despesa, ver migration_11.sql.
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS empenho CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

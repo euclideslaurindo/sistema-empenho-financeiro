@@ -34,6 +34,36 @@ function IndicadorSaldo({ control }: { control: any }) {
   );
 }
 
+function CamposElementoSubelemento({ control }: { control: any }) {
+  const elemento = useWatch({ control, name: "elemento" });
+  const subelemento = useWatch({ control, name: "subelemento" });
+
+  return (
+    <>
+      <div className="col-span-12 md:col-span-4">
+        <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Elemento</label>
+        <input
+          type="text"
+          value={elemento || ''}
+          disabled
+          readOnly
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed transition-all duration-300"
+        />
+      </div>
+      <div className="col-span-12 md:col-span-4">
+        <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Subelemento</label>
+        <input
+          type="text"
+          value={subelemento || ''}
+          disabled
+          readOnly
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed transition-all duration-300"
+        />
+      </div>
+    </>
+  );
+}
+
 function InputValorPagamento({ register, control, errors, setValue }: { register: any, control: any, errors: any, setValue: any }) {
   const saldoAnterior = useWatch({ control, name: "saldoAnterior" });
   const valorPagamento = useWatch({ control, name: "valorPagamento" });
@@ -303,6 +333,8 @@ export default function OpPaymentData({ errors }: { errors: any }) {
           <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Gestão</label>
           <input type="text" {...register("gestao")} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" />
         </div>
+
+        <CamposElementoSubelemento control={control} />
 
         <div className="col-span-12">
           <div className="flex items-center mb-4 mt-4 pb-2 border-b border-slate-100">

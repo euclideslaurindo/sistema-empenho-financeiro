@@ -1,12 +1,16 @@
 "use client";
 import { ActionToolbar, ActionButton } from "@/components/action-toolbar";
-import { Save, Shield, Bell, User, Lock, Settings } from "lucide-react";
+import { Save, Shield, Bell, User, Lock, Settings, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ChangePasswordModal } from "@/components/change-password-modal";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useAppStore } from "@/lib/store";
 
 export default function Configuracoes() {
+  const router = useRouter();
+  const userProfile = useAppStore((s) => s.userProfile);
   const [activeTab, setActiveTab] = useState("perfil");
   const [mounted, setMounted] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -258,6 +262,22 @@ export default function Configuracoes() {
                   As permissões do seu perfil (Nível: Administrador) são
                   gerenciadas pela TI da Secretaria da Fazenda.
                 </p>
+
+                {userProfile?.perfil === "ADMIN" && (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/configuracoes/retencoes")}
+                    className="w-full flex items-center justify-between p-5 mb-6 bg-blue-50 border border-blue-200/60 rounded-xl hover:shadow-sm hover:bg-blue-100/60 transition-all text-left"
+                  >
+                    <div>
+                      <h4 className="font-bold text-blue-900 text-sm">Retenções e Descontos</h4>
+                      <p className="text-blue-700/80 text-xs mt-1">
+                        Alíquotas, regras por elemento e simulador — só ADMIN.
+                      </p>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-blue-600" />
+                  </button>
+                )}
 
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-5 bg-slate-50/50 border border-slate-200/60 rounded-xl hover:shadow-sm transition-shadow">

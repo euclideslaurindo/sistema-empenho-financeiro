@@ -122,6 +122,45 @@ export interface LiquidacaoDB {
   deleted_at: Date | null;
 }
 
+export interface ElementoDespesaDB {
+  codigo: string;
+  descricao: string;
+  legado: number;
+  ativo: number;
+  ordem: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface SubelementoDespesaDB {
+  codigo: string;
+  elemento_codigo: string;
+  descricao: string;
+  ativo: number;
+  ordem: number;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface ElementoRetencaoDB {
+  elemento_codigo: string;
+  campo: string;
+}
+
+export interface ConfigRetencaoDB {
+  campo: string;
+  rotulo: string;
+  tipo: string;
+  aliquota: number | string | null;
+  calculo_automatico: number;
+  editavel_operador: number;
+  entra_darf: number;
+  ativo: number;
+  ordem: number;
+  updated_by: string | null;
+  updated_at: Date;
+}
+
 export interface AuditoriaFinanceiraDB {
   id: string;
   entidade: string;
