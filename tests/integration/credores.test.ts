@@ -55,6 +55,42 @@ describe('Integração API Credores', () => {
     expect(query).toHaveBeenCalled();
   });
 
+  test('POST normaliza município e monta o endereço com ele', async () => {
+    (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
+    (query as any).mockResolvedValue([{ id: '123' }]);
+
+    const req = new NextRequest('http://localhost:3000/api/credores', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: 'Empresa Teste LTDA',
+        cpfCnpj: '11.222.333/0001-81',
+        logradouro: 'Rua A',
+        numero: '10',
+        cidade: '  Garanhuns  ',
+        uf: 'pe',
+      }),
+    });
+    const res: any = await POST(req);
+    expect(res.status).toBe(201);
+
+    const insert = (query as any).mock.calls.find((c: any[]) => String(c[0]).includes('INSERT INTO credores'));
+    const p = insert[1];
+    expect(p[7]).toBe('Rua A, Nº 10, Garanhuns, PE'); // endereco
+    expect(p[12]).toBe('Garanhuns'); // cidade
+    expect(p[13]).toBe('PE'); // uf
+  });
+
+  test('POST com UF inválida retorna 400', async () => {
+    (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
+    const req = new NextRequest('http://localhost:3000/api/credores', {
+      method: 'POST',
+      body: JSON.stringify({ nome: 'X', cpfCnpj: '11.222.333/0001-81', uf: 'Pernambuco' }),
+    });
+    const res: any = await POST(req);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain('UF inválida');
+  });
+
   test('POST /api/credores falha sem nome ou cpfCnpj', async () => {
     (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
     

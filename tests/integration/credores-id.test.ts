@@ -46,6 +46,57 @@ describe('Integração API Credores [id]', () => {
       expect(res.status).toBe(200);
     });
 
+    function conexaoUpdate() {
+      const chamadas: Array<[string, any[]]> = [];
+      (withTransaction as any).mockImplementationOnce(async (cb: any) =>
+        cb({
+          execute: vi.fn(async (sql: string, params: any[] = []) => {
+            chamadas.push([sql, params]);
+            if (sql.includes('FOR UPDATE')) return [[{ id: 'credor-1' }]];
+            if (sql.includes('SELECT id FROM usuarios')) return [[{ id: '123' }]];
+            if (sql.includes('UPDATE credores')) return [{ affectedRows: 1 }];
+            return [[]];
+          }),
+        })
+      );
+      return () => {
+        const [sql, values] = chamadas.find(([s]) => s.includes('UPDATE credores'))!;
+        const colunas = sql.match(/SET (.*) WHERE/)![1].split(', ').map((c) => c.replace(' = ?', ''));
+        return Object.fromEntries(colunas.map((c, i) => [c, values[i]]));
+      };
+    }
+
+    test('Trocar o município atualiza o endereço mesmo com o endereço antigo no body', async () => {
+      (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
+      const gravado = conexaoUpdate();
+      const req = new NextRequest('http://localhost:3000/api/credores/credor-1', {
+        method: 'PUT',
+        body: JSON.stringify({
+          nome: 'Empresa X',
+          cpfCnpj: '11.222.333/0001-81',
+          endereco: 'Rua A, Nº 10, Recife, PE',
+          logradouro: 'Rua A',
+          numero: '10',
+          cidade: 'Garanhuns',
+          uf: 'PE',
+        }),
+      });
+      const res: any = await PUT(req, { params: Promise.resolve({ id: 'credor-1' }) });
+      expect(res.status).toBe(200);
+      expect(gravado()).toMatchObject({ endereco: 'Rua A, Nº 10, Garanhuns, PE', cidade: 'Garanhuns', uf: 'PE' });
+    });
+
+    test('Editar sem tocar no município mantém cidade/UF', async () => {
+      (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
+      const gravado = conexaoUpdate();
+      const req = new NextRequest('http://localhost:3000/api/credores/credor-1', {
+        method: 'PUT',
+        body: JSON.stringify({ nome: 'Novo Nome', cpfCnpj: '11.222.333/0001-81', cidade: 'Garanhuns', uf: 'PE' }),
+      });
+      await PUT(req, { params: Promise.resolve({ id: 'credor-1' }) });
+      expect(gravado()).toMatchObject({ nome: 'Novo Nome', cidade: 'Garanhuns', uf: 'PE' });
+    });
+
     test('CPF/CNPJ duplicado retorna 409', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 

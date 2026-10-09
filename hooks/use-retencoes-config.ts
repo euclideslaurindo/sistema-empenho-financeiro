@@ -29,10 +29,17 @@ interface UseRetencoesConfigResult {
   recarregar: () => void;
 }
 
-// Diferente de use-elementos.ts (T05): aqui NÃO há cache em memória — esta
-// tela é editada por ADMIN e precisa sempre do estado mais recente do banco,
-// nunca de um valor da sessão anterior.
-export function useRetencoesConfig(): UseRetencoesConfigResult {
+interface UseRetencoesConfigOpcoes {
+  comElementos?: boolean;
+  recarregarNoFoco?: boolean;
+}
+
+// Diferente de use-elementos.ts (T05): aqui NÃO há cache em memória — a config
+// é editada por ADMIN e quem usa precisa sempre do estado mais recente do banco.
+export function useRetencoesConfig({
+  comElementos = true,
+  recarregarNoFoco = false,
+}: UseRetencoesConfigOpcoes = {}): UseRetencoesConfigResult {
   const [config, setConfig] = useState<ConfigRetencoes | null>(null);
   const [elementos, setElementos] = useState<ElementoOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +53,9 @@ export function useRetencoesConfig(): UseRetencoesConfigResult {
 
     Promise.all([
       apiClient.get<ConfigRetencoes>("/api/configuracoes/retencoes"),
-      apiClient.get<{ elementos: ElementoOption[] }>("/api/elementos?incluirInativos=1"),
+      comElementos
+        ? apiClient.get<{ elementos: ElementoOption[] }>("/api/elementos?incluirInativos=1")
+        : Promise.resolve({ elementos: [] as ElementoOption[] }),
     ])
       .then(([configData, elementosData]) => {
         if (cancelado) return;
@@ -63,9 +72,15 @@ export function useRetencoesConfig(): UseRetencoesConfigResult {
     return () => {
       cancelado = true;
     };
-  }, [tick]);
+  }, [tick, comElementos]);
 
   const recarregar = useCallback(() => setTick((t) => t + 1), []);
+
+  useEffect(() => {
+    if (!recarregarNoFoco) return;
+    window.addEventListener("focus", recarregar);
+    return () => window.removeEventListener("focus", recarregar);
+  }, [recarregarNoFoco, recarregar]);
 
   return { config, elementos, loading, erro, recarregar };
 }

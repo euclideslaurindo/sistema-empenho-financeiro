@@ -1,6 +1,8 @@
 import { numeroPorExtenso } from '@/lib/utils';
+import { LINHAS_DOCUMENTO_EM_BRANCO, type LinhaDesconto } from '@/lib/impressao-op';
 
 export const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
+  const linhas: LinhaDesconto[] = data.linhasDescontos ?? LINHAS_DOCUMENTO_EM_BRANCO;
   return (
     <div
       className={`w-full max-w-[210mm] min-h-[297mm] print:min-h-0 print:h-screen bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 box-border font-sans text-black relative mx-auto shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none p-[16mm]`}
@@ -68,121 +70,43 @@ export const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
           <div className="border-b border-black text-center font-bold text-[11px] uppercase py-1.5 bg-slate-50/50 print:bg-transparent tracking-widest">
             Discriminação dos Descontos
           </div>
-          <div className="grid grid-cols-6 text-[11px] border-b border-black">
-            {/* 1. IRRF */}
-            <div className="border-r border-black p-2 flex flex-col justify-between">
-              <span className="font-bold text-gray-800 print:text-black uppercase text-[10px]">
-                IRRF (1,5%)
-              </span>
-              <div className="mt-1 font-bold flex items-center justify-end text-[12px]">
-                <span>R$&nbsp;</span>
-                {isEditing ? (
-                  <input
-                    value={data.irrf}
-                    onChange={(e) => onChange("irrf", e.target.value)}
-                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
-                  />
-                ) : (
-                  <span>{data.irrf || "0,00"}</span>
-                )}
-              </div>
+          {linhas.length === 0 ? (
+            <div className="text-[11px] text-center p-2 font-bold uppercase">Sem descontos</div>
+          ) : (
+            <div
+              className="grid text-[11px]"
+              style={{ gridTemplateColumns: `repeat(${Math.min(linhas.length, 4)}, minmax(0, 1fr))` }}
+            >
+              {linhas.map((linha, i) => {
+                const colunas = Math.min(linhas.length, 4);
+                const ultimaDaFileira = (i + 1) % colunas === 0 || i === linhas.length - 1;
+                const ultimaFileira = i >= linhas.length - (linhas.length % colunas || colunas);
+                return (
+                  <div
+                    key={linha.chave}
+                    className={`p-2 flex flex-col justify-between border-black ${ultimaDaFileira ? "" : "border-r"} ${ultimaFileira ? "" : "border-b"}`}
+                  >
+                    <span className="font-bold text-gray-800 print:text-black uppercase text-[10px]">
+                      {linha.rotulo}
+                    </span>
+                    <div className="mt-1 font-bold flex items-center justify-end text-[12px]">
+                      <span>R$&nbsp;</span>
+                      {isEditing ? (
+                        <input
+                          aria-label={linha.rotulo}
+                          value={data[linha.chave] ?? ""}
+                          onChange={(e) => onChange(linha.chave, e.target.value)}
+                          className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
+                        />
+                      ) : (
+                        <span>{data[linha.chave] || "0,00"}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            {/* 2. ISS */}
-            <div className="border-r border-black p-2 flex flex-col justify-between">
-              <span className="font-bold text-gray-800 print:text-black uppercase text-[10px]">
-                ISS (5%)
-              </span>
-              <div className="mt-1 font-bold flex items-center justify-end text-[12px]">
-                <span>R$&nbsp;</span>
-                {isEditing ? (
-                  <input
-                    value={data.iss}
-                    onChange={(e) => onChange("iss", e.target.value)}
-                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
-                  />
-                ) : (
-                  <span>{data.iss || "0,00"}</span>
-                )}
-              </div>
-            </div>
-
-            {/* 3. INSS */}
-            <div className="border-r border-black p-2 flex flex-col justify-between">
-              <span className="font-bold text-gray-800 print:text-black uppercase text-[10px]">
-                INSS (11%)
-              </span>
-              <div className="mt-1 font-bold flex items-center justify-end text-[12px]">
-                <span>R$&nbsp;</span>
-                {isEditing ? (
-                  <input
-                    value={data.inss}
-                    onChange={(e) => onChange("inss", e.target.value)}
-                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
-                  />
-                ) : (
-                  <span>{data.inss || "0,00"}</span>
-                )}
-              </div>
-            </div>
-
-            {/* 4. PATRONAL */}
-            <div className="border-r border-black p-2 flex flex-col justify-between">
-              <span className="font-bold text-gray-800 print:text-black uppercase text-[10px]">
-                PATRONAL (20%)
-              </span>
-              <div className="mt-1 font-bold flex items-center justify-end text-[12px]">
-                <span>R$&nbsp;</span>
-                {isEditing ? (
-                  <input
-                    value={data.patronal}
-                    onChange={(e) => onChange("patronal", e.target.value)}
-                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
-                  />
-                ) : (
-                  <span>{data.patronal || "0,00"}</span>
-                )}
-              </div>
-            </div>
-
-            {/* 5. SEST / SENAT */}
-            <div className="border-r border-black p-2 flex flex-col justify-between">
-              <span className="font-bold text-gray-800 print:text-black uppercase text-[10px]">
-                SEST/SENAT (2,5%)
-              </span>
-              <div className="mt-1 font-bold flex items-center justify-end text-[12px]">
-                <span>R$&nbsp;</span>
-                {isEditing ? (
-                  <input
-                    value={data.sestSenat}
-                    onChange={(e) => onChange("sestSenat", e.target.value)}
-                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
-                  />
-                ) : (
-                  <span>{data.sestSenat || "0,00"}</span>
-                )}
-              </div>
-            </div>
-
-            {/* 6. OUTROS / IBS-CBS */}
-            <div className="p-2 flex flex-col justify-between">
-              <span className="font-bold text-gray-800 print:text-black uppercase text-[10px]">
-                OUTROS / IBS-CBS
-              </span>
-              <div className="mt-1 font-bold flex items-center justify-end text-[12px]">
-                <span>R$&nbsp;</span>
-                {isEditing ? (
-                  <input
-                    value={data.outrosDescontos}
-                    onChange={(e) => onChange("outrosDescontos", e.target.value)}
-                    className="w-full text-right outline-none bg-blue-50/50 backdrop-blur-sm/50 font-bold px-1"
-                  />
-                ) : (
-                  <span>{data.outrosDescontos || "0,00"}</span>
-                )}
-              </div>
-            </div>
-          </div>
+          )}
 
           <div className="border-t border-black text-right p-2.5 font-bold text-[13px] bg-slate-50/50 print:bg-transparent flex justify-end items-center">
             <span className="mr-4 uppercase tracking-wider text-[11px]">
