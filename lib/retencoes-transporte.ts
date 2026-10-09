@@ -90,6 +90,7 @@ export interface EntradaTransporte {
   brutoCents: number;
   elementoCodigo: string | null;
   vigencia: string; // 'YYYY-MM-DD' de onde vieram parâmetros/faixas
+  vigenciaIrrf?: string; // vigência da tabela do IRRF usada (T27: trava edição de tabela já usada)
   parametros: ParametrosTransporte;
   faixas: FaixaIrrf[];
   issMunicipio: IssMunicipio | null; // null = município sem cadastro
@@ -195,6 +196,7 @@ export function calcularTransporteAutonomo(e: EntradaTransporte): ResultadoCalcu
     perfil: "TRANSPORTE_AUTONOMO",
     elemento: e.elementoCodigo,
     vigencia: e.vigencia,
+    vigencia_irrf: e.vigenciaIrrf ?? null,
     mei: e.credorMei,
     ...(sobrescreverMei ? { mei_sobrescrito: true } : {}),
     base_inss: paraNumero(baseInss),
