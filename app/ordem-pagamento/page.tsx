@@ -7,6 +7,12 @@ import { Plus, Save, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { parseFormNumber } from "@/lib/utils";
+import { toCents, formatarBRL } from "@/lib/money";
+import { extrairCodigoElemento } from "@/lib/elementos";
+import { CAMPO_FORM, camposInformativos, ehCampoRetencao, estadoCampoOp, somarDescontosCents, type Perfil } from "@/lib/retencoes-form";
+import { useRetencoesConfig } from "@/hooks/use-retencoes-config";
+import { credorDaListaNe } from "@/components/op-form/SeletorCredorOp";
+import type { NeCredorResposta } from "@/lib/types/db";
 
 import OpPaymentData from "@/components/op-form/OpPaymentData";
 import OpItemsTable from "@/components/op-form/OpItemsTable";
@@ -67,16 +73,59 @@ const ordemPagamentoSchema = z.object({
   sestSenat: transformNumber,
   patronal: transformNumber,
   outrosDescontos: transformNumber,
+  taxaBancaria: transformNumber,
+  taxaPix: transformNumber,
 
-  autoCalculate: z.boolean().optional(),
-  appliedTax_irrf: z.boolean().optional(),
-  appliedTax_iss: z.boolean().optional(),
-  appliedTax_inss: z.boolean().optional(),
-  appliedTax_sestSenat: z.boolean().optional(),
-  appliedTax_patronal: z.boolean().optional(),
+  // Campos de retenção que o operador digitou (nomes do motor, ex. "taxa_bancaria").
+  // Só esses vão no payload — o servidor (T10) trata chave ausente como "não informado".
+  camposInformados: z.array(z.string()).optional(),
+
+  // Número previsto da OP (T13): só pra exibir e comparar com o definitivo.
+  neCarregada: z.string().optional(),
+  previsaoNumero: z.any().optional(),
+
+  // Credores da NE carregada (T17) — só pra seletor/validação no cliente.
+  credoresNe: z.array(z.any()).optional(),
+
+  // Avisos da prévia do servidor no transporte (T25) — só exibição.
+  previaAvisos: z.array(z.string()).optional(),
+
+  // MEI do credor escolhido e confirmação do ADMIN para reter mesmo assim (T26).
+  credorMei: z.boolean().optional(),
+  sobrescreverMei: z.boolean().optional(),
 });
 
 type OpFormValues = z.input<typeof ordemPagamentoSchema>;
+
+// Usada no defaultValues E no reset do "Nova OP", pra os dois nunca divergirem.
+const valoresIniciais = (): OpFormValues => ({
+  numeroNe: "",
+  empenho: "",
+  numeroCheque: "",
+  nomeCredor: "",
+  cpfCnpj: "",
+  rgCredor: "",
+  enderecoCredor: "",
+  unidadeOrcamentaria: "",
+  elemento: "", subelemento: "",
+  gestao: "",
+  historico: "",
+  itens: [{ especificacao: "", quantidade: 1, unidade: "UN", valorUnitario: 0 }],
+  dataEmissao: getLocalDate(),
+  dataPagamento: "",
+  contaBancaria: "",
+  valorPagamento: 0,
+  saldoAnterior: 0,
+  valorEmpenho: 0,
+  irrf: "", iss: "", inss: "", sestSenat: "", patronal: "", outrosDescontos: "", taxaBancaria: "", taxaPix: "",
+  camposInformados: [],
+  neCarregada: "",
+  previsaoNumero: null,
+  credoresNe: [],
+  previaAvisos: [],
+  credorMei: false,
+  sobrescreverMei: false,
+});
 
 export default function OrdemPagamento() {
   const [isLoading, setIsLoading] = useState(false);
@@ -88,31 +137,14 @@ export default function OrdemPagamento() {
 
 
 
+  const { config: configRetencoes, erro: erroConfigRetencoes } = useRetencoesConfig({
+    comElementos: false,
+    recarregarNoFoco: true,
+  });
+
   const methods = useForm<OpFormValues>({
     resolver: zodResolver(ordemPagamentoSchema),
-    defaultValues: {
-      numeroNe: "",
-      empenho: "",
-      numeroCheque: "",
-      nomeCredor: "",
-      cpfCnpj: "",
-      rgCredor: "",
-      enderecoCredor: "",
-      unidadeOrcamentaria: "",
-      elemento: "", subelemento: "",
-      gestao: "",
-      historico: "",
-      itens: [{ especificacao: "", quantidade: 1, unidade: "UN", valorUnitario: 0 }],
-      dataEmissao: getLocalDate(),
-      dataPagamento: "",
-      contaBancaria: "",
-      valorPagamento: 0,
-      saldoAnterior: 0,
-      valorEmpenho: 0,
-      irrf: "", iss: "", inss: "", sestSenat: "", patronal: "", outrosDescontos: "",
-      autoCalculate: true,
-      appliedTax_irrf: true, appliedTax_iss: true, appliedTax_inss: true, appliedTax_patronal: true, appliedTax_sestSenat: true,
-    }
+    defaultValues: valoresIniciais(),
   });
 
   const { reset, handleSubmit, formState: { errors } } = methods;
@@ -147,15 +179,7 @@ export default function OrdemPagamento() {
   }, [fetchOps, fetchUserRole]);
 
   const handleNovaOp = () => {
-    reset({
-      numeroNe: "", empenho: "", numeroCheque: "", nomeCredor: "", cpfCnpj: "", rgCredor: "", enderecoCredor: "",
-      unidadeOrcamentaria: "", elemento: "", subelemento: "", gestao: "", historico: "",
-      itens: [{ especificacao: "", quantidade: 1, unidade: "UN", valorUnitario: 0 }],
-      dataEmissao: getLocalDate(), dataPagamento: "", contaBancaria: "",
-      valorPagamento: 0, saldoAnterior: 0, valorEmpenho: 0,
-      irrf: 0, iss: 0, inss: 0, sestSenat: 0, patronal: 0, outrosDescontos: 0,
-      autoCalculate: true, appliedTax_irrf: true, appliedTax_iss: true, appliedTax_inss: true,
-    });
+    reset(valoresIniciais());
     setEditingId(null);
   };
 
@@ -177,13 +201,65 @@ export default function OrdemPagamento() {
         return;
       }
 
-      const totalDesc = parseFormNumber(data.irrf) + parseFormNumber(data.iss) + parseFormNumber(data.inss) +
-        parseFormNumber(data.sestSenat) + parseFormNumber(data.patronal) + parseFormNumber(data.outrosDescontos);
+      // O resolver do Zod já transformou os campos em número; os valores
+      // mascarados (string) que a tela mostra estão em getValues().
+      const valoresTela = methods.getValues();
+      const camposInformados: string[] = valoresTela.camposInformados || [];
 
-      if (totalDesc > vp) {
+      if (configRetencoes) {
+        const elementoCodigo = extrairCodigoElemento(valoresTela.elemento);
+        const pendentes = configRetencoes.campos.filter(
+          (cfg) =>
+            cfg.ativo &&
+            ehCampoRetencao(cfg.campo) &&
+            estadoCampoOp(cfg, elementoCodigo, configRetencoes.regras, userRole as Perfil, {
+              credorMei: !!valoresTela.credorMei,
+              sobrescreverMei: !!valoresTela.sobrescreverMei,
+            }).obrigatorio &&
+            !camposInformados.includes(cfg.campo)
+        );
+        if (pendentes.length > 0) {
+          toast.error(`Informe o valor de: ${pendentes.map((c) => c.rotulo).join(", ")}.`);
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      const brutoCents = toCents(vp);
+
+      // NE com credores (T17): o servidor valida de novo, aqui é só pra avisar antes.
+      const credoresNe: NeCredorResposta[] = valoresTela.credoresNe || [];
+      if (credoresNe.length > 0) {
+        const credor = credorDaListaNe(credoresNe, valoresTela.cpfCnpj);
+        if (!credor) {
+          toast.error("O credor informado não pertence a esta NE. Escolha um dos credores da NE.");
+          setIsSaving(false);
+          return;
+        }
+        const restanteCents = toCents(credor.saldo);
+        if (brutoCents > restanteCents) {
+          toast.error(
+            `Saldo do credor insuficiente. Bruto R$ ${formatarBRL(toCents(credor.valorBruto))}, ` +
+              `já pago R$ ${formatarBRL(toCents(credor.valorPago))}, restante R$ ${formatarBRL(restanteCents)}.`
+          );
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      const descontosCents = somarDescontosCents(valoresTela, camposInformativos(extrairCodigoElemento(valoresTela.elemento)));
+      if (descontosCents > brutoCents) {
         toast.error(`Total de descontos não pode ser maior que o valor a pagar.`);
         setIsSaving(false);
         return;
+      }
+      const liquidoTelaCents = brutoCents - descontosCents;
+
+      const retencoesInformadas: Record<string, number> = {};
+      for (const campo of camposInformados) {
+        if (ehCampoRetencao(campo)) {
+          retencoesInformadas[CAMPO_FORM[campo]] = parseFormNumber(valoresTela[CAMPO_FORM[campo] as keyof OpFormValues]);
+        }
       }
 
       let totalItens = 0;
@@ -198,8 +274,6 @@ export default function OrdemPagamento() {
         setIsSaving(false);
         return;
       }
-
-      const vLiquido = vp - totalDesc;
 
       const payload = {
         numeroNe: data.numeroNe,
@@ -216,14 +290,8 @@ export default function OrdemPagamento() {
         saldoAnterior: data.saldoAnterior,
         valorEmpenho: data.valorEmpenho,
         valorPagamento: vp,
-        irrf: parseFormNumber(data.irrf),
-        iss: parseFormNumber(data.iss),
-        inss: parseFormNumber(data.inss),
-        sestSenat: parseFormNumber(data.sestSenat),
-        patronal: parseFormNumber(data.patronal),
-        outrosDescontos: parseFormNumber(data.outrosDescontos),
-        totalDescontos: totalDesc,
-        valorLiquido: vLiquido,
+        ...retencoesInformadas,
+        ...(valoresTela.credorMei && valoresTela.sobrescreverMei ? { sobrescreverMei: true } : {}),
         dataEmissao: data.dataEmissao,
         dataPagamento: data.dataPagamento,
         historico: data.itens && data.itens.length > 0 ? data.itens.map((i: any) => i.especificacao).join(' | ') : data.historico,
@@ -243,7 +311,23 @@ export default function OrdemPagamento() {
         responseData = await apiClient.post("/api/ordens-pagamento", payload);
       }
 
-      toast.success(editingId ? "OP atualizada com sucesso!" : "Ordem de Pagamento salva com sucesso!");
+      if (!editingId && responseData?.numeroOp) {
+        toast.success(`OP ${responseData.numeroOp} salva · NE ${data.empenho}/${responseData.sub}`);
+        const previsto = valoresTela.previsaoNumero;
+        if (previsto && (previsto.numeroOp !== responseData.numeroOp || previsto.sub !== responseData.sub)) {
+          toast.info(
+            `O número mudou porque outra OP foi salva antes (previsto: ${previsto.numeroOp} · /${previsto.sub}).`
+          );
+        }
+      } else {
+        toast.success(editingId ? "OP atualizada com sucesso!" : "Ordem de Pagamento salva com sucesso!");
+      }
+      if (responseData && typeof responseData.valorLiquido === "number") {
+        const liquidoServidorCents = toCents(responseData.valorLiquido);
+        if (liquidoServidorCents !== liquidoTelaCents) {
+          toast.warning(`Valores recalculados pelo servidor: líquido gravado R$ ${formatarBRL(liquidoServidorCents)}.`);
+        }
+      }
       setLastSavedNe(data.empenho);
       handleNovaOp();
       await fetchOps();
@@ -314,7 +398,7 @@ export default function OrdemPagamento() {
             <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
               <OpItemsTable errors={errors} />
             </div>
-            <OpTaxesSection userRole={userRole} />
+            <OpTaxesSection userRole={userRole} config={configRetencoes} erroConfig={erroConfigRetencoes} />
           </form>
         </FormProvider>
 

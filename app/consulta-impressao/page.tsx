@@ -18,6 +18,8 @@ import { apiClient } from "@/lib/api-client";
 
 import { EmpenhoVia } from "@/components/consulta-impressao/EmpenhoVia";
 import { ReciboVia } from "@/components/consulta-impressao/ReciboVia";
+import { LINHAS_DOCUMENTO_EM_BRANCO, formatarValorOp, linhasDescontoDaOp, notaDescontosDaOp } from "@/lib/impressao-op";
+import type { NeCredorResposta } from "@/lib/types/db";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -131,6 +133,9 @@ export default function ConsultaImpressao() {
     sestSenat: "0,00",
     patronal: "0,00",
     outrosDescontos: "0,00",
+    taxaBancaria: "0,00",
+    taxaPix: "0,00",
+    linhasDescontos: LINHAS_DOCUMENTO_EM_BRANCO,
     totalDescontos: "0,00",
     descontosExtenso: "zero",
     valorRecibo: "0,00",
@@ -292,7 +297,18 @@ export default function ConsultaImpressao() {
     }
   };
 
-  const gerarDocFormatado = (op: any, formattedNe: string, ano: string, i: number) => {
+  // Credores da NE (T17) para a linha "Credores da NE" da via; NE antiga
+  // (credor só sintetizado do legado) não tem relação a imprimir.
+  const buscarCredoresNe = async (numeroNe: string): Promise<NeCredorResposta[]> => {
+    try {
+      const data = await apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(numeroNe)}`);
+      return (data?.ne?.credores || []).filter((c: NeCredorResposta) => !c.legado);
+    } catch {
+      return [];
+    }
+  };
+
+  const gerarDocFormatado = (op: any, formattedNe: string, ano: string, i: number, credoresNe: NeCredorResposta[] = []) => {
     const valorF = Number(op.valorPagamento || op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     const liquidoF = Number(op.valorLiquido || op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     const itensFormatados = formatarItensParaImpressao(op.itensJson);
@@ -322,6 +338,7 @@ export default function ConsultaImpressao() {
         deduzidoData: formatDateOnlyBR(op.dataPagamento),
         provisaoData: formatDateOnlyBR(op.dataEmissao),
         pagamentoData: formatDateOnlyBR(op.dataPagamento),
+        credoresNe,
       },
       verso: {
         ...versoData,
@@ -334,12 +351,16 @@ export default function ConsultaImpressao() {
         nomeRecebedor: op.credorNome || "",
         valorExtenso: numeroPorExtenso(Number(op.valorLiquido || op.valorEmpenho)),
         descontosExtenso: numeroPorExtenso(Number(op.totalDescontos || 0)),
-        irrf: op.irrf !== undefined ? String(op.irrf).replace('.', ',') : "0,00",
-        iss: op.iss !== undefined ? String(op.iss).replace('.', ',') : "0,00",
-        inss: op.inss !== undefined ? String(op.inss).replace('.', ',') : "0,00",
-        sestSenat: op.sestSenat !== undefined ? String(op.sestSenat).replace('.', ',') : "0,00",
-        patronal: op.patronal !== undefined ? String(op.patronal).replace('.', ',') : "0,00",
-        outrosDescontos: op.outrosDescontos !== undefined ? String(op.outrosDescontos).replace('.', ',') : "0,00",
+        irrf: formatarValorOp(op.irrf),
+        iss: formatarValorOp(op.iss),
+        inss: formatarValorOp(op.inss),
+        sestSenat: formatarValorOp(op.sestSenat),
+        patronal: formatarValorOp(op.patronal),
+        outrosDescontos: formatarValorOp(op.outrosDescontos),
+        taxaBancaria: formatarValorOp(op.taxaBancaria),
+        taxaPix: formatarValorOp(op.taxaPix),
+        linhasDescontos: linhasDescontoDaOp(op),
+        notaDescontos: notaDescontosDaOp(op),
         totalDescontos: Number(op.totalDescontos || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
         valorRecibo: liquidoF,
       }
@@ -361,8 +382,9 @@ export default function ConsultaImpressao() {
 
       if (opsParaGerar.length > 0) {
         // tem OPs salvas selecionadas: gera documentos com os dados delas
+        const credoresNe = await buscarCredoresNe(formattedNe);
         opsParaGerar.forEach((op, opIndex) => {
-          allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex));
+          allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex, credoresNe));
         });
       } else {
         // nenhuma OP salva selecionada: gera documento em branco baseado na NE
@@ -403,6 +425,7 @@ export default function ConsultaImpressao() {
             elementoSubelemento: finalElemento,
             saldoAnterior: valorFormatado,
             especificacao: finalHistorico,
+            credoresNe: (neDB?.credores || []).filter((c: NeCredorResposta) => !c.legado),
           },
           verso: {
             ...versoData,
@@ -430,8 +453,9 @@ export default function ConsultaImpressao() {
       const match = formattedNe.match(/^(\d{4})NE/i);
       const ano = match ? match[1] : frenteData.emissaoAno;
 
+      const credoresNe = await buscarCredoresNe(formattedNe);
       selectedOpData.forEach((op, opIndex) => {
-        allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex));
+        allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex, credoresNe));
       });
     }
 
