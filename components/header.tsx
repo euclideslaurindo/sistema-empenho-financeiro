@@ -1,6 +1,6 @@
 'use client';
 import Image from 'next/image';
-import { Search, LogOut, Bell, LayoutDashboard, Users, FileText, Banknote, FileStack, Shield } from 'lucide-react';
+import { Search, LogOut, Bell, LayoutDashboard, Users, FileText, Banknote, FileStack, Receipt, Settings, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -11,6 +11,15 @@ export function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const userProfile = useAppStore((state) => state.userProfile);
+  const navigationBlocked = useAppStore((state) => state.navigationBlocked);
+
+  // Páginas com edição pendente (ex.: configuração de retenções) marcam navigationBlocked;
+  // o beforeunload da página não cobre a navegação interna do next/link.
+  const confirmarSeNavegacaoBloqueada = (e: { preventDefault: () => void }) => {
+    if (navigationBlocked && !window.confirm('Você tem alterações não salvas. Sair mesmo assim?')) {
+      e.preventDefault();
+    }
+  };
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && e.currentTarget.value.trim() !== '') {
@@ -37,8 +46,11 @@ export function Header() {
     { href: '/credores', label: 'Credores', icon: Users },
     { href: '/notas-empenho', label: 'Notas de Empenho', icon: FileText },
     { href: '/ordem-pagamento', label: 'Ordem de Pagamento', icon: Banknote },
+    { href: '/darf', label: 'DARF', icon: Receipt },
     { href: '/consulta-impressao', label: 'Relatórios', icon: FileStack },
   ];
+  // Configurações é só do ADMIN (as telas redirecionam os outros perfis).
+  const configAtiva = pathname?.startsWith('/configuracoes');
 
   return (
     <header className="h-[76px] bg-white/70 backdrop-blur-xl border-b border-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between px-8 shrink-0 z-40 w-full relative">
@@ -60,6 +72,7 @@ export function Header() {
             <Link
               key={link.href}
               href={link.href}
+              onNavigate={confirmarSeNavegacaoBloqueada}
               className={`relative px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2 group ${
                 isActive 
                   ? 'text-blue-700 bg-blue-50/80' 
@@ -76,6 +89,23 @@ export function Header() {
             </Link>
           );
         })}
+
+        {userProfile?.perfil === 'ADMIN' && (
+          <Link
+            href="/configuracoes"
+            onNavigate={confirmarSeNavegacaoBloqueada}
+            aria-label="Configurações"
+            title="Configurações"
+            className={`relative p-2.5 rounded-lg transition-all duration-300 group ${
+              configAtiva ? 'text-blue-700 bg-blue-50/80' : 'text-slate-400 hover:text-slate-800 hover:bg-slate-50'
+            }`}
+          >
+            <Settings className={`w-4 h-4 transition-colors ${configAtiva ? 'text-blue-900' : 'group-hover:text-slate-600'}`} />
+            {configAtiva && (
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-1 bg-blue-900 rounded-t-full shadow-[0_-2px_8px_rgba(37,99,235,0.5)]"></div>
+            )}
+          </Link>
+        )}
       </nav>
 
       {/* Right: Actions & User */}

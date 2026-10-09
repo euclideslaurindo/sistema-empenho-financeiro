@@ -11,6 +11,7 @@ import { parseFormNumber } from "@/lib/utils";
 import RetencoesCamposTable from "@/components/admin/RetencoesCamposTable";
 import RetencoesMatriz from "@/components/admin/RetencoesMatriz";
 import RetencoesSimulador from "@/components/admin/RetencoesSimulador";
+import TransporteConfig from "@/components/admin/TransporteConfig";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -136,6 +137,9 @@ export default function RetencoesConfigPage() {
   const [versaoBase, setVersaoBase] = useState<string | null>(null);
   const [diffPendente, setDiffPendente] = useState<string[] | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [aba, setAba] = useState<"padrao" | "transporte">("padrao");
+  const [transporteAberto, setTransporteAberto] = useState(false);
+  const [transporteDirty, setTransporteDirty] = useState(false);
 
   const methods = useForm<FormValues>({ defaultValues: { campos: [], elementos: [] } });
   const {
@@ -168,23 +172,29 @@ export default function RetencoesConfigPage() {
 
   // Bloqueio de navegação: avisa o Sidebar (onNavigate) enquanto houver
   // alteração não salva.
+  const pendente = isDirty || transporteDirty;
   useEffect(() => {
-    setNavigationBlocked(isDirty);
+    setNavigationBlocked(pendente);
     return () => setNavigationBlocked(false);
-  }, [isDirty, setNavigationBlocked]);
+  }, [pendente, setNavigationBlocked]);
 
   // Fechar aba / atualizar / digitar URL nova — beforeunload nativo
   // (onNavigate do next/link não cobre esses casos).
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
+      if (pendente) {
         e.preventDefault();
         e.returnValue = "";
       }
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty]);
+  }, [pendente]);
+
+  const abrirAba = (nova: "padrao" | "transporte") => {
+    setAba(nova);
+    if (nova === "transporte") setTransporteAberto(true);
+  };
 
   const onSubmit = (data: FormValues) => {
     if (!defaultValuesSnapshot) return;
@@ -257,14 +267,40 @@ export default function RetencoesConfigPage() {
             </div>
             <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">Retenções e Descontos</h1>
           </div>
-          <button
-            type="button"
-            onClick={handleSubmit(onSubmit)}
-            disabled={loading || salvando}
-            className="mt-6 md:mt-0 bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" /> Salvar Alterações
-          </button>
+          {aba === "padrao" && (
+            <button
+              type="button"
+              onClick={handleSubmit(onSubmit)}
+              disabled={loading || salvando}
+              className="mt-6 md:mt-0 bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" /> Salvar Alterações
+            </button>
+          )}
+        </div>
+
+        <div role="tablist" aria-label="Tipo de cálculo" className="flex gap-2 border-b border-slate-200">
+          {(
+            [
+              ["padrao", "Retenções padrão"],
+              ["transporte", "Transporte (3.3.90.33)"],
+            ] as const
+          ).map(([id, rotulo]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`aba-${id}`}
+              aria-selected={aba === id}
+              aria-controls={`painel-${id}`}
+              onClick={() => abrirAba(id)}
+              className={`px-4 py-2.5 text-sm font-bold border-b-2 -mb-px transition-colors ${
+                aba === id ? "border-blue-900 text-blue-900" : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {rotulo}
+            </button>
+          ))}
         </div>
 
         {erro && (
@@ -279,16 +315,24 @@ export default function RetencoesConfigPage() {
           </div>
         )}
 
-        {loading ? (
-          <TelaCarregando />
-        ) : (
-          <FormProvider {...methods}>
-            <form>
-              <RetencoesCamposTable />
-              <RetencoesMatriz />
-              <RetencoesSimulador />
-            </form>
-          </FormProvider>
+        {/* Os dois painéis ficam montados (só escondidos) para não perder edições ao trocar de aba. */}
+        <div role="tabpanel" id="painel-padrao" aria-labelledby="aba-padrao" hidden={aba !== "padrao"}>
+          {loading ? (
+            <TelaCarregando />
+          ) : (
+            <FormProvider {...methods}>
+              <form>
+                <RetencoesCamposTable />
+                <RetencoesMatriz />
+                <RetencoesSimulador />
+              </form>
+            </FormProvider>
+          )}
+        </div>
+        {transporteAberto && (
+          <div role="tabpanel" id="painel-transporte" aria-labelledby="aba-transporte" hidden={aba !== "transporte"}>
+            <TransporteConfig config={config?.campos ?? []} onDirtyChange={setTransporteDirty} />
+          </div>
         )}
       </div>
 

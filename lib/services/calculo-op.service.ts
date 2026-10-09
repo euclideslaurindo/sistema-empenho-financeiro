@@ -52,7 +52,7 @@ export async function calcularRetencoesDaOp(
 
   if (perfilCalculo === 'TRANSPORTE_AUTONOMO') {
     const data = dataReferenciaDaOp(e.dataPagamento, e.dataEmissao);
-    const [{ parametros, vigencia }, { faixas }, issMunicipio] = await Promise.all([
+    const [{ parametros, vigencia }, { faixas, vigencia: vigenciaIrrf }, issMunicipio] = await Promise.all([
       obterParametrosVigentes(conn, perfilCalculo, data),
       obterFaixasIrrfVigentes(conn, data),
       obterIssMunicipio(conn, credor?.cidade),
@@ -61,6 +61,7 @@ export async function calcularRetencoesDaOp(
       brutoCents: e.brutoCents,
       elementoCodigo: e.elementoCodigo,
       vigencia,
+      vigenciaIrrf,
       parametros,
       faixas,
       issMunicipio,
