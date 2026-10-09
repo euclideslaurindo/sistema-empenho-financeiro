@@ -264,19 +264,34 @@ export default function Configuracoes() {
                 </p>
 
                 {userProfile?.perfil === "ADMIN" && (
-                  <button
-                    type="button"
-                    onClick={() => router.push("/configuracoes/retencoes")}
-                    className="w-full flex items-center justify-between p-5 mb-6 bg-blue-50 border border-blue-200/60 rounded-xl hover:shadow-sm hover:bg-blue-100/60 transition-all text-left"
-                  >
-                    <div>
-                      <h4 className="font-bold text-blue-900 text-sm">Retenções e Descontos</h4>
-                      <p className="text-blue-700/80 text-xs mt-1">
-                        Alíquotas, regras por elemento e simulador — só ADMIN.
-                      </p>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-blue-600" />
-                  </button>
+                  <div className="space-y-3 mb-6">
+                    <button
+                      type="button"
+                      onClick={() => router.push("/configuracoes/retencoes")}
+                      className="w-full flex items-center justify-between p-5 bg-blue-50 border border-blue-200/60 rounded-xl hover:shadow-sm hover:bg-blue-100/60 transition-all text-left"
+                    >
+                      <div>
+                        <h4 className="font-bold text-blue-900 text-sm">Retenções e Descontos</h4>
+                        <p className="text-blue-700/80 text-xs mt-1">
+                          Alíquotas, regras por elemento e simulador — só ADMIN.
+                        </p>
+                      </div>
+                      <ArrowRight className="w-5 h-5 text-blue-600" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push("/configuracoes/elementos")}
+                      className="w-full flex items-center justify-between p-5 bg-slate-50 border border-slate-200/60 rounded-xl hover:shadow-sm hover:bg-slate-100/60 transition-all text-left"
+                    >
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-sm">Elementos e Subelementos</h4>
+                        <p className="text-slate-500 text-xs mt-1">
+                          Cadastre e gerencie elementos de despesa sem precisar de script SQL.
+                        </p>
+                      </div>
+                      <ArrowRight className="w-5 h-5 text-slate-500" />
+                    </button>
+                  </div>
                 )}
 
                 <div className="space-y-4">

@@ -1,5 +1,10 @@
 import Image from 'next/image';
 import { numeroPorExtenso } from '@/lib/utils';
+import { formatarBRL, toCents } from '@/lib/money';
+import type { NeCredorResposta } from '@/lib/types/db';
+
+export const linhaCredoresNe = (credores: NeCredorResposta[]) =>
+  'Credores da NE: ' + credores.map((c) => `${c.nome} R$ ${formatarBRL(toCents(c.valorBruto))}`).join(' · ');
 
 export const EmpenhoVia = ({
   data,
@@ -138,6 +143,12 @@ export const EmpenhoVia = ({
             )}
           </div>
         </div>
+
+        {Array.isArray(data.credoresNe) && data.credoresNe.length >= 2 && (
+          <p data-testid="credores-ne" className="mt-1 px-1 text-[9px] leading-tight truncate" title={linhaCredoresNe(data.credoresNe)}>
+            {linhaCredoresNe(data.credoresNe)}
+          </p>
+        )}
 
         {/* CPF / CNPJ do Credor - Posicionado logo abaixo de Nome do Credor */}
         <div className="border border-black mt-2 bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 text-[10px] flex">

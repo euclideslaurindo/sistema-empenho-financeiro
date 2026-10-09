@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { formatCpfCnpj, formatTelefone, maskCep } from "@/lib/utils";
+import { CIDADE_MAX, completarMunicipio, rotuloMunicipio } from "@/lib/credor-endereco";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -122,17 +123,15 @@ function CredoresContent() {
         const data = await res.json();
         
         if (res.ok && data.razao_social) {
-          setFormData(prev => ({
+          setFormData(prev => completarMunicipio({
             ...prev,
             nome: data.razao_social || prev.nome,
             logradouro: data.logradouro || prev.logradouro,
             numero: data.numero || prev.numero,
             bairro: data.bairro || prev.bairro,
             cep: data.cep || prev.cep,
-            cidade: data.municipio || prev.cidade,
-            uf: data.uf || prev.uf,
             telefone: data.ddd_telefone_1 || prev.telefone
-          }));
+          }, { cidade: data.municipio, uf: data.uf }));
           toast.success("Dados da empresa carregados com sucesso!");
         } else {
           toast.warning(data.error || "CNPJ não localizado na Receita Federal.");
@@ -152,14 +151,12 @@ function CredoresContent() {
         if (res.ok) {
           const data = await res.json();
           if (!data.erro) {
-            setFormData(prev => ({
+            setFormData(prev => completarMunicipio({
               ...prev,
               cep: maskCep(val),
               logradouro: data.logradouro,
               bairro: data.bairro,
-              cidade: data.localidade,
-              uf: data.uf
-            }));
+            }, { cidade: data.localidade, uf: data.uf }));
             toast.success("Endereço preenchido!");
           }
         }
@@ -348,17 +345,26 @@ function CredoresContent() {
               />
             </div>
 
-            <div className="col-span-12 md:col-span-2 flex items-end pb-3">
-              <label htmlFor="credor-is-mei" className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+            <div className="col-span-12 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+              <label htmlFor="credor-is-mei" className="flex items-center gap-2 cursor-pointer">
                 <input
                   id="credor-is-mei"
                   type="checkbox"
-                  checked={formData.isMei || false}
+                  checked={!!Number(formData.isMei) || false}
                   onChange={(e) => setFormData({ ...formData, isMei: e.target.checked })}
-                  className="w-5 h-5 rounded border-slate-300 text-blue-900 focus:ring-blue-900"
+                  aria-describedby="credor-is-mei-ajuda"
+                  className="w-5 h-5 rounded border-slate-300 text-violet-700 focus:ring-violet-700"
                 />
-                <span className="text-sm font-bold text-slate-700">Sou MEI</span>
+                <span className="text-sm font-black text-violet-900">Credor MEI (Microempreendedor Individual)</span>
               </label>
+              <p id="credor-is-mei-ajuda" className="mt-1 ml-7 text-xs font-semibold text-violet-700">
+                MEI não sofre retenção de IR, ISS, INSS, SEST/SENAT nem patronal. Confira antes de salvar: isso muda o valor pago.
+              </p>
+              {!!Number(formData.isMei) && (formData.cpfCnpj || "").replace(/\D/g, "").length === 11 && (
+                <p role="alert" className="mt-1 ml-7 text-xs font-bold text-amber-700">
+                  MEI tem CNPJ — o documento informado é um CPF. Confira o cadastro.
+                </p>
+              )}
             </div>
 
             {/* Row 2: RG, Órgão, Data Emissão, PIS */}
@@ -400,7 +406,7 @@ function CredoresContent() {
             {/* Row 4: Localidade e Contato */}
             <div className="col-span-12 md:col-span-4">
               <label htmlFor="credor-cidade" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Município</label>
-              <input id="credor-cidade" type="text" placeholder="Cidade" value={formData.cidade || ""} onChange={(e) => handleChange("cidade", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
+              <input id="credor-cidade" type="text" placeholder="Cidade" maxLength={CIDADE_MAX} value={formData.cidade || ""} onChange={(e) => handleChange("cidade", e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300" />
             </div>
             <div className="col-span-12 md:col-span-2">
               <label htmlFor="credor-uf" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">UF</label>
@@ -503,6 +509,7 @@ function CredoresContent() {
                 <tr className="border-b border-slate-100">
                   <th className="pb-4 pl-2 text-sm font-black text-slate-500 uppercase tracking-widest">CNPJ/CPF</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Nome/Razão Social</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Município</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Banco</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Conta</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-center">Status</th>
@@ -512,13 +519,13 @@ function CredoresContent() {
               <tbody className="divide-y divide-slate-50">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 font-bold">
+                    <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
                        Carregando...
                     </td>
                   </tr>
                 ) : credores.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-400 font-bold">
+                    <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
                       Nenhum credor encontrado.
                     </td>
                   </tr>
@@ -542,6 +549,14 @@ function CredoresContent() {
                       </td>
                       <td className="py-5 font-semibold text-slate-700">
                         {c.nome}
+                        {!!Number(c.isMei) && (
+                          <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-violet-700">
+                            MEI
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-5 font-semibold text-slate-600">
+                        {rotuloMunicipio(c.cidade, c.uf) || "-"}
                       </td>
                       <td className="py-5 font-semibold text-slate-600">
                         {c.banco || "Não informado"}

@@ -58,7 +58,7 @@ export default function Login() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200/80 text-red-700 p-3.5 rounded-xl text-sm flex items-center gap-2.5 mb-6 animate-slide-up">
+          <div role="alert" className="bg-red-50 border border-red-200/80 text-red-700 p-3.5 rounded-xl text-sm flex items-center gap-2.5 mb-6 animate-slide-up">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
             <span className="font-medium">{error}</span>
           </div>

@@ -99,8 +99,13 @@ export interface OrdemPagamentoDB {
   sest_senat: number | string | null;
   patronal: number | string | null;
   outros_descontos: number | string | null;
+  taxa_bancaria: number | string;
+  taxa_pix: number | string;
   total_descontos: number | string | null;
   valor_liquido: number | string | null;
+  // JSON nativo do MySQL: mysql2 já entrega objeto, nunca string (mesma
+  // observação já registrada para itens_json).
+  retencoes_snapshot: Record<string, any> | null;
   numero_cheque: string | null;
   data_emissao: Date | string | null;
   data_pagamento: Date | string | null;
@@ -139,6 +144,79 @@ export interface SubelementoDespesaDB {
   ativo: number;
   ordem: number;
   created_at: Date;
+  updated_at: Date;
+}
+
+export interface NeCredorDB {
+  id: string;
+  numero_ne: string;
+  credor_cpf_cnpj: string;
+  credor_nome: string;
+  valor_bruto: number | string;
+  ordem: number;
+  created_by: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/** Credor de uma NE como devolvido pela API (valores em reais). */
+export interface NeCredorResposta {
+  cpfCnpj: string;
+  nome: string;
+  valorBruto: number;
+  valorPago: number;
+  saldo: number;
+  legado?: true; // sintetizado das colunas legadas (NE sem linhas em ne_credores)
+  isMei?: true; // credor MEI no cadastro (T26)
+}
+
+export interface DarfAcompanhamentoDB {
+  id: string;
+  ordem_pagamento_id: string;
+  numero_ne: string;
+  numero_op: string | null; // = ordens_pagamento.numero_empenho
+  sub: string | null;
+  credor_cpf_cnpj: string;
+  credor_nome: string | null;
+  competencia: string; // 'YYYY-MM'
+  valor_darf: number | string;
+  detalhe_json: Record<string, number> | null;
+  status: 'PENDENTE' | 'PAGA' | string;
+  data_pagamento: Date | string | null;
+  observacao: string | null;
+  atualizado_por: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CalculoParametroDB {
+  perfil: string; // 'TRANSPORTE_AUTONOMO'
+  chave: string;
+  valor: number | string;
+  vigente_de: Date | string;
+  updated_by: string | null;
+  updated_at: Date;
+}
+
+export interface IrrfFaixaDB {
+  vigente_de: Date | string;
+  ordem: number;
+  limite_ate: number | string | null; // null = última faixa
+  aliquota: number | string; // 7.5 = 7,5%
+  parcela_deduzir: number | string;
+  updated_by: string | null;
+  updated_at: Date;
+}
+
+export interface IssMunicipioDB {
+  chave: string; // nome normalizado: minúsculas, sem acento
+  nome: string;
+  uf: string;
+  aliquota: number | string;
+  taxa_expediente: number | string; // taxa da prefeitura, parte do ISS (não é a taxa bancária)
+  apelidos: string | null; // separados por ';'
+  ativo: number;
+  updated_by: string | null;
   updated_at: Date;
 }
 

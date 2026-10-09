@@ -9,6 +9,19 @@ export type ServiceResult<T = any> =
 
 const ENTIDADE_ID_CONFIG = 'config_retencoes_global';
 
+/** Shape devolvido por mapCampo — reaproveitado pelo motor de cálculo (T10), não duplicado. */
+export interface ConfigRetencaoCampoMapeado {
+  campo: string;
+  rotulo: string;
+  tipo: string;
+  aliquota: number | null;
+  calculoAutomatico: boolean;
+  editavelOperador: boolean;
+  entraDarf: boolean;
+  ativo: boolean;
+  ordem: number;
+}
+
 /** Roteia pra conn.execute (dentro de transação, formato tupla) ou pro query() direto do pool. */
 async function executar<T>(conn: PoolConnection | undefined, sql: string, values?: any[]): Promise<T> {
   if (conn) {
@@ -18,7 +31,7 @@ async function executar<T>(conn: PoolConnection | undefined, sql: string, values
   return query<T>(sql, values);
 }
 
-function mapCampo(row: ConfigRetencaoDB) {
+function mapCampo(row: ConfigRetencaoDB): ConfigRetencaoCampoMapeado {
   return {
     campo: row.campo,
     rotulo: row.rotulo,
