@@ -70,8 +70,15 @@ export const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
           <div className="border-b border-black text-center font-bold text-[11px] uppercase py-1.5 bg-slate-50/50 print:bg-transparent tracking-widest">
             Discriminação dos Descontos
           </div>
+          {data.notaDescontos && (
+            <div data-testid="nota-descontos" className="text-[11px] text-center p-2 font-bold uppercase border-b border-black">
+              {data.notaDescontos}
+            </div>
+          )}
           {linhas.length === 0 ? (
-            <div className="text-[11px] text-center p-2 font-bold uppercase">Sem descontos</div>
+            data.notaDescontos ? null : (
+              <div className="text-[11px] text-center p-2 font-bold uppercase">Sem descontos</div>
+            )
           ) : (
             <div
               className="grid text-[11px]"

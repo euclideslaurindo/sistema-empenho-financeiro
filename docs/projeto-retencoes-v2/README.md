@@ -47,6 +47,7 @@ Anotações manuscritas do usuário (4 fotos: tabela de elementos com marcaçõe
 - importar planilha de cálculo base para gerar empenhos.
 
 > A tabela `ne_credores` (T14) já deixa a base pronta para a importação de planilha no futuro.
+> Backlog (T26): a planilha de cálculo base importada deverá trazer o **MEI** de cada credor — o MEI muda o valor pago (isento de retenções).
 
 ## 4. Decisões fechadas
 

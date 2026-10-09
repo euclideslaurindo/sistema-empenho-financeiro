@@ -18,7 +18,7 @@ import { apiClient } from "@/lib/api-client";
 
 import { EmpenhoVia } from "@/components/consulta-impressao/EmpenhoVia";
 import { ReciboVia } from "@/components/consulta-impressao/ReciboVia";
-import { LINHAS_DOCUMENTO_EM_BRANCO, formatarValorOp, linhasDescontoDaOp } from "@/lib/impressao-op";
+import { LINHAS_DOCUMENTO_EM_BRANCO, formatarValorOp, linhasDescontoDaOp, notaDescontosDaOp } from "@/lib/impressao-op";
 import type { NeCredorResposta } from "@/lib/types/db";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -360,6 +360,7 @@ export default function ConsultaImpressao() {
         taxaBancaria: formatarValorOp(op.taxaBancaria),
         taxaPix: formatarValorOp(op.taxaPix),
         linhasDescontos: linhasDescontoDaOp(op),
+        notaDescontos: notaDescontosDaOp(op),
         totalDescontos: Number(op.totalDescontos || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
         valorRecibo: liquidoF,
       }

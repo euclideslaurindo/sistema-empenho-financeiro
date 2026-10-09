@@ -22,6 +22,8 @@ export function credorDaListaNe(credores: NeCredorResposta[] | undefined, cpfCnp
 export async function selecionarCredorOp(setValue: SetValue, credor: NeCredorResposta) {
   setValue("nomeCredor", credor.nome, { shouldValidate: true, shouldDirty: true });
   setValue("cpfCnpj", credor.cpfCnpj, { shouldValidate: true, shouldDirty: true });
+  setValue("credorMei", !!credor.isMei);
+  setValue("sobrescreverMei", false);
   const restanteCents = toCents(credor.saldo);
   setValue("valorPagamento", restanteCents > 0 ? maskCurrency(restanteCents / 100) : "", {
     shouldValidate: true,
@@ -30,13 +32,14 @@ export async function selecionarCredorOp(setValue: SetValue, credor: NeCredorRes
 
   const digitos = somenteDigitos(credor.cpfCnpj);
   try {
-    const data = await apiClient.get<{ credores: Array<{ cpfCnpj: string; rg?: string | null; endereco?: string | null }> }>(
+    const data = await apiClient.get<{ credores: Array<{ cpfCnpj: string; rg?: string | null; endereco?: string | null; isMei?: number | boolean | null }> }>(
       `/api/credores?busca=${encodeURIComponent(digitos)}&limit=5`
     );
     const cadastro = data?.credores?.find((c) => somenteDigitos(c.cpfCnpj) === digitos);
     if (cadastro) {
       setValue("rgCredor", cadastro.rg || "");
       setValue("enderecoCredor", cadastro.endereco || "");
+      setValue("credorMei", !!Number(cadastro.isMei));
     }
   } catch {
     // Sem RG/endereço: o operador completa à mão, como antes.
@@ -81,7 +84,12 @@ export function SeletorCredorOp() {
                 className="mt-1"
               />
               <span className="text-sm">
-                <span className="block font-bold text-slate-800">{c.nome}</span>
+                <span className="block font-bold text-slate-800">
+                  {c.nome}
+                  {c.isMei && (
+                    <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-violet-700">MEI</span>
+                  )}
+                </span>
                 <span className="block text-xs text-slate-500">{c.cpfCnpj}</span>
                 <span className="block text-xs font-semibold text-slate-600">
                   Bruto R$ {formatarBRL(toCents(c.valorBruto))} · Pago R$ {formatarBRL(toCents(c.valorPago))} ·{" "}

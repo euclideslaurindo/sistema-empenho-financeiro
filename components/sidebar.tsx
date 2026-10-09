@@ -21,6 +21,7 @@ const navItems = [
   { name: "Notas de Empenho", href: "/notas-empenho", icon: FileText },
   { name: "Ordem de Pagamento", href: "/ordem-pagamento", icon: Banknote },
   { name: "Consulta/Impressão", href: "/consulta-impressao", icon: Printer },
+  { name: "DARF", href: "/darf", icon: Landmark },
   { name: "Usuários", href: "/usuarios", icon: Users },
 ];
 

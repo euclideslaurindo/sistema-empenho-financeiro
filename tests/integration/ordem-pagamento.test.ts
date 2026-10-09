@@ -77,7 +77,7 @@ describe('Integração OrdemPagamentoService', () => {
     const executeSpy = vi.fn();
 
     // Config/matriz iguais à seed real da T03 (migration_12.sql): elemento
-    // 3.3.90.33 aplica os 5 campos tributários; nenhum deles é editável
+    // 3.3.90.39 (cálculo padrão) aplica os 5 campos tributários; nenhum deles é editável
     // pelo operador (editavel_operador=0), só por ADMIN.
     const configRows = [
       { campo: 'irrf', rotulo: 'IRRF', tipo: 'PERCENTUAL', aliquota: '1.5000', calculo_automatico: 1, editavel_operador: 0, entra_darf: 0, ativo: 1, ordem: 10, updated_at: new Date() },
@@ -90,7 +90,7 @@ describe('Integração OrdemPagamentoService', () => {
       { campo: 'taxa_pix', rotulo: 'Taxa PIX', tipo: 'VALOR_DIGITADO', aliquota: null, calculo_automatico: 0, editavel_operador: 1, entra_darf: 0, ativo: 1, ordem: 80, updated_at: new Date() },
     ];
     const elementoRetencoesRows = ['irrf', 'iss', 'inss', 'patronal', 'sest_senat'].map((campo) => ({
-      elemento_codigo: '3.3.90.33',
+      elemento_codigo: '3.3.90.39',
       campo,
     }));
 
@@ -99,7 +99,7 @@ describe('Integração OrdemPagamentoService', () => {
         execute: vi.fn().mockImplementation((queryStr: string, params: any[]) => {
           executeSpy(queryStr, params);
           if (queryStr.includes('SELECT id, valor, status, elemento, subelemento FROM notas_empenho')) {
-            return [[{ id: 'ne-1', valor: 1000, status: 'EMITIDO', elemento: '3.3.90.33 - Material de consumo', subelemento: null }]];
+            return [[{ id: 'ne-1', valor: 1000, status: 'EMITIDO', elemento: '3.3.90.39 - Outros serviços de terceiros PJ', subelemento: null }]];
           }
           if (queryStr.includes('SELECT COALESCE(SUM(valor_pagamento), 0)')) {
             return [[{ total_pago: 0 }]];
@@ -114,7 +114,7 @@ describe('Integração OrdemPagamentoService', () => {
             return [configRows];
           }
           if (queryStr.includes('SELECT codigo FROM elementos_despesa')) {
-            return [[{ codigo: '3.3.90.33' }]];
+            return [[{ codigo: '3.3.90.39' }]];
           }
           if (queryStr.includes('SELECT elemento_codigo, campo FROM elemento_retencoes')) {
             return [elementoRetencoesRows];
