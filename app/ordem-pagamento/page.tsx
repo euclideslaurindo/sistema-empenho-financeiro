@@ -9,7 +9,7 @@ import { apiClient } from "@/lib/api-client";
 import { parseFormNumber } from "@/lib/utils";
 import { toCents, formatarBRL } from "@/lib/money";
 import { extrairCodigoElemento } from "@/lib/elementos";
-import { CAMPO_FORM, ehCampoRetencao, estadoCampo, somarDescontosCents, type Perfil } from "@/lib/retencoes-form";
+import { CAMPO_FORM, camposInformativos, ehCampoRetencao, estadoCampoOp, somarDescontosCents, type Perfil } from "@/lib/retencoes-form";
 import { useRetencoesConfig } from "@/hooks/use-retencoes-config";
 import { credorDaListaNe } from "@/components/op-form/SeletorCredorOp";
 import type { NeCredorResposta } from "@/lib/types/db";
@@ -86,6 +86,13 @@ const ordemPagamentoSchema = z.object({
 
   // Credores da NE carregada (T17) — só pra seletor/validação no cliente.
   credoresNe: z.array(z.any()).optional(),
+
+  // Avisos da prévia do servidor no transporte (T25) — só exibição.
+  previaAvisos: z.array(z.string()).optional(),
+
+  // MEI do credor escolhido e confirmação do ADMIN para reter mesmo assim (T26).
+  credorMei: z.boolean().optional(),
+  sobrescreverMei: z.boolean().optional(),
 });
 
 type OpFormValues = z.input<typeof ordemPagamentoSchema>;
@@ -115,6 +122,9 @@ const valoresIniciais = (): OpFormValues => ({
   neCarregada: "",
   previsaoNumero: null,
   credoresNe: [],
+  previaAvisos: [],
+  credorMei: false,
+  sobrescreverMei: false,
 });
 
 export default function OrdemPagamento() {
@@ -202,7 +212,10 @@ export default function OrdemPagamento() {
           (cfg) =>
             cfg.ativo &&
             ehCampoRetencao(cfg.campo) &&
-            estadoCampo(cfg, elementoCodigo, configRetencoes.regras, userRole as Perfil).obrigatorio &&
+            estadoCampoOp(cfg, elementoCodigo, configRetencoes.regras, userRole as Perfil, {
+              credorMei: !!valoresTela.credorMei,
+              sobrescreverMei: !!valoresTela.sobrescreverMei,
+            }).obrigatorio &&
             !camposInformados.includes(cfg.campo)
         );
         if (pendentes.length > 0) {
@@ -234,7 +247,7 @@ export default function OrdemPagamento() {
         }
       }
 
-      const descontosCents = somarDescontosCents(valoresTela);
+      const descontosCents = somarDescontosCents(valoresTela, camposInformativos(extrairCodigoElemento(valoresTela.elemento)));
       if (descontosCents > brutoCents) {
         toast.error(`Total de descontos não pode ser maior que o valor a pagar.`);
         setIsSaving(false);
@@ -278,6 +291,7 @@ export default function OrdemPagamento() {
         valorEmpenho: data.valorEmpenho,
         valorPagamento: vp,
         ...retencoesInformadas,
+        ...(valoresTela.credorMei && valoresTela.sobrescreverMei ? { sobrescreverMei: true } : {}),
         dataEmissao: data.dataEmissao,
         dataPagamento: data.dataPagamento,
         historico: data.itens && data.itens.length > 0 ? data.itens.map((i: any) => i.especificacao).join(' | ') : data.historico,

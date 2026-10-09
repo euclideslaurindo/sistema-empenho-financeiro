@@ -53,3 +53,22 @@ describe('ReciboVia — discriminação dos descontos', () => {
     expect(onChange).toHaveBeenCalledWith('taxaPix', '1,00');
   });
 });
+
+describe('ReciboVia — MEI (T26)', () => {
+  test('mostra a nota de isenção acima das linhas de desconto', () => {
+    render(
+      <ReciboVia
+        data={{ ...base, notaDescontos: 'Isento de retenções (MEI)', linhasDescontos: [{ chave: 'taxaPix', rotulo: 'Taxa PIX' }] }}
+        isEditing={false}
+        onChange={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('nota-descontos')).toHaveTextContent('Isento de retenções (MEI)');
+    expect(screen.getByText('Taxa PIX')).toBeInTheDocument();
+  });
+
+  test('nota sem linhas: não mostra "Sem descontos" junto', () => {
+    render(<ReciboVia data={{ ...base, notaDescontos: 'Isento de retenções (MEI)', linhasDescontos: [] }} isEditing={false} onChange={vi.fn()} />);
+    expect(screen.queryByText('Sem descontos')).toBeNull();
+  });
+});

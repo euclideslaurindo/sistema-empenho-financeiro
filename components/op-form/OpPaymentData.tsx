@@ -232,8 +232,15 @@ export default function OpPaymentData({ errors }: { errors: any }) {
     } catch {}
   }, 350);
 
+  // Digitar outro credor à mão: o MEI fica desconhecido (o servidor decide pelo cadastro).
+  const esquecerMei = () => {
+    setValue("credorMei", false);
+    setValue("sobrescreverMei", false);
+  };
+
   const handleCpfChange = (val: string) => {
     setValue("cpfCnpj", val);
+    esquecerMei();
     setCpfSuggestions([]);
     setShowCpfSuggestions(false);
     const digits = val.replace(/\D/g, '');
@@ -257,6 +264,7 @@ export default function OpPaymentData({ errors }: { errors: any }) {
 
   const handleCredorNameChange = (val: string) => {
     setValue("nomeCredor", val);
+    esquecerMei();
     if (val.length >= 2) {
       buscarCredorSugestoes(val);
     } else {
@@ -268,6 +276,8 @@ export default function OpPaymentData({ errors }: { errors: any }) {
   const selectCredor = (credor: any) => {
     setValue("nomeCredor", credor.nome);
     setValue("cpfCnpj", credor.cpf_cnpj || credor.cpfCnpj || '');
+    setValue("credorMei", !!Number(credor.isMei ?? credor.is_mei));
+    setValue("sobrescreverMei", false);
     setValue("rgCredor", credor.rg || '');
     setValue("enderecoCredor", credor.endereco || '');
     setCredorSuggestions([]);

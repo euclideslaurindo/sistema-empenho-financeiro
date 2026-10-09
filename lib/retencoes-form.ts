@@ -5,6 +5,7 @@ import { CAMPOS_TRIBUTARIOS, type CampoDesconto, type CampoTributario } from "@/
 import type { ConfigRetencaoCampoMapeado } from "@/lib/services/config-retencoes.service";
 import { maskCurrency } from "@/lib/utils";
 import { toCents } from "@/lib/money";
+import { perfilDoElemento } from "@/lib/perfis-calculo";
 
 export type CampoRetencao = CampoTributario | CampoDesconto;
 export type Perfil = "ADMIN" | "GESTOR" | "CONSULTA";
@@ -58,6 +59,24 @@ export function estadoCampo(
   return { editavel: true, obrigatorio: true, dica: "Sem cálculo automático: informe o valor" };
 }
 
+/**
+ * Estado do campo considerando o credor MEI (T26): tributários isentos e
+ * travados; só o ADMIN que confirmou a sobrescrita digita manualmente.
+ */
+export function estadoCampoOp(
+  cfg: ConfigRetencaoCampoMapeado,
+  elementoCodigo: string | null,
+  regras: Record<string, string[]>,
+  perfil: Perfil,
+  mei: { credorMei: boolean; sobrescreverMei: boolean } = { credorMei: false, sobrescreverMei: false }
+): EstadoCampo {
+  if (mei.credorMei && (CAMPOS_TRIBUTARIOS as string[]).includes(cfg.campo)) {
+    const manual = mei.sobrescreverMei && perfil === "ADMIN";
+    return { editavel: manual, obrigatorio: false, dica: manual ? "Valor manual (ADMIN, credor MEI)" : "Isento (MEI)" };
+  }
+  return estadoCampo(cfg, elementoCodigo, regras, perfil);
+}
+
 export function rotuloCampo(cfg: ConfigRetencaoCampoMapeado): string {
   if (cfg.tipo === "PERCENTUAL" && cfg.aliquota != null) {
     const aliquota = cfg.aliquota.toLocaleString("pt-BR", { maximumFractionDigits: 4 });
@@ -89,9 +108,20 @@ export function informadosEmCentavos(
   return informados;
 }
 
-export function somarDescontosCents(valores: Record<string, unknown>): number {
-  return CAMPOS_RETENCAO.reduce(
+/** `excluir`: campos informativos, que não entram no total (ex.: patronal no transporte). */
+export function somarDescontosCents(valores: Record<string, unknown>, excluir: CampoRetencao[] = []): number {
+  return CAMPOS_RETENCAO.filter((c) => !excluir.includes(c)).reduce(
     (total, campo) => total + toCents(valores[CAMPO_FORM[campo]] as string | number | undefined),
     0
   );
+}
+
+/** No transporte (T25) a patronal é só informativa: fora do total e do líquido. */
+export const camposInformativos = (elementoCodigo: string | null): CampoRetencao[] =>
+  perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO" ? ["patronal"] : [];
+
+/** No transporte os percentuais incidem sobre bases diferentes: rótulo sem "%". */
+export function rotuloCampoDoElemento(cfg: ConfigRetencaoCampoMapeado, elementoCodigo: string | null): string {
+  if (perfilDoElemento(elementoCodigo) !== "TRANSPORTE_AUTONOMO") return rotuloCampo(cfg);
+  return cfg.campo === "patronal" ? `${cfg.rotulo} (informativa)` : cfg.rotulo;
 }

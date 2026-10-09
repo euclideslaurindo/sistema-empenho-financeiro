@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { formatarValorOp, linhasDescontoDaOp, LINHAS_DOCUMENTO_EM_BRANCO } from '@/lib/impressao-op';
+import { formatarValorOp, linhasDescontoDaOp, notaDescontosDaOp, LINHAS_DOCUMENTO_EM_BRANCO } from '@/lib/impressao-op';
 import { calcularRetencoes } from '@/lib/retencoes';
 import type { ConfigRetencaoCampoMapeado } from '@/lib/services/config-retencoes.service';
 
@@ -93,5 +93,28 @@ describe('formatarValorOp', () => {
   test('vazio vira 0,00', () => {
     expect(formatarValorOp(null)).toBe('0,00');
     expect(formatarValorOp(undefined)).toBe('0,00');
+  });
+});
+
+describe('MEI na via impressa (T26)', () => {
+  const snapMei = () => calcularRetencoes({
+    brutoCents: 100000, elementoCodigo: '3.3.90.36', config: CONFIG, regras: REGRAS, informados: {}, perfil: 'GESTOR', credorMei: true,
+  }).snapshot;
+
+  test('isento: nota "Isento de retenções (MEI)" e só as linhas de desconto', () => {
+    const op = { retencoesSnapshot: snapMei() };
+    expect(notaDescontosDaOp(op)).toBe('Isento de retenções (MEI)');
+    expect(rotulos(op)).toEqual(['Outros / IBS-CBS', 'Taxa bancária (expediente)', 'Taxa PIX']);
+  });
+
+  test('com sobrescrita do ADMIN: sem nota, linhas normais', () => {
+    const op = { retencoesSnapshot: { ...snapMei(), mei_sobrescrito: true } };
+    expect(notaDescontosDaOp(op)).toBeNull();
+    expect(rotulos(op)).toContain('IRRF (1,5%)');
+  });
+
+  test('credor comum e OP antiga: sem nota', () => {
+    expect(notaDescontosDaOp({ retencoesSnapshot: snapshot('3.3.90.36') })).toBeNull();
+    expect(notaDescontosDaOp({ retencoesSnapshot: null })).toBeNull();
   });
 });

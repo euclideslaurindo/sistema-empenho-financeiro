@@ -345,17 +345,26 @@ function CredoresContent() {
               />
             </div>
 
-            <div className="col-span-12 md:col-span-2 flex items-end pb-3">
-              <label htmlFor="credor-is-mei" className="flex items-center gap-2 cursor-pointer whitespace-nowrap">
+            <div className="col-span-12 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+              <label htmlFor="credor-is-mei" className="flex items-center gap-2 cursor-pointer">
                 <input
                   id="credor-is-mei"
                   type="checkbox"
-                  checked={formData.isMei || false}
+                  checked={!!Number(formData.isMei) || false}
                   onChange={(e) => setFormData({ ...formData, isMei: e.target.checked })}
-                  className="w-5 h-5 rounded border-slate-300 text-blue-900 focus:ring-blue-900"
+                  aria-describedby="credor-is-mei-ajuda"
+                  className="w-5 h-5 rounded border-slate-300 text-violet-700 focus:ring-violet-700"
                 />
-                <span className="text-sm font-bold text-slate-700">Sou MEI</span>
+                <span className="text-sm font-black text-violet-900">Credor MEI (Microempreendedor Individual)</span>
               </label>
+              <p id="credor-is-mei-ajuda" className="mt-1 ml-7 text-xs font-semibold text-violet-700">
+                MEI não sofre retenção de IR, ISS, INSS, SEST/SENAT nem patronal. Confira antes de salvar: isso muda o valor pago.
+              </p>
+              {!!Number(formData.isMei) && (formData.cpfCnpj || "").replace(/\D/g, "").length === 11 && (
+                <p role="alert" className="mt-1 ml-7 text-xs font-bold text-amber-700">
+                  MEI tem CNPJ — o documento informado é um CPF. Confira o cadastro.
+                </p>
+              )}
             </div>
 
             {/* Row 2: RG, Órgão, Data Emissão, PIS */}
@@ -540,6 +549,11 @@ function CredoresContent() {
                       </td>
                       <td className="py-5 font-semibold text-slate-700">
                         {c.nome}
+                        {!!Number(c.isMei) && (
+                          <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-violet-700">
+                            MEI
+                          </span>
+                        )}
                       </td>
                       <td className="py-5 font-semibold text-slate-600">
                         {rotuloMunicipio(c.cidade, c.uf) || "-"}

@@ -23,7 +23,30 @@ export interface EntradaCalculo {
   // respeitar (não mandar sempre os 8 campos com "" / 0).
   informados: Partial<Record<CampoTributario | CampoDesconto, number>>;
   perfil: "ADMIN" | "GESTOR" | "CONSULTA";
+  /** Regra 0: credor MEI não sofre retenção (lido do cadastro no servidor). */
+  credorMei?: boolean;
+  /** T26: ADMIN confirmou reter mesmo sendo MEI — aceita só valores digitados, nada automático. */
+  sobrescreverMei?: boolean;
 }
+
+/** MEI: 0, ou o valor digitado se o ADMIN confirmou a sobrescrita (T26). */
+export function valorTributarioMei(
+  campo: string,
+  ativo: boolean,
+  informado: number | undefined,
+  sobrescrever: boolean,
+  brutoCents: number
+): number {
+  if (!sobrescrever || !ativo || informado === undefined) return 0;
+  return validarInformado(campo, informado, brutoCents);
+}
+
+export const avisosMei = (credorMei: boolean, sobrescrever: boolean): string[] =>
+  !credorMei
+    ? []
+    : sobrescrever
+      ? ["Credor MEI: retenção aplicada manualmente pelo ADMIN."]
+      : ["Credor MEI: isento de retenções."];
 
 export interface ResultadoCalculo {
   itens: Record<string, number>; // centavos, uma chave por um dos 8 campos
@@ -31,9 +54,11 @@ export interface ResultadoCalculo {
   liquidoCents: number;
   avisos: string[];
   snapshot: Record<string, any>;
+  /** Campos gravados só para informação, fora do total (ex.: patronal no transporte). */
+  informativos?: string[];
 }
 
-function validarInformado(campo: string, valor: number, brutoCents: number): number {
+export function validarInformado(campo: string, valor: number, brutoCents: number): number {
   if (!Number.isFinite(valor) || valor < 0 || valor > brutoCents) {
     throw { status: 422, error: `Valor informado para "${campo}" é inválido (deve estar entre 0 e o valor bruto).` };
   }
@@ -53,12 +78,20 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
   const camposAplicaveis = elementoCodigo !== null ? regras[elementoCodigo] : undefined;
   const elementoDesconhecido = elementoCodigo === null || camposAplicaveis === undefined;
 
-  if (elementoDesconhecido) {
+  const sobrescreverMei = !!entrada.credorMei && !!entrada.sobrescreverMei && perfil === "ADMIN";
+  if (entrada.credorMei) {
+    avisos.push(...avisosMei(true, sobrescreverMei));
+  } else if (elementoDesconhecido) {
     avisos.push("Elemento desconhecido: nenhuma retenção foi calculada automaticamente.");
   }
 
   for (const campo of CAMPOS_TRIBUTARIOS) {
     const cfg = configPorCampo.get(campo);
+    // Regra 0: MEI zera os tributários (T26: ADMIN pode digitar, com confirmação).
+    if (entrada.credorMei) {
+      itens[campo] = valorTributarioMei(campo, !!cfg?.ativo, informados[campo], sobrescreverMei, brutoCents);
+      continue;
+    }
     if (!cfg || !cfg.ativo) {
       itens[campo] = 0;
       continue;
@@ -131,6 +164,8 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
   const tributarios = CAMPOS_TRIBUTARIOS as string[];
   const snapshot = {
     elemento: elementoCodigo,
+    ...(entrada.credorMei ? { mei: true } : {}),
+    ...(sobrescreverMei ? { mei_sobrescrito: true } : {}),
     campos: Object.fromEntries(
       config.map((cfg) => [
         cfg.campo,

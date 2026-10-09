@@ -67,10 +67,12 @@ export function validarCredoresPayload(
 export function montarCredoresDaNe(
   ne: { valor?: unknown; cpfCnpj?: string | null; credorNome?: string | null },
   linhas: Array<{ credor_cpf_cnpj: string; credor_nome: string; valor_bruto: unknown }>,
-  pagoPorDigitos: Map<string, number>
+  pagoPorDigitos: Map<string, number>,
+  meiPorDigitos: Set<string> = new Set()
 ): NeCredorResposta[] {
   const montar = (cpfCnpj: string, nome: string, brutoCents: number, legado?: true): NeCredorResposta => {
-    const pagoCents = pagoPorDigitos.get(somenteDigitos(cpfCnpj)) ?? 0;
+    const digitos = somenteDigitos(cpfCnpj);
+    const pagoCents = pagoPorDigitos.get(digitos) ?? 0;
     return {
       cpfCnpj,
       nome,
@@ -78,6 +80,7 @@ export function montarCredoresDaNe(
       valorPago: fromCents(pagoCents),
       saldo: fromCents(brutoCents - pagoCents),
       ...(legado ? { legado } : {}),
+      ...(meiPorDigitos.has(digitos) ? { isMei: true as const } : {}),
     };
   };
 
@@ -111,6 +114,24 @@ async function anexarCredores<T extends { numero?: string; valor?: unknown; cpfC
     numeros
   );
 
+  // Selo MEI (T26): casa por dígitos com literais, sem JOIN — ne_credores e
+  // credores podem ter collations diferentes no banco compartilhado.
+  const digitosCredores = [
+    ...new Set(
+      [...linhas.map((l) => l.credor_cpf_cnpj), ...rows.map((r) => r.cpfCnpj)].map(somenteDigitos).filter(Boolean)
+    ),
+  ];
+  const meiPorDigitos = new Set<string>();
+  if (digitosCredores.length > 0) {
+    const meis = await query<Array<{ cpf_cnpj: string }>>(
+      `SELECT cpf_cnpj FROM credores
+        WHERE is_mei = 1
+          AND REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') IN (${digitosCredores.map(() => '?').join(',')})`,
+      digitosCredores
+    );
+    for (const m of meis) meiPorDigitos.add(somenteDigitos(m.cpf_cnpj));
+  }
+
   return rows.map((ne) => {
     const pagoPorDigitos = new Map<string, number>();
     for (const p of pagos.filter((x) => x.numero_ne === ne.numero)) {
@@ -118,7 +139,7 @@ async function anexarCredores<T extends { numero?: string; valor?: unknown; cpfC
       pagoPorDigitos.set(digitos, (pagoPorDigitos.get(digitos) ?? 0) + toCents(p.total_pago));
     }
     const linhasDaNe = linhas.filter((l) => l.numero_ne === ne.numero);
-    return { ...ne, credores: montarCredoresDaNe(ne, linhasDaNe, pagoPorDigitos) };
+    return { ...ne, credores: montarCredoresDaNe(ne, linhasDaNe, pagoPorDigitos, meiPorDigitos) };
   });
 }
 

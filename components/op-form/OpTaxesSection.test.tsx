@@ -1,9 +1,12 @@
 import React from 'react';
-import { describe, test, expect } from 'vitest';
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent, act, within } from '@testing-library/react';
 import { useForm, FormProvider, type UseFormReturn } from 'react-hook-form';
 import OpTaxesSection from './OpTaxesSection';
 import type { ConfigRetencoes, ConfigRetencaoCampo } from '@/hooks/use-retencoes-config';
+
+vi.mock('@/lib/api-client', () => ({ apiClient: { post: vi.fn(), get: vi.fn() } }));
+import { apiClient } from '@/lib/api-client';
 
 // Igual à seed real da T03 (database/migration_12.sql). Motor, máscara e
 // formatação são os reais — nada mockado — pra o teste valer como paridade
@@ -29,6 +32,7 @@ const CONFIG: ConfigRetencoes = {
     '3.3.90.30': SEM_ISS,
     '3.3.90.36': TODOS,
     '3.3.90.39': TODOS,
+    '3.3.90.33': TODOS,
   },
   versao: '2026-01-01T00:00:00.000Z',
 };
@@ -214,5 +218,151 @@ describe('OpTaxesSection — camposInformados (contrato com o servidor da T10)',
     renderSecao({ valorPagamento: '10,00', elemento: '3.3.90.14 - Diárias' });
     fireEvent.change(input('Taxa bancária (expediente)'), { target: { value: '2000' } });
     expect(await screen.findByRole('alert')).toHaveTextContent(/maior que o valor a pagar/i);
+  });
+});
+
+describe('OpTaxesSection — transporte autônomo (3.3.90.33, T25)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function renderTransporte(over: Record<string, unknown> = {}) {
+    const ref: { methods?: UseFormReturn<any> } = {};
+    function Wrapper() {
+      const methods = useForm<any>({
+        defaultValues: {
+          valorPagamento: '11.970,00',
+          elemento: '3.3.90.33 - Serviços de transporte',
+          empenho: '2026NE000001',
+          cpfCnpj: '111.111.111-11',
+          dataPagamento: '2026-10-15',
+          dataEmissao: '',
+          irrf: '', iss: '', inss: '', patronal: '', sestSenat: '', outrosDescontos: '', taxaBancaria: '', taxaPix: '',
+          camposInformados: [],
+          previaAvisos: [],
+          ...over,
+        },
+      });
+      ref.methods = methods;
+      return (
+        <FormProvider {...methods}>
+          <OpTaxesSection userRole="GESTOR" config={CONFIG} erroConfig={null} />
+        </FormProvider>
+      );
+    }
+    render(<Wrapper />);
+    return () => ref.methods!;
+  }
+
+  const PREVIA_G = {
+    perfil: 'TRANSPORTE_AUTONOMO',
+    itens: { irrf: 899.34, iss: 598.5, inss: 263.34, patronal: 478.8, sest_senat: 59.85, outros: 0, taxa_bancaria: 0, taxa_pix: 0 },
+    totalDescontos: 1821.03,
+    valorLiquido: 10148.97,
+    avisos: [],
+    informativos: ['patronal'],
+  };
+
+  test('pede a prévia ao servidor e preenche os campos; patronal não entra no total', async () => {
+    (apiClient.post as any).mockResolvedValue(PREVIA_G);
+    renderTransporte();
+    await waitFor(() => expect(liquido()).toBe('R$ 10.148,97'));
+    expect(apiClient.post).toHaveBeenCalledWith('/api/ordens-pagamento/previa', expect.objectContaining({
+      numeroEmpenho: '2026NE000001', credorCpfCnpj: '111.111.111-11', valorPagamento: 11970, dataPagamento: '2026-10-15',
+    }));
+    expect(input('IRRF').value).toBe('899,34');
+    expect(input('Patronal (informativa)').value).toBe('478,80');
+    expect(input('SEST/SENAT').value).toBe('59,85');
+    expect(descontos()).toBe('- R$ 1.821,03'); // sem os 478,80 da patronal
+    expect(screen.queryByLabelText(/\(1,5%\)/)).toBeNull(); // rótulos sem %
+  });
+
+  test('sem credor: não chama a prévia e avisa', async () => {
+    renderTransporte({ cpfCnpj: '' });
+    expect(await screen.findByText('Escolha o credor para calcular o transporte.')).toBeInTheDocument();
+    expect(apiClient.post).not.toHaveBeenCalled();
+  });
+
+  test('avisos e erros da prévia aparecem na seção', async () => {
+    (apiClient.post as any).mockResolvedValueOnce({ ...PREVIA_G, avisos: ['Município sem cadastro de ISS: usada a alíquota padrão (5%) sem taxa de expediente.'] });
+    renderTransporte();
+    expect(await screen.findByText(/Município sem cadastro de ISS/)).toBeInTheDocument();
+  });
+
+  test('erro 422 de vigência aparece como aviso e limpa os campos', async () => {
+    (apiClient.post as any).mockRejectedValueOnce(new Error('Parâmetros de cálculo do transporte não cadastrados para a data 15/10/2026.'));
+    renderTransporte();
+    expect(await screen.findByText(/não cadastrados para a data/)).toBeInTheDocument();
+    expect(input('IRRF').value).toBe('');
+  });
+
+  test('elemento padrão não chama a prévia (continua calculando no navegador)', async () => {
+    renderTransporte({ elemento: '3.3.90.36 - Outros', valorPagamento: '1.000,00' });
+    await waitFor(() => expect(liquido()).toBe('R$ 600,00'));
+    expect(apiClient.post).not.toHaveBeenCalled();
+  });
+});
+
+describe('OpTaxesSection — credor MEI (T26)', () => {
+  function renderMei(perfil = 'GESTOR', over: Record<string, unknown> = {}) {
+    const ref: { methods?: UseFormReturn<any> } = {};
+    function Wrapper() {
+      const methods = useForm<any>({
+        defaultValues: {
+          valorPagamento: '1.000,00',
+          elemento: '3.3.90.36 - Serviços',
+          irrf: '', iss: '', inss: '', patronal: '', sestSenat: '', outrosDescontos: '', taxaBancaria: '', taxaPix: '',
+          camposInformados: [],
+          credorMei: true,
+          sobrescreverMei: false,
+          ...over,
+        },
+      });
+      ref.methods = methods;
+      return (
+        <FormProvider {...methods}>
+          <OpTaxesSection userRole={perfil} config={CONFIG} erroConfig={null} />
+        </FormProvider>
+      );
+    }
+    render(<Wrapper />);
+    return () => ref.methods!;
+  }
+
+  test('banner, tributários zerados e travados, taxa bancária continua valendo', async () => {
+    renderMei();
+    expect(screen.getByText('Credor MEI — isento de retenções')).toBeInTheDocument();
+    await waitFor(() => expect(liquido()).toBe('R$ 1.000,00'));
+    for (const r of ['IRRF (1,5%)', 'ISS (5%)', 'INSS (11%)', 'Patronal (20%)', 'SEST/SENAT (2,5%)']) {
+      expect(input(r).disabled).toBe(true);
+      expect(input(r).value).toBe('');
+    }
+    expect(screen.getAllByText('Isento (MEI)')).toHaveLength(5);
+    const taxa = input('Taxa bancária (expediente)');
+    expect(taxa.disabled).toBe(false);
+    fireEvent.change(taxa, { target: { value: '850' } });
+    await waitFor(() => expect(liquido()).toBe('R$ 991,50'));
+  });
+
+  test('GESTOR não vê a opção de sobrescrever', () => {
+    renderMei('GESTOR');
+    expect(screen.queryByRole('button', { name: /Aplicar retenção mesmo assim/ })).toBeNull();
+  });
+
+  test('ADMIN confirma e passa a digitar manualmente (sem cálculo automático)', async () => {
+    const methods = renderMei('ADMIN');
+    fireEvent.click(screen.getByRole('button', { name: /Aplicar retenção mesmo assim/ }));
+    const alerta = await screen.findByRole('alertdialog');
+    fireEvent.click(within(alerta).getByRole('button', { name: 'Liberar retenção manual' }));
+    await waitFor(() => expect(methods().getValues('sobrescreverMei')).toBe(true));
+
+    const inss = input('INSS (11%)');
+    expect(inss.disabled).toBe(false);
+    expect(input('IRRF (1,5%)').value).toBe(''); // nada calculado sozinho
+    fireEvent.change(inss, { target: { value: '11000' } });
+    await waitFor(() => expect(liquido()).toBe('R$ 890,00'));
+    expect(screen.getByText(/Retenção manual liberada/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar à isenção' }));
+    await waitFor(() => expect(liquido()).toBe('R$ 1.000,00'));
+    expect(methods().getValues('camposInformados')).toEqual([]);
   });
 });

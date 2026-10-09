@@ -167,6 +167,7 @@ export interface NeCredorResposta {
   valorPago: number;
   saldo: number;
   legado?: true; // sintetizado das colunas legadas (NE sem linhas em ne_credores)
+  isMei?: true; // credor MEI no cadastro (T26)
 }
 
 export interface DarfAcompanhamentoDB {
@@ -185,6 +186,37 @@ export interface DarfAcompanhamentoDB {
   observacao: string | null;
   atualizado_por: string | null;
   created_at: Date;
+  updated_at: Date;
+}
+
+export interface CalculoParametroDB {
+  perfil: string; // 'TRANSPORTE_AUTONOMO'
+  chave: string;
+  valor: number | string;
+  vigente_de: Date | string;
+  updated_by: string | null;
+  updated_at: Date;
+}
+
+export interface IrrfFaixaDB {
+  vigente_de: Date | string;
+  ordem: number;
+  limite_ate: number | string | null; // null = última faixa
+  aliquota: number | string; // 7.5 = 7,5%
+  parcela_deduzir: number | string;
+  updated_by: string | null;
+  updated_at: Date;
+}
+
+export interface IssMunicipioDB {
+  chave: string; // nome normalizado: minúsculas, sem acento
+  nome: string;
+  uf: string;
+  aliquota: number | string;
+  taxa_expediente: number | string; // taxa da prefeitura, parte do ISS (não é a taxa bancária)
+  apelidos: string | null; // separados por ';'
+  ativo: number;
+  updated_by: string | null;
   updated_at: Date;
 }
 

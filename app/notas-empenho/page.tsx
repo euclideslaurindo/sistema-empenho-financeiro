@@ -53,6 +53,7 @@ const credoresParaFormulario = (ne: NotaEmpenho): CredorFormulario[] =>
     valorPago: Number(c.valorPago) || 0,
     doCadastro: false,
     legado: !!c.legado,
+    isMei: !!c.isMei,
   }));
 
 export default function NotasEmpenho() {

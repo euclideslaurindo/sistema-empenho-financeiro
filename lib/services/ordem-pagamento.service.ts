@@ -2,11 +2,12 @@ import { query, withTransaction } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 import { extrairCodigoElemento } from '@/lib/elementos';
-import { obterConfigRetencoes } from '@/lib/services/config-retencoes.service';
-import { calcularRetencoes, type CampoTributario, type CampoDesconto } from '@/lib/retencoes';
+import { calcularRetencoesDaOp } from '@/lib/services/calculo-op.service';
+import type { CampoTributario, CampoDesconto } from '@/lib/retencoes';
 import { toCents, fromCents, formatarBRL } from '@/lib/money';
 import { somenteDigitos } from '@/lib/ne-credores';
 import { calcularProximoNumeroOp } from '@/lib/services/numeracao-op';
+import { entraDarfDaConfig, removerDarfDaOp, sincronizarDarfDaOp } from '@/lib/services/darf.service';
 
 export type ServiceResult<T = any> = 
   | { success: true; data: T; status?: number }
@@ -46,6 +47,8 @@ const ordemPagamentoSchema = z.object({
   outrosDescontos: safeNumber.optional(),
   taxaBancaria: safeNumber.optional(),
   taxaPix: safeNumber.optional(),
+  // T26: ADMIN confirmou reter mesmo com credor MEI.
+  sobrescreverMei: z.boolean().optional(),
   totalDescontos: safeNumber.optional(),
   valorLiquido: safeNumber.optional(),
   dataEmissao: z.string().optional().nullable(),
@@ -129,6 +132,51 @@ async function validarSaldoCredor(
 }
 
 export class OrdemPagamentoService {
+  /**
+   * Prévia das retenções para o formulário (T25): o mesmo cálculo do salvar,
+   * com o elemento lido da NE no servidor, sem gravar nada.
+   */
+  static async previa(rawData: any, perfil: string): Promise<ServiceResult> {
+    if (perfil === 'CONSULTA') {
+      return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+    }
+    const dados = ordemPagamentoSchema.parse(rawData); // ZodError -> 400
+    try {
+      const neRows = await query<any[]>('SELECT elemento, status FROM notas_empenho WHERE numero = ?', [dados.numeroEmpenho]);
+      if (!neRows || neRows.length === 0) {
+        return { success: false, error: `NE "${dados.numeroEmpenho}" não encontrada.`, status: 404 };
+      }
+      if (neRows[0].status === 'CANCELADO') {
+        return { success: false, error: `A NE "${dados.numeroEmpenho}" está CANCELADA.`, status: 409 };
+      }
+      const brutoCents = toCents(dados.valorPagamento);
+      const { resultado, perfilCalculo } = await calcularRetencoesDaOp(undefined, {
+        brutoCents,
+        elementoCodigo: extrairCodigoElemento(neRows[0].elemento || ''),
+        credorCpfCnpj: dados.credorCpfCnpj,
+        dataPagamento: dados.dataPagamento,
+        dataEmissao: dados.dataEmissao,
+        informados: montarInformados(dados),
+        perfilUsuario: perfil as 'ADMIN' | 'GESTOR' | 'CONSULTA',
+        sobrescreverMei: dados.sobrescreverMei,
+      });
+      return {
+        success: true,
+        data: {
+          perfil: perfilCalculo,
+          itens: Object.fromEntries(Object.entries(resultado.itens).map(([campo, cents]) => [campo, fromCents(cents)])),
+          totalDescontos: fromCents(resultado.totalDescontosCents),
+          valorLiquido: fromCents(resultado.liquidoCents),
+          avisos: resultado.avisos,
+          informativos: resultado.informativos ?? [],
+        },
+      };
+    } catch (error: any) {
+      if (error?.status && error?.error) return { success: false, error: error.error, status: error.status };
+      throw error;
+    }
+  }
+
   
   static async listar(params: { numeroNe?: string | null; busca?: string | null; page?: number; limit?: number }) {
     const { numeroNe, busca, page = 1, limit = 50 } = params;
@@ -299,18 +347,17 @@ export class OrdemPagamentoService {
           { travar: true }
         );
 
-        // Motor único de cálculo (T10): lê config/matriz do banco (T06/T03),
-        // nunca confia em totalDescontos/valorLiquido enviados pelo cliente,
-        // e só aceita sobrescrita manual de quem tem permissão (ver lib/retencoes.ts).
-        const { campos: configCampos, regras } = await obterConfigRetencoes(conn);
-        const informados = montarInformados(parsedData);
-        const resultado = calcularRetencoes({
+        // Motor único (T10/T25): config do banco, perfil pelo elemento (transporte
+        // no .33), MEI do cadastro; nunca confia em total/líquido do cliente.
+        const { resultado, configCampos } = await calcularRetencoesDaOp(conn, {
           brutoCents,
           elementoCodigo,
-          config: configCampos,
-          regras,
-          informados,
-          perfil: perfil as 'ADMIN' | 'GESTOR' | 'CONSULTA',
+          credorCpfCnpj,
+          dataPagamento,
+          dataEmissao,
+          informados: montarInformados(parsedData),
+          perfilUsuario: perfil as 'ADMIN' | 'GESTOR' | 'CONSULTA',
+          sobrescreverMei: parsedData.sobrescreverMei,
         });
 
         const finalIrrf = fromCents(resultado.itens.irrf ?? 0);
@@ -351,6 +398,33 @@ export class OrdemPagamentoService {
             finalTotalDescontos, finalLiquido, snapshotJson,
             chequeFormatado, dataEmissao || null, dataPagamento || null, usuarioId
           ]
+        );
+
+        // T26: retenção em credor MEI só com confirmação do ADMIN — fica na auditoria.
+        if (resultado.snapshot.mei_sobrescrito) {
+          await conn.execute(
+            `INSERT INTO auditoria_financeira (id, entidade, entidade_id, acao, dados_anteriores, dados_novos, usuario_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              crypto.randomUUID(), 'ordens_pagamento', id, 'CREATE', null,
+              JSON.stringify({
+                aviso: 'Retenção aplicada manualmente pelo ADMIN em credor MEI.',
+                credorCpfCnpj, irrf: finalIrrf, iss: finalIss, inss: finalInss, patronal: finalPatronal, sestSenat: finalSestSenat,
+              }),
+              usuarioId,
+            ]
+          );
+        }
+
+        // Mesma transação: erro na DARF desfaz a OP.
+        await sincronizarDarfDaOp(
+          conn,
+          {
+            id, numeroNe: neReal, numeroOp: numeroDaOpGerado, sub: subGerado,
+            credorCpfCnpj, credorNome: credorNome || null, dataPagamento, dataEmissao,
+            valores: { irrf: finalIrrf, iss: finalIss, inss: finalInss, patronal: finalPatronal, sest_senat: finalSestSenat },
+          },
+          { entraDarf: entraDarfDaConfig(configCampos) }
         );
 
         const saldoRestante = Math.round((saldoDisponivel - vPagamentoArredondado) * 100) / 100;
@@ -502,15 +576,15 @@ export class OrdemPagamentoService {
         let finalTotalDescontos: number, finalLiquido: number, snapshotJson: string | null;
 
         if (precisaRecalcular) {
-          const { campos: configCampos, regras } = await obterConfigRetencoes(conn);
-          const informados = montarInformados(parsedData);
-          const resultado = calcularRetencoes({
+          const { resultado } = await calcularRetencoesDaOp(conn, {
             brutoCents,
             elementoCodigo,
-            config: configCampos,
-            regras,
-            informados,
-            perfil: perfil as 'ADMIN' | 'GESTOR' | 'CONSULTA',
+            credorCpfCnpj,
+            dataPagamento,
+            dataEmissao,
+            informados: montarInformados(parsedData),
+            perfilUsuario: perfil as 'ADMIN' | 'GESTOR' | 'CONSULTA',
+          sobrescreverMei: parsedData.sobrescreverMei,
           });
           finalIrrf = fromCents(resultado.itens.irrf ?? 0);
           finalIss = fromCents(resultado.itens.iss ?? 0);
@@ -562,6 +636,17 @@ export class OrdemPagamentoService {
             finalTotalDescontos, finalLiquido, snapshotJson,
             numeroCheque ? numeroCheque.trim() : null, dataEmissao || null, dataPagamento || null, historico || '', usuarioId, id
           ]
+        );
+
+        // Mesma transação: DARF paga que mudaria de valor/competência bloqueia a edição (D13).
+        await sincronizarDarfDaOp(
+          conn,
+          {
+            id, numeroNe: neSegura, numeroOp: oldOp.numero_empenho ?? null, sub: sub || '01',
+            credorCpfCnpj, credorNome: credorNome || null, dataPagamento, dataEmissao,
+            valores: { irrf: finalIrrf, iss: finalIss, inss: finalInss, patronal: finalPatronal, sest_senat: finalSestSenat },
+          },
+          { manterValorExistente: !precisaRecalcular }
         );
 
         // AUDITORIA: Salvar estado novo
@@ -632,6 +717,7 @@ export class OrdemPagamentoService {
         const oldOp = (ordens as any[])[0];
         const numeroNe = oldOp.numero_ne;
 
+        await removerDarfDaOp(conn, id); // DARF paga -> 409, antes de apagar a OP
         await conn.execute('DELETE FROM ordens_pagamento WHERE id = ?', [id]);
 
         // AUDITORIA: Salvar exclusão

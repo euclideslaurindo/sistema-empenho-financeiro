@@ -37,15 +37,25 @@ function lerSnapshot(valor: unknown): { campos?: Record<string, any> } | null {
   return typeof valor === "object" ? (valor as any) : null;
 }
 
+const TRIBUTARIOS = new Set(["irrf", "iss", "inss", "patronal", "sest_senat"]);
+const isentoMei = (snapshot: Record<string, any> | null) => !!snapshot?.mei && !snapshot?.mei_sobrescrito;
+
+/** Nota para a via quando não houve retenção por isenção (T26). */
+export function notaDescontosDaOp(op: { retencoesSnapshot?: unknown }): string | null {
+  return isentoMei(lerSnapshot(op.retencoesSnapshot)) ? "Isento de retenções (MEI)" : null;
+}
+
 export function linhasDescontoDaOp(op: { retencoesSnapshot?: unknown }): LinhaDesconto[] {
   const snapshot = lerSnapshot(op.retencoesSnapshot);
   if (!snapshot?.campos) return LINHAS_OP_ANTIGA;
+  const mei = isentoMei(snapshot);
 
   const linhas: LinhaDesconto[] = [];
   for (const c of CAMPOS) {
     const s = snapshot.campos[c.campo];
     if (!s) continue;
     if (s.ativo === false || s.aplica === false) continue;
+    if (mei && TRIBUTARIOS.has(c.campo)) continue; // a nota "Isento (MEI)" substitui as linhas de imposto
     const rotulo = s.rotulo || c.rotuloPadrao;
     const aliquota = !s.automatico || s.aliquota === null || s.aliquota === undefined ? null : Number(s.aliquota);
     linhas.push({

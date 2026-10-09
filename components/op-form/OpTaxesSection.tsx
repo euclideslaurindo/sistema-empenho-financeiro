@@ -1,19 +1,31 @@
 "use client";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { AlertTriangle, Calculator } from "lucide-react";
+import { AlertTriangle, Calculator, ShieldCheck } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { maskCurrency } from "@/lib/utils";
 import { toCents, formatarBRL } from "@/lib/money";
 import { extrairCodigoElemento } from "@/lib/elementos";
-import { calcularRetencoes } from "@/lib/retencoes";
+import { calcularRetencoes, CAMPOS_TRIBUTARIOS } from "@/lib/retencoes";
+import { perfilDoElemento } from "@/lib/perfis-calculo";
+import { apiClient } from "@/lib/api-client";
 import {
   CAMPO_FORM,
   CAMPOS_RETENCAO,
+  camposInformativos,
   ehCampoRetencao,
-  estadoCampo,
+  estadoCampoOp,
   informadosEmCentavos,
   mascararValorDigitado,
-  rotuloCampo,
+  rotuloCampoDoElemento,
   somarDescontosCents,
   type CampoRetencao,
   type Perfil,
@@ -34,11 +46,15 @@ function AutoCalcEffect({ config, perfil }: { config: ConfigRetencoes; perfil: P
   const valorPagamento = useWatch({ control, name: "valorPagamento" });
   const elemento = useWatch({ control, name: "elemento" });
   const camposInformados: string[] = useWatch({ control, name: "camposInformados" }) || [];
+  const credorMei: boolean = !!useWatch({ control, name: "credorMei" });
+  const sobrescreverMei: boolean = !!useWatch({ control, name: "sobrescreverMei" });
   const valoresCampos = useWatch({ control, name: NOMES_FORM });
   const chaveValores = JSON.stringify(valoresCampos);
   const chaveInformados = camposInformados.join("|");
 
   useEffect(() => {
+    // Transporte (.33) é calculado pelo servidor (PreviaTransporteEffect).
+    if (perfilDoElemento(extrairCodigoElemento(elemento)) !== "PADRAO") return;
     const timer = setTimeout(() => {
       const elementoCodigo = extrairCodigoElemento(elemento);
       const configPorCampo = new Map(config.campos.map((c) => [c.campo, c]));
@@ -47,7 +63,7 @@ function AutoCalcEffect({ config, perfil }: { config: ConfigRetencoes; perfil: P
       // imposto não se aplica mais) volta a ser do cálculo automático.
       const informadosValidos = camposInformados.filter((campo) => {
         const cfg = configPorCampo.get(campo);
-        return !!cfg && cfg.ativo && estadoCampo(cfg, elementoCodigo, config.regras, perfil).editavel;
+        return !!cfg && cfg.ativo && estadoCampoOp(cfg, elementoCodigo, config.regras, perfil, { credorMei, sobrescreverMei }).editavel;
       });
 
       let resultado;
@@ -59,6 +75,8 @@ function AutoCalcEffect({ config, perfil }: { config: ConfigRetencoes; perfil: P
           regras: config.regras,
           informados: informadosEmCentavos(getValues(), informadosValidos),
           perfil,
+          credorMei,
+          sobrescreverMei,
         });
       } catch {
         return; // valor digitado inválido (ex.: maior que o bruto): o resumo mostra o alerta
@@ -77,7 +95,100 @@ function AutoCalcEffect({ config, perfil }: { config: ConfigRetencoes; perfil: P
     return () => clearTimeout(timer);
     // chaveValores/chaveInformados representam os arrays observados (identidade muda a cada render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [valorPagamento, elemento, chaveInformados, chaveValores, config, perfil, setValue, getValues]);
+  }, [valorPagamento, elemento, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues]);
+
+  return null;
+}
+
+/**
+ * Transporte autônomo (3.3.90.33, T25): depende de tabela do IRRF, município
+ * do credor e vigência, que só o servidor tem — pede a prévia (mesmo cálculo
+ * do salvar, sem gravar). Descarta resposta atrasada de um estado anterior.
+ */
+function PreviaTransporteEffect({ config, perfil }: { config: ConfigRetencoes; perfil: Perfil }) {
+  const { control, setValue, getValues } = useFormContext<any>();
+  const elemento = useWatch({ control, name: "elemento" });
+  const empenho = useWatch({ control, name: "empenho" });
+  const cpfCnpj = useWatch({ control, name: "cpfCnpj" });
+  const valorPagamento = useWatch({ control, name: "valorPagamento" });
+  const dataPagamento = useWatch({ control, name: "dataPagamento" });
+  const dataEmissao = useWatch({ control, name: "dataEmissao" });
+  const camposInformados: string[] = useWatch({ control, name: "camposInformados" }) || [];
+  const credorMei: boolean = !!useWatch({ control, name: "credorMei" });
+  const sobrescreverMei: boolean = !!useWatch({ control, name: "sobrescreverMei" });
+  const valoresCampos = useWatch({ control, name: NOMES_FORM });
+  const chaveValores = JSON.stringify(valoresCampos);
+  const chaveInformados = camposInformados.join("|");
+
+  useEffect(() => {
+    const elementoCodigo = extrairCodigoElemento(elemento);
+    if (perfilDoElemento(elementoCodigo) !== "TRANSPORTE_AUTONOMO") return;
+    let cancelado = false;
+
+    const limparCalculados = (informadosValidos: string[]) => {
+      for (const campo of CAMPOS_RETENCAO) {
+        if (!informadosValidos.includes(campo) && getValues(CAMPO_FORM[campo]) !== "") setValue(CAMPO_FORM[campo], "");
+      }
+    };
+
+    const timer = setTimeout(async () => {
+      const configPorCampo = new Map(config.campos.map((c) => [c.campo, c]));
+      const informadosValidos = camposInformados.filter((campo) => {
+        const cfg = configPorCampo.get(campo);
+        return !!cfg && cfg.ativo && estadoCampoOp(cfg, elementoCodigo, config.regras, perfil, { credorMei, sobrescreverMei }).editavel;
+      });
+      if (!mesmaLista(informadosValidos, camposInformados)) setValue("camposInformados", informadosValidos);
+
+      const bruto = toCents(valorPagamento);
+      if (!cpfCnpj || !empenho || bruto <= 0) {
+        limparCalculados(informadosValidos);
+        setValue("previaAvisos", [
+          !cpfCnpj ? "Escolha o credor para calcular o transporte." : "Informe o valor a pagar para calcular o transporte.",
+        ]);
+        return;
+      }
+
+      const valores = getValues();
+      const retencoesInformadas: Record<string, number> = {};
+      for (const campo of informadosValidos) {
+        if (ehCampoRetencao(campo)) retencoesInformadas[CAMPO_FORM[campo]] = toCents(valores[CAMPO_FORM[campo]]) / 100;
+      }
+
+      try {
+        const previa = await apiClient.post<{ itens: Record<string, number>; avisos: string[] }>(
+          "/api/ordens-pagamento/previa",
+          {
+            numeroEmpenho: empenho,
+            credorCpfCnpj: cpfCnpj,
+            valorPagamento: bruto / 100,
+            dataPagamento: dataPagamento || null,
+            dataEmissao: dataEmissao || null,
+            ...(credorMei && sobrescreverMei ? { sobrescreverMei: true } : {}),
+            ...retencoesInformadas,
+          }
+        );
+        if (cancelado) return;
+        for (const campo of CAMPOS_RETENCAO) {
+          if (informadosValidos.includes(campo)) continue;
+          const cents = toCents(previa.itens?.[campo] ?? 0);
+          const novo = cents > 0 ? maskCurrency(cents / 100) : "";
+          if (getValues(CAMPO_FORM[campo]) !== novo) setValue(CAMPO_FORM[campo], novo);
+        }
+        setValue("previaAvisos", previa.avisos || []);
+      } catch (e: any) {
+        if (cancelado) return;
+        limparCalculados(informadosValidos);
+        setValue("previaAvisos", [e?.message || "Não foi possível calcular a prévia do transporte."]);
+      }
+    }, 350);
+
+    return () => {
+      cancelado = true;
+      clearTimeout(timer);
+    };
+    // chaveValores/chaveInformados representam os arrays observados (identidade muda a cada render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elemento, empenho, cpfCnpj, valorPagamento, dataPagamento, dataEmissao, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues]);
 
   return null;
 }
@@ -85,11 +196,12 @@ function AutoCalcEffect({ config, perfil }: { config: ConfigRetencoes; perfil: P
 function TaxesTotalSummary() {
   const { control } = useFormContext<any>();
   const valorPagamento = useWatch({ control, name: "valorPagamento" });
+  const elemento = useWatch({ control, name: "elemento" });
   const valoresCampos: unknown[] = useWatch({ control, name: NOMES_FORM }) || [];
 
   const valores = Object.fromEntries(NOMES_FORM.map((nome, i) => [nome, valoresCampos[i]]));
   const brutoCents = toCents(valorPagamento);
-  const descontosCents = somarDescontosCents(valores);
+  const descontosCents = somarDescontosCents(valores, camposInformativos(extrairCodigoElemento(elemento)));
   const liquidoCents = brutoCents - descontosCents;
   const excedeu = descontosCents > brutoCents;
 
@@ -177,11 +289,68 @@ function CampoRetencaoInput({
   );
 }
 
+function BannerMei({ perfil, sobrescreverMei }: { perfil: Perfil; sobrescreverMei: boolean }) {
+  const { setValue, getValues } = useFormContext<any>();
+  const [confirmando, setConfirmando] = useState(false);
+
+  const desfazer = () => {
+    setValue("sobrescreverMei", false);
+    const tributarios = CAMPOS_TRIBUTARIOS as string[];
+    setValue("camposInformados", (getValues("camposInformados") || []).filter((c: string) => !tributarios.includes(c)));
+  };
+
+  return (
+    <div role="status" className="mb-6 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+      <p className="flex items-center gap-2 text-sm font-black text-violet-800">
+        <ShieldCheck className="w-4 h-4" /> Credor MEI — isento de retenções
+      </p>
+      <p className="mt-1 text-xs font-semibold text-violet-700">
+        IRRF, ISS, INSS, SEST/SENAT e patronal ficam zerados. Taxa bancária, PIX e outros descontos continuam valendo.
+      </p>
+      {perfil === "ADMIN" &&
+        (sobrescreverMei ? (
+          <p className="mt-2 text-xs font-bold text-amber-800">
+            Retenção manual liberada (fica registrada na auditoria).{" "}
+            <button type="button" onClick={desfazer} className="underline">
+              Voltar à isenção
+            </button>
+          </p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmando(true)}
+            className="mt-2 text-xs font-black uppercase tracking-widest text-violet-900 hover:underline"
+          >
+            Aplicar retenção mesmo assim…
+          </button>
+        ))}
+
+      <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Reter imposto de um credor MEI?</AlertDialogTitle>
+          <AlertDialogDescription>
+            MEI não sofre retenção. Se continuar, você digita manualmente os valores a reter, e a operação fica registrada na
+            auditoria com o seu usuário.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => setValue("sobrescreverMei", true)}>Liberar retenção manual</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 function CamposRetencao({ config, perfil }: { config: ConfigRetencoes; perfil: Perfil }) {
   const { control } = useFormContext<any>();
   const elemento = useWatch({ control, name: "elemento" });
+  const previaAvisos: string[] = useWatch({ control, name: "previaAvisos" }) || [];
+  const credorMei: boolean = !!useWatch({ control, name: "credorMei" });
+  const sobrescreverMei: boolean = !!useWatch({ control, name: "sobrescreverMei" });
   const elementoCodigo = extrairCodigoElemento(elemento);
   const elementoConhecido = elementoCodigo !== null && config.regras[elementoCodigo] !== undefined;
+  const transporte = perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO";
 
   const campos = config.campos
     .filter((c) => c.ativo && ehCampoRetencao(c.campo))
@@ -189,8 +358,21 @@ function CamposRetencao({ config, perfil }: { config: ConfigRetencoes; perfil: P
 
   return (
     <>
+      {credorMei && <BannerMei perfil={perfil} sobrescreverMei={sobrescreverMei} />}
       {!elemento ? (
         <p className="mb-6 text-sm font-semibold text-slate-500">Selecione a NE para calcular as retenções.</p>
+      ) : transporte ? (
+        <div className="mb-6 space-y-1" role="status">
+          <p className="text-sm font-semibold text-slate-500">
+            Transporte autônomo ({elementoCodigo}): retenções calculadas pelo servidor conforme a tabela vigente. A patronal é
+            informativa e não entra no total.
+          </p>
+          {previaAvisos.map((aviso) => (
+            <p key={aviso} className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+              <AlertTriangle className="w-4 h-4" /> {aviso}
+            </p>
+          ))}
+        </div>
       ) : !elementoConhecido ? (
         <p role="status" className="mb-6 flex items-center gap-2 text-sm font-semibold text-amber-700">
           <AlertTriangle className="w-4 h-4" /> Elemento da NE não cadastrado nas regras de retenção: nenhuma retenção é
@@ -202,12 +384,12 @@ function CamposRetencao({ config, perfil }: { config: ConfigRetencoes; perfil: P
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {campos.map((cfg) => {
-          const estado = estadoCampo(cfg, elementoCodigo, config.regras, perfil);
+          const estado = estadoCampoOp(cfg, elementoCodigo, config.regras, perfil, { credorMei, sobrescreverMei });
           return (
             <CampoRetencaoInput
               key={cfg.campo}
               campo={cfg.campo as CampoRetencao}
-              rotulo={rotuloCampo(cfg)}
+              rotulo={rotuloCampoDoElemento(cfg, elementoCodigo)}
               editavel={estado.editavel}
               obrigatorio={estado.obrigatorio}
               dica={estado.dica}
@@ -217,6 +399,7 @@ function CamposRetencao({ config, perfil }: { config: ConfigRetencoes; perfil: P
       </div>
 
       <AutoCalcEffect config={config} perfil={perfil} />
+      <PreviaTransporteEffect config={config} perfil={perfil} />
     </>
   );
 }

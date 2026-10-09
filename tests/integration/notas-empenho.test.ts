@@ -178,14 +178,37 @@ describe('Integração API Notas de Empenho', () => {
   });
 
   describe('GET — Listar Notas de Empenho', () => {
-    function mockLeitura(notas: any[], linhasCredores: any[], pagos: any[], total = notas.length) {
-      (query as any).mockImplementation(async (sql: string) => {
+    function mockLeitura(notas: any[], linhasCredores: any[], pagos: any[], total = notas.length, meis: string[] = []) {
+      (query as any).mockImplementation(async (sql: string, params: any[] = []) => {
         if (sql.includes('COUNT(*) as total')) return [{ total }];
         if (sql.includes('FROM ne_credores')) return linhasCredores;
         if (sql.includes('GROUP BY numero_ne, credor_cpf_cnpj')) return pagos;
+        if (sql.includes('FROM credores')) {
+          return meis.filter((m) => params.includes(m.replace(/\D/g, ''))).map((cpf_cnpj) => ({ cpf_cnpj }));
+        }
         return notas;
       });
     }
+
+    test('credores da NE trazem o selo MEI (casando por dígitos, sem JOIN)', async () => {
+      mockLeitura(
+        [{ id: 'ne-1', numero: 'NE-001', valor: '100.00', cpfCnpj: null, credorNome: null }],
+        [
+          { numero_ne: 'NE-001', credor_cpf_cnpj: '11111111000111', credor_nome: 'Maria ME', valor_bruto: '60.00' },
+          { numero_ne: 'NE-001', credor_cpf_cnpj: '222.222.222-22', credor_nome: 'José', valor_bruto: '40.00' },
+        ],
+        [],
+        1,
+        ['11.111.111/0001-11']
+      );
+      const res: any = await GET(new NextRequest('http://localhost:3000/api/notas-empenho'));
+      const { notas } = await res.json();
+      expect(notas[0].credores[0].isMei).toBe(true);
+      expect(notas[0].credores[1].isMei).toBeUndefined();
+      const sqlMei = (query as any).mock.calls.map((c: any[]) => c[0]).find((s: string) => s.includes('FROM credores'));
+      expect(sqlMei).toContain('is_mei = 1');
+      expect(sqlMei).not.toContain('JOIN');
+    });
 
     test('GET sem parâmetros retorna lista paginada', async () => {
       mockLeitura(

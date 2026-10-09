@@ -342,3 +342,54 @@ describe("calcularRetencoes — snapshot (usado pela impressão, T12)", () => {
     expect(calcular("3.3.90.36", config).campos.taxa_pix.ativo).toBe(false);
   });
 });
+
+describe("calcularRetencoes — credor MEI (regra 0, T25)", () => {
+  test("zera todos os tributários, ignora valores digitados neles, mantém a taxa bancária", () => {
+    const r = calcularRetencoes({
+      brutoCents: toCents(1000),
+      elementoCodigo: "3.3.90.36",
+      config: CONFIG_PADRAO,
+      regras: REGRAS_PADRAO,
+      informados: { irrf: 999, taxa_bancaria: 850 },
+      perfil: "ADMIN",
+      credorMei: true,
+    });
+    for (const c of ["irrf", "iss", "inss", "patronal", "sest_senat"]) expect(r.itens[c]).toBe(0);
+    expect(r.itens.taxa_bancaria).toBe(850);
+    expect(r.liquidoCents).toBe(100000 - 850);
+    expect(r.avisos).toContain("Credor MEI: isento de retenções.");
+    expect(r.snapshot.mei).toBe(true);
+  });
+
+  test("o mesmo bruto para credor não MEI calcula normalmente", () => {
+    const r = calcularRetencoes({
+      brutoCents: toCents(1000), elementoCodigo: "3.3.90.36", config: CONFIG_PADRAO, regras: REGRAS_PADRAO,
+      informados: {}, perfil: "GESTOR", credorMei: false,
+    });
+    expect(r.totalDescontosCents).toBe(40000);
+    expect(r.snapshot.mei).toBeUndefined();
+  });
+});
+
+describe("calcularRetencoes — sobrescrita do ADMIN em credor MEI (T26)", () => {
+  const base = {
+    brutoCents: toCents(1000), elementoCodigo: "3.3.90.36", config: CONFIG_PADRAO, regras: REGRAS_PADRAO,
+    informados: { irrf: 1500, inss: 11000 }, credorMei: true, sobrescreverMei: true,
+  };
+
+  test("ADMIN com confirmação: só os valores digitados entram, nada automático", () => {
+    const r = calcularRetencoes({ ...base, perfil: "ADMIN" });
+    expect(r.itens.irrf).toBe(1500);
+    expect(r.itens.inss).toBe(11000);
+    expect(r.itens.iss).toBe(0); // não digitado -> 0 (sem cálculo automático)
+    expect(r.snapshot.mei_sobrescrito).toBe(true);
+    expect(r.avisos).toContain("Credor MEI: retenção aplicada manualmente pelo ADMIN.");
+  });
+
+  test("GESTOR pedindo sobrescrita continua isento", () => {
+    const r = calcularRetencoes({ ...base, perfil: "GESTOR" });
+    expect(r.itens.irrf).toBe(0);
+    expect(r.itens.inss).toBe(0);
+    expect(r.snapshot.mei_sobrescrito).toBeUndefined();
+  });
+});
