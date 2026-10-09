@@ -7,17 +7,39 @@ import { apiClient } from "@/lib/api-client";
 import { maskCurrency, parseFormNumber } from "@/lib/utils";
 import { useListboxKeyboardNav } from "@/hooks/use-listbox-keyboard-nav";
 import { useDebouncedCallback } from "@/hooks/use-debounce";
+import { FaixaNumeroPrevisto, placeholderNumeroOp } from "@/components/op-form/FaixaNumeroPrevisto";
+import { SeletorCredorOp, credorDaListaNe, selecionarCredorOp } from "@/components/op-form/SeletorCredorOp";
+import { formatarBRL, toCents } from "@/lib/money";
+import type { NeCredorResposta } from "@/lib/types/db";
+import { rotuloMunicipio } from "@/lib/credor-endereco";
+
+function InputNumeroOp({ control }: { control: any }) {
+  const previsao = useWatch({ control, name: "previsaoNumero" });
+  return (
+    <input
+      type="text"
+      placeholder={placeholderNumeroOp(previsao)}
+      disabled
+      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed transition-all duration-300"
+    />
+  );
+}
 
 function IndicadorSaldo({ control }: { control: any }) {
   const empenho = useWatch({ control, name: "empenho" });
   const saldoAnterior = useWatch({ control, name: "saldoAnterior" });
   const valorPagamento = useWatch({ control, name: "valorPagamento" });
+  const credoresNe: NeCredorResposta[] = useWatch({ control, name: "credoresNe" }) || [];
+  const cpfCnpj = useWatch({ control, name: "cpfCnpj" });
 
   if (!empenho) return null;
 
   const valorPg = parseFormNumber(valorPagamento);
   const saldoAtual = Number(saldoAnterior) || 0;
-  const ultrapassouSaldo = valorPg > saldoAtual && saldoAtual > 0;
+  const credor = credorDaListaNe(credoresNe, cpfCnpj);
+  const saldoCredorAposCents = credor ? toCents(credor.saldo) - toCents(valorPagamento) : null;
+  const ultrapassouSaldo =
+    (valorPg > saldoAtual && saldoAtual > 0) || (saldoCredorAposCents !== null && saldoCredorAposCents < 0);
 
   return (
     <div className={`p-4 rounded-xl border flex items-center gap-4 mb-8 ${ultrapassouSaldo ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
@@ -30,6 +52,13 @@ function IndicadorSaldo({ control }: { control: any }) {
         <p className="text-sm font-bold uppercase tracking-widest opacity-80">Saldo Restante Após Pagamento</p>
         <p className="text-xl font-bold">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldoAtual - valorPg)}</p>
       </div>
+      {credor && saldoCredorAposCents !== null && (
+        <div className="text-right pl-6 border-l border-current/20" data-testid="saldo-credor">
+          <p className="text-sm font-bold uppercase tracking-widest opacity-80">Saldo do Credor Após Pagamento</p>
+          <p className="text-xl font-bold">R$ {formatarBRL(saldoCredorAposCents)}</p>
+          <p className="text-xs font-semibold opacity-80">{credor.nome}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -131,6 +160,16 @@ export default function OpPaymentData({ errors }: { errors: any }) {
         setValue("gestao", ne.gestao || '');
         setValue("elemento", ne.elemento || '');
         setValue("subelemento", ne.subelemento || '');
+        setValue("neCarregada", ne.numero);
+
+        // NE com credores (T15+): o seletor mostra bruto/pago/restante; com um
+        // só, ele já vem escolhido. NE antiga (só credor sintetizado/legado)
+        // segue livre, como antes.
+        const credoresNe: NeCredorResposta[] = (ne.credores || []).filter((c: NeCredorResposta) => !c.legado);
+        setValue("credoresNe", credoresNe);
+        if (credoresNe.length === 1) {
+          await selecionarCredorOp(setValue, credoresNe[0]);
+        }
 
         // Valor a Pagar e o valor unitário do item NÃO são preenchidos
         // automaticamente: a OP pode ser um pagamento parcial do saldo da
@@ -166,6 +205,8 @@ export default function OpPaymentData({ errors }: { errors: any }) {
 
   const handleNeSearchChange = (val: string) => {
     setValue("empenho", val);
+    setValue("neCarregada", "");
+    setValue("credoresNe", []);
     if (val.length >= 2) {
       buscarNeSugestoes(val);
     } else {
@@ -257,9 +298,11 @@ export default function OpPaymentData({ errors }: { errors: any }) {
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
 
+        <FaixaNumeroPrevisto />
+
         <div className="col-span-12 md:col-span-3">
           <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Número da OP</label>
-          <input type="text" placeholder="Gerado automaticamente" disabled className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed transition-all duration-300" />
+          <InputNumeroOp control={control} />
         </div>
         <div className="col-span-12 md:col-span-3">
           <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Data Emissão OP</label>
@@ -336,6 +379,8 @@ export default function OpPaymentData({ errors }: { errors: any }) {
 
         <CamposElementoSubelemento control={control} />
 
+        <SeletorCredorOp />
+
         <div className="col-span-12">
           <div className="flex items-center mb-4 mt-4 pb-2 border-b border-slate-100">
             <div className="w-6 h-6 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600 mr-2"><User className="w-3 h-3" /></div>
@@ -375,8 +420,11 @@ export default function OpPaymentData({ errors }: { errors: any }) {
                   onMouseEnter={() => cpfNav.setHighlightedIndex(i)}
                   className={`p-3 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${cpfNav.highlightedIndex === i ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
                 >
-                  <div className="font-bold text-slate-800 text-sm">{c.nome} {c.is_mei ? <span className="text-emerald-600 ml-1 font-black text-xs uppercase bg-emerald-100 px-1 rounded">MEI</span> : ""}</div>
-                  <div className="text-xs text-slate-500">{c.cpf_cnpj || c.cpfCnpj}</div>
+                  <div className="font-bold text-slate-800 text-sm">{c.nome} {Number(c.isMei ?? c.is_mei) ? <span className="text-emerald-600 ml-1 font-black text-xs uppercase bg-emerald-100 px-1 rounded">MEI</span> : ""}</div>
+                  <div className="text-xs text-slate-500">
+                    {c.cpf_cnpj || c.cpfCnpj}
+                    {rotuloMunicipio(c.cidade, c.uf) && ` · ${rotuloMunicipio(c.cidade, c.uf)}`}
+                  </div>
                 </div>
               ))}
             </div>
@@ -415,8 +463,11 @@ export default function OpPaymentData({ errors }: { errors: any }) {
                   onMouseEnter={() => credorNav.setHighlightedIndex(i)}
                   className={`p-3 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${credorNav.highlightedIndex === i ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
                 >
-                  <div className="font-bold text-slate-800 text-sm">{c.nome} {c.is_mei ? <span className="text-emerald-600 ml-1 font-black text-xs uppercase bg-emerald-100 px-1 rounded">MEI</span> : ""}</div>
-                  <div className="text-xs text-slate-500">{c.cpf_cnpj || c.cpfCnpj}</div>
+                  <div className="font-bold text-slate-800 text-sm">{c.nome} {Number(c.isMei ?? c.is_mei) ? <span className="text-emerald-600 ml-1 font-black text-xs uppercase bg-emerald-100 px-1 rounded">MEI</span> : ""}</div>
+                  <div className="text-xs text-slate-500">
+                    {c.cpf_cnpj || c.cpfCnpj}
+                    {rotuloMunicipio(c.cidade, c.uf) && ` · ${rotuloMunicipio(c.cidade, c.uf)}`}
+                  </div>
                 </div>
               ))}
             </div>

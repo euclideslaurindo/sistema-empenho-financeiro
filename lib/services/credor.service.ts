@@ -2,6 +2,7 @@ import { query, withTransaction } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
 import { isValidCpfCnpj } from '@/lib/utils';
 import { CredorDB } from '@/lib/types/db';
+import { montarEnderecoFinal, normalizarCidade, normalizarUf, validarMunicipio } from '@/lib/credor-endereco';
 
 export type ServiceResult<T = any> =
   | { success: true; data: T; status?: number }
@@ -16,10 +17,6 @@ async function resolveUsuarioId(usuarioId: string): Promise<string | null> {
   }
 }
 
-function montarEnderecoFinal(body: any): string | null {
-  const { endereco, logradouro, numero, bairro, cidade, uf } = body;
-  return endereco?.trim() || [logradouro, numero ? `Nº ${numero}` : '', bairro, cidade, uf].filter(Boolean).join(', ') || null;
-}
 
 function formatarDataExpedicao(dataExpedicao: any): string | null {
   return dataExpedicao && String(dataExpedicao).trim().length >= 8 ? String(dataExpedicao).trim() : null;
@@ -92,6 +89,12 @@ export class CredorService {
     if (!isValidCpfCnpj(cpfCnpj)) {
       return { success: false, error: 'CPF ou CNPJ inválido. Verifique os dígitos digitados.', status: 400 };
     }
+    const cidadeNorm = normalizarCidade(cidade);
+    const ufNorm = normalizarUf(uf);
+    const erroMunicipio = validarMunicipio(cidadeNorm, ufNorm);
+    if (erroMunicipio) {
+      return { success: false, error: erroMunicipio, status: 400 };
+    }
 
     const usuarioId = await resolveUsuarioId(usuarioIdSolicitante);
     const dataExpFormatada = formatarDataExpedicao(dataExpedicao);
@@ -105,7 +108,7 @@ export class CredorService {
         [
           id, cpfCnpj.trim(), nome.trim(), rg?.trim() || 'ISENTO', orgaoEmissor?.trim() || null,
           pis?.trim() || null, dataExpFormatada, enderecoFinal, cep?.trim() || null, logradouro?.trim() || null,
-          numero?.trim() || null, bairro?.trim() || null, cidade?.trim() || null, uf?.trim() || null,
+          numero?.trim() || null, bairro?.trim() || null, cidadeNorm, ufNorm,
           telefone?.trim() || null, banco?.trim() || null, agencia?.trim() || null, contaCorrente?.trim() || null,
           pix?.trim() || null, isMei ? 1 : 0, usuarioId,
         ]
@@ -132,6 +135,12 @@ export class CredorService {
     }
     if (!isValidCpfCnpj(cpfCnpj)) {
       return { success: false, error: 'CPF ou CNPJ inválido. Verifique os dígitos digitados.', status: 400 };
+    }
+    const cidadeNorm = normalizarCidade(cidade);
+    const ufNorm = normalizarUf(uf);
+    const erroMunicipio = validarMunicipio(cidadeNorm, ufNorm);
+    if (erroMunicipio) {
+      return { success: false, error: erroMunicipio, status: 400 };
     }
 
     try {
@@ -170,8 +179,8 @@ export class CredorService {
           rg: rg?.trim() || 'ISENTO',
           orgao_emissor: orgaoEmissor?.trim() || null,
           data_expedicao: dataExpFormatada,
-          cidade: cidade?.trim() || null,
-          uf: uf?.trim() || null,
+          cidade: cidadeNorm,
+          uf: ufNorm,
           telefone: telefone?.trim() || null,
           banco: banco?.trim() || null,
           agencia: agencia?.trim() || null,

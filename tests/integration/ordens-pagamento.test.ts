@@ -34,7 +34,7 @@ describe('Integração API Ordens de Pagamento', () => {
     (withTransaction as any).mockImplementationOnce(async (callback: any) => {
       const connectionMock = {
         execute: vi.fn().mockImplementation(async (sql: string, params: any[]) => {
-          if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
+          if (sql.includes('SELECT id, valor, status, elemento, subelemento FROM notas_empenho')) {
             return [[{ id: '1', valor: 10000, status: 'EMITIDO' }]]; // NE de R$ 10.000
           }
           if (sql.includes('COALESCE(SUM(valor_pagamento), 0)')) {
@@ -70,7 +70,7 @@ describe('Integração API Ordens de Pagamento', () => {
     (withTransaction as any).mockImplementationOnce(async (callback: any) => {
       const connectionMock = {
         execute: vi.fn().mockImplementation(async (sql: string, params: any[]) => {
-          if (sql.includes('SELECT id, valor, status FROM notas_empenho')) {
+          if (sql.includes('SELECT id, valor, status, elemento, subelemento FROM notas_empenho')) {
             return [[{ id: '1', valor: 10000, status: 'EMITIDO' }]];
           }
           if (sql.includes('COALESCE(SUM(valor_pagamento), 0)')) {

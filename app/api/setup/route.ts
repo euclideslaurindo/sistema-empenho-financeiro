@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
         senha_hash VARCHAR(255) NOT NULL,
         perfil ENUM('ADMIN', 'GESTOR', 'CONSULTA') DEFAULT 'CONSULTA',
         ativo BOOLEAN DEFAULT 1,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        ultimo_acesso TIMESTAMP NULL DEFAULT NULL
       )
     `);
 

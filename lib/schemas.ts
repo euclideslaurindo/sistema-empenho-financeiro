@@ -32,6 +32,20 @@ export const notaEmpenhoSchema = z.object({
   }, "Ano inválido"),
   credorNome: z.string().optional(),
   cpfCnpj: z.string().optional(),
+  credores: z
+    .array(
+      z.object({
+        cpfCnpj: z.string(),
+        nome: z.string(),
+        valorBruto: z.string(),
+        valorPago: z.number().optional(),
+        doCadastro: z.boolean(),
+        isMei: z.boolean().optional(),
+        municipio: z.string().optional(),
+        legado: z.boolean().optional(),
+      })
+    )
+    .optional(),
 });
 
 export type NotaEmpenhoFormValues = z.input<typeof notaEmpenhoSchema>;
