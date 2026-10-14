@@ -2,7 +2,20 @@ import { query, withTransaction } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
 import { isValidCpfCnpj } from '@/lib/utils';
 import { CredorDB } from '@/lib/types/db';
-import { montarEnderecoFinal, normalizarCidade, normalizarUf, validarMunicipio } from '@/lib/credor-endereco';
+import { CIDADE_MAX, montarEnderecoFinal, normalizarCidade, normalizarUf, validarMunicipio } from '@/lib/credor-endereco';
+
+/**
+ * Município (Expediente) — T33: só trim e espaços colapsados (vazio vira NULL).
+ * Não passa pela validação de cidade/UF: é o município da prefeitura que
+ * cobra a taxa de expediente, não o endereço.
+ */
+function lerMunicipioExpediente(v: unknown): { valor: string | null } | { erro: string } {
+  const valor = normalizarCidade(v);
+  if (valor && valor.length > CIDADE_MAX) {
+    return { erro: `Município (Expediente) deve ter no máximo ${CIDADE_MAX} caracteres.` };
+  }
+  return { valor };
+}
 
 export type ServiceResult<T = any> =
   | { success: true; data: T; status?: number }
@@ -31,7 +44,7 @@ export class CredorService {
       SELECT id, cpf_cnpj as cpfCnpj, nome, rg, orgao_emissor as orgaoEmissor,
              endereco, cep, logradouro, numero, bairro,
              pis, data_expedicao as dataExpedicao,
-             cidade, uf, telefone, banco, agencia, conta_corrente as contaCorrente, pix, is_mei as isMei
+             cidade, uf, municipioExpediente, telefone, banco, agencia, conta_corrente as contaCorrente, pix, is_mei as isMei
       FROM credores
       WHERE ativo = 1`;
     const sqlParams: any[] = [];
@@ -95,6 +108,10 @@ export class CredorService {
     if (erroMunicipio) {
       return { success: false, error: erroMunicipio, status: 400 };
     }
+    const expediente = lerMunicipioExpediente(body.municipioExpediente);
+    if ('erro' in expediente) {
+      return { success: false, error: expediente.erro, status: 400 };
+    }
 
     const usuarioId = await resolveUsuarioId(usuarioIdSolicitante);
     const dataExpFormatada = formatarDataExpedicao(dataExpedicao);
@@ -103,14 +120,14 @@ export class CredorService {
 
     try {
       await query(
-        `INSERT INTO credores (id, cpf_cnpj, nome, rg, orgao_emissor, pis, data_expedicao, endereco, cep, logradouro, numero, bairro, cidade, uf, telefone, banco, agencia, conta_corrente, pix, is_mei, usuario_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO credores (id, cpf_cnpj, nome, rg, orgao_emissor, pis, data_expedicao, endereco, cep, logradouro, numero, bairro, cidade, uf, telefone, banco, agencia, conta_corrente, pix, is_mei, usuario_id, municipioExpediente)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id, cpfCnpj.trim(), nome.trim(), rg?.trim() || 'ISENTO', orgaoEmissor?.trim() || null,
           pis?.trim() || null, dataExpFormatada, enderecoFinal, cep?.trim() || null, logradouro?.trim() || null,
           numero?.trim() || null, bairro?.trim() || null, cidadeNorm, ufNorm,
           telefone?.trim() || null, banco?.trim() || null, agencia?.trim() || null, contaCorrente?.trim() || null,
-          pix?.trim() || null, isMei ? 1 : 0, usuarioId,
+          pix?.trim() || null, isMei ? 1 : 0, usuarioId, expediente.valor,
         ]
       );
     } catch (err: any) {
@@ -141,6 +158,13 @@ export class CredorService {
     const erroMunicipio = validarMunicipio(cidadeNorm, ufNorm);
     if (erroMunicipio) {
       return { success: false, error: erroMunicipio, status: 400 };
+    }
+    // Só mexe no Município (Expediente) se o campo veio no payload: um
+    // chamador que não o conhece não apaga o valor gravado.
+    const veioExpediente = Object.prototype.hasOwnProperty.call(body, 'municipioExpediente');
+    const expediente = lerMunicipioExpediente(body.municipioExpediente);
+    if ('erro' in expediente) {
+      return { success: false, error: expediente.erro, status: 400 };
     }
 
     try {
@@ -192,6 +216,7 @@ export class CredorService {
           pix: pix?.trim() || null,
           is_mei: isMei ? 1 : 0,
           usuario_id: usuarioId,
+          ...(veioExpediente ? { municipioExpediente: expediente.valor } : {}),
         };
         const setClauses = Object.keys(updateFields).map(col => `${col} = ?`).join(', ');
         const values = [...Object.values(updateFields), id];

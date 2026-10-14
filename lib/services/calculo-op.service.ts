@@ -40,8 +40,12 @@ export async function calcularRetencoesDaOp(
 ): Promise<ResultadoCalculoOp> {
   const { campos, regras } = await obterConfigRetencoes(conn);
 
-  const sqlCredor = `SELECT cidade, uf, is_mei FROM credores
-     WHERE cpf_cnpj = ? OR REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') = ?
+  // T33: no 3.3.90.33 a taxa de expediente vem só do Município (Expediente);
+  // a `cidade` do endereço não entra no cálculo. Credor inativo é ignorado
+  // (o cadastro não deixa desativar credor que já tem OP).
+  const sqlCredor = `SELECT municipioExpediente, is_mei FROM credores
+     WHERE ativo = 1
+       AND (cpf_cnpj = ? OR REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') = ?)
      LIMIT 1`;
   const paramsCredor = [e.credorCpfCnpj, String(e.credorCpfCnpj ?? '').replace(/\D/g, '')];
   const credores: any[] = conn ? ((await conn.execute(sqlCredor, paramsCredor))[0] as any[]) : await query<any[]>(sqlCredor, paramsCredor);
@@ -55,7 +59,7 @@ export async function calcularRetencoesDaOp(
     const [{ parametros, vigencia }, { faixas, vigencia: vigenciaIrrf }, issMunicipio] = await Promise.all([
       obterParametrosVigentes(conn, perfilCalculo, data),
       obterFaixasIrrfVigentes(conn, data),
-      obterIssMunicipio(conn, credor?.cidade),
+      obterIssMunicipio(conn, credor?.municipioExpediente),
     ]);
     const resultado = calcularTransporteAutonomo({
       brutoCents: e.brutoCents,
@@ -65,7 +69,7 @@ export async function calcularRetencoesDaOp(
       parametros,
       faixas,
       issMunicipio,
-      municipioCredor: credor?.cidade ?? null,
+      municipioCredor: credor?.municipioExpediente ?? null,
       credorMei,
       sobrescreverMei: e.sobrescreverMei,
       config: campos,

@@ -63,9 +63,9 @@ export const CONFIG_SEED = [
   updated_at: new Date('2026-01-01'),
 }));
 
+/** O credor como o cálculo o lê (T33: o município vem do Município (Expediente)). */
 export interface CredorSimulado {
-  cidade: string | null;
-  uf: string;
+  municipioExpediente: string | null;
   is_mei: number;
 }
 
