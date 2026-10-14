@@ -2,7 +2,6 @@ import { describe, test, expect } from 'vitest';
 import { calcularTransporteAutonomo, dec, type EntradaTransporte, type FaixaIrrf, type ParametrosTransporte } from '@/lib/retencoes-transporte';
 import { normalizarMunicipio, perfilDoElemento } from '@/lib/perfis-calculo';
 import type { ConfigRetencaoCampoMapeado } from '@/lib/services/config-retencoes.service';
-import fixture from '../../docs/projeto-retencoes-v2/fixtures/eja-campo-5a-parcela.json';
 
 // Seed da T24 (migration_16), como o MySQL devolve DECIMAL: texto.
 const PARAMETROS: ParametrosTransporte = {
@@ -145,35 +144,7 @@ describe('regras complementares', () => {
   });
 });
 
-describe('planilha EJA Campo inteira (91 linhas)', () => {
-  test('todas dentro de 1 centavo; isentos zerados', () => {
-    const campos: Array<[string, (r: any) => number]> = [
-      ['irrf', (r) => reais(r, 'irrf')],
-      ['iss', (r) => reais(r, 'iss')],
-      ['inss', (r) => reais(r, 'inss')],
-      ['patronal', (r) => reais(r, 'patronal')],
-      ['sest', (r) => r.snapshot.sest],
-      ['senat', (r) => r.snapshot.senat],
-      ['liquido', (r) => r.liquidoCents / 100],
-    ];
-    let exatas = 0;
-    const comDiferenca: string[] = [];
-    for (const l of fixture.linhas) {
-      const r = calcularTransporteAutonomo(entrada(l.bruto, l.municipio, { credorMei: l.isento }));
-      let maiorDif = 0;
-      for (const [campo, ler] of campos) {
-        const dif = Math.abs(Math.round((ler(r) - (l.esperado as any)[campo]) * 100));
-        expect(dif, `${l.id} ${campo}`).toBeLessThanOrEqual(1);
-        maiorDif = Math.max(maiorDif, dif);
-      }
-      if (maiorDif === 0) exatas++;
-      else comDiferenca.push(l.id);
-    }
-    // Registro do resultado (a T28 transforma isso no teste de conformidade formal).
-    console.info(`EJA Campo: ${exatas} exatas, ${comDiferenca.length} com 1 centavo: ${comDiferenca.join(', ')}`);
-    expect(exatas + comDiferenca.length).toBe(91);
-  });
-});
+// A planilha EJA Campo inteira (91 linhas) está em tests/unit/conformidade-eja-campo.test.ts (T28).
 
 describe('sobrescrita do ADMIN em credor MEI no transporte (T26)', () => {
   test('ADMIN digita; GESTOR continua isento', () => {
