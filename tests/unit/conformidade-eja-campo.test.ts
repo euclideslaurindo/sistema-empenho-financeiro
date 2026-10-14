@@ -27,8 +27,8 @@ type Campo = (typeof CAMPOS)[number];
 const RETENCOES = CAMPOS.filter((c) => c !== 'liquido');
 const cents = (reais: number) => Math.round(reais * 100);
 
-/** O credor como o cadastro devolve. Na T33, o município passa a vir de `municipioExpediente`. */
-const credorDaLinha = (l: Linha): CredorSimulado => ({ cidade: l.municipio, uf: 'PE', is_mei: l.isento ? 1 : 0 });
+/** O credor como o cálculo o lê: o município da planilha é o Município (Expediente) (T33). */
+const credorDaLinha = (l: Linha): CredorSimulado => ({ municipioExpediente: l.municipio, is_mei: l.isento ? 1 : 0 });
 
 const tipo = (l: Linha) => (l.isento ? 'isenta' : l.divergenciaConhecida ? 'divergente' : 'exata');
 

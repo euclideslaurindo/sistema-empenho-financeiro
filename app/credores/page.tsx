@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { formatCpfCnpj, formatTelefone, maskCep } from "@/lib/utils";
 import { CIDADE_MAX, completarMunicipio, rotuloMunicipio } from "@/lib/credor-endereco";
+import { encontrarIssMunicipio } from "@/lib/perfis-calculo";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -46,6 +47,16 @@ interface Credor {
   contaCorrente?: string;
   pix?: string;
   isMei?: boolean;
+  /** T33: prefeitura que cobra a taxa de expediente (só no 3.3.90.33). */
+  municipioExpediente?: string | null;
+}
+
+interface IssMunicipioOpcao {
+  chave: string;
+  nome: string;
+  uf: string;
+  apelidos: string | null;
+  ativo: boolean;
 }
 
 export default function Credores() {
@@ -71,6 +82,19 @@ function CredoresContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCredores, setTotalCredores] = useState(0);
+  // Municípios com cadastro de ISS (T27): sugestões e aviso do Município (Expediente).
+  const [municipiosIss, setMunicipiosIss] = useState<IssMunicipioOpcao[]>([]);
+
+  useEffect(() => {
+    apiClient
+      .get<{ municipios: IssMunicipioOpcao[] }>("/api/configuracoes/iss-municipios")
+      .then((d) => setMunicipiosIss((d.municipios || []).filter((m) => m.ativo)))
+      .catch(() => setMunicipiosIss([])); // sem a lista, o campo continua funcionando (só sem sugestões)
+  }, []);
+
+  const expedienteDigitado = (formData.municipioExpediente || "").trim();
+  const expedienteSemCadastro =
+    !!expedienteDigitado && municipiosIss.length > 0 && !encontrarIssMunicipio(municipiosIss, expedienteDigitado);
 
   // carrega a lista de credores do banco, paginada no servidor
   const fetchCredores = useCallback(async (busca = "", page = 1) => {
@@ -415,6 +439,33 @@ function CredoresContent() {
                 <option value="AC">AC</option><option value="AL">AL</option><option value="AP">AP</option><option value="AM">AM</option><option value="BA">BA</option><option value="CE">CE</option><option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option><option value="MA">MA</option><option value="MT">MT</option><option value="MS">MS</option><option value="MG">MG</option><option value="PA">PA</option><option value="PB">PB</option><option value="PR">PR</option><option value="PE">PE</option><option value="PI">PI</option><option value="RJ">RJ</option><option value="RN">RN</option><option value="RS">RS</option><option value="RO">RO</option><option value="RR">RR</option><option value="SC">SC</option><option value="SP">SP</option><option value="SE">SE</option><option value="TO">TO</option>
               </select>
             </div>
+            <div className="col-span-12 md:col-span-6">
+              <label htmlFor="credor-municipio-expediente" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Município (Expediente)</label>
+              <input
+                id="credor-municipio-expediente"
+                type="text"
+                list="credor-municipios-iss"
+                placeholder="Se for o caso (ex.: Canhotinho)"
+                maxLength={CIDADE_MAX}
+                value={formData.municipioExpediente || ""}
+                onChange={(e) => handleChange("municipioExpediente", e.target.value)}
+                aria-describedby={expedienteSemCadastro ? "credor-municipio-expediente-ajuda credor-municipio-expediente-aviso" : "credor-municipio-expediente-ajuda"}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
+              />
+              <datalist id="credor-municipios-iss">
+                {municipiosIss.map((m) => (
+                  <option key={m.chave} value={m.nome} />
+                ))}
+              </datalist>
+              <p id="credor-municipio-expediente-ajuda" className="text-xs text-slate-500 mt-1.5">
+                Preencha só se este credor tiver taxa de expediente (ex.: Canhotinho). Usado no elemento 3.3.90.33.
+              </p>
+              {expedienteSemCadastro && (
+                <p id="credor-municipio-expediente-aviso" role="status" className="text-xs text-amber-700 font-bold mt-1">
+                  Município sem cadastro de ISS; a taxa de expediente será R$ 0,00 até o admin cadastrá-lo.
+                </p>
+              )}
+            </div>
 
             {/* Row 5 */}
             <div className="col-span-12 md:col-span-4">
@@ -557,6 +608,9 @@ function CredoresContent() {
                       </td>
                       <td className="py-5 font-semibold text-slate-600">
                         {rotuloMunicipio(c.cidade, c.uf) || "-"}
+                        {c.municipioExpediente && (
+                          <span className="block text-xs font-bold text-blue-800">expediente: {c.municipioExpediente}</span>
+                        )}
                       </td>
                       <td className="py-5 font-semibold text-slate-600">
                         {c.banco || "Não informado"}
