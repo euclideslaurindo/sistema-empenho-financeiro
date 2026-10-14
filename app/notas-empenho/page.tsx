@@ -24,13 +24,15 @@ import { formatarBRL, toCents } from "@/lib/money";
 import { diferencaBrutos, montarPayloadCredores, type CredorFormulario } from "@/lib/ne-credores";
 import type { NeCredorResposta } from "@/lib/types/db";
 import { BotaoSalvarNe, NeCredoresField } from "@/components/ne-form/NeCredoresField";
+import { SubelementoCampo } from "@/components/ne-form/SubelementoCampo";
 
 interface NotaEmpenho {
   id: string;
   codigo: string;
   numero: string;
   valor: number;
-  dataPagamento: string;
+  /** Data de cadastro (created_at), 'YYYY-MM-DD' — coluna "Cadastro" da lista (T29). */
+  criadaEm?: string;
   unidadeOrcamentaria: string;
   elemento: string;
   subelemento: string;
@@ -38,7 +40,6 @@ interface NotaEmpenho {
   status: string;
   historico: string;
   dataProvisaoConcedida?: string;
-  dataEmissao?: string;
   quemAtualizou?: string;
   credorNome?: string;
   cpfCnpj?: string;
@@ -70,7 +71,6 @@ export default function NotasEmpenho() {
     defaultValues: {
       numeroNE: "",
       valorNE: "",
-      dataPagamento: "",
       unidadeOrcamentaria: "Secretaria de Educação",
       elemento: "",
       subelemento: "",
@@ -114,27 +114,6 @@ export default function NotasEmpenho() {
     fetchNotas(searchTerm, currentPage);
   }, [fetchNotas, currentPage]);
 
-  // avisa quando a data ta passada de 60 dias
-  let showAlerta = false;
-  const dataPagamentoWatch = useWatch({ control, name: "dataPagamento" });
-  if (dataPagamentoWatch) {
-    const parts = dataPagamentoWatch.split("-");
-    if (parts.length === 3) {
-      const selectedDate = new Date(
-        parseInt(parts[0]),
-        parseInt(parts[1]) - 1,
-        parseInt(parts[2])
-      );
-      const today = new Date();
-      const diffDays = Math.ceil(
-        Math.abs(today.getTime() - selectedDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      if (selectedDate < today && diffDays >= 60) {
-        showAlerta = true;
-      }
-    }
-  }
-
   // detecta se ja tem uma NE com o mesmo valor no banco (possivel duplicata)
   // Debounce API check para duplicidade
   const valorNEWatch = useWatch({ control, name: "valorNE" });
@@ -145,14 +124,11 @@ export default function NotasEmpenho() {
   const subelementoWatch = useWatch({ control, name: "subelemento" });
   const elementoWatch = useWatch({ control, name: "elemento" });
 
-  // Cascata elemento -> subelemento: o subelemento oferecido depende do
-  // elemento escolhido. Valores "legado" (texto gravado em NE antiga que
-  // não bate com nenhuma opção atual) ganham uma opção extra "(legado) ..."
-  // pra não serem perdidos ao salvar de novo (D9).
+  // Cascata elemento -> subelemento: com subelementos cadastrados, lista (e
+  // "(legado) ..." para valor antigo fora dela, D9); sem lista, texto livre.
+  // O campo aparece sempre (T29, D26) — ver SubelementoCampo.
   const elementoAtual = elementos.find((el) => el.valor === elementoWatch);
   const subelementosDisponiveis = elementoAtual?.subelementos ?? [];
-  const subelementoReconhecido = subelementosDisponiveis.some((s) => s.valor === subelementoWatch);
-  const mostrarCampoSubelemento = subelementosDisponiveis.length > 0 || (!!subelementoWatch && !subelementoReconhecido);
   const elementoReconhecido = !!elementoAtual;
 
   useEffect(() => {
@@ -192,7 +168,6 @@ export default function NotasEmpenho() {
   const handleLoadDuplicate = (ne: NotaEmpenho) => {
     reset({
       numeroNE: ne.numero,
-      dataPagamento: ne.dataPagamento ? ne.dataPagamento.split('T')[0] : "",
       valorNE: String(ne.valor),
       unidadeOrcamentaria: ne.unidadeOrcamentaria || "",
       elemento: ne.elemento || "",
@@ -200,7 +175,6 @@ export default function NotasEmpenho() {
       gestao: ne.gestao || "",
       historico: ne.historico || "",
       dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",
-      dataEmissao: ne.dataEmissao ? ne.dataEmissao.split('T')[0] : "",
       credores: credoresParaFormulario(ne),
     });
     setEditingId(ne.id || "");
@@ -211,14 +185,12 @@ export default function NotasEmpenho() {
     reset({
       numeroNE: "",
       valorNE: "",
-      dataPagamento: "",
       unidadeOrcamentaria: "Secretaria de Educação",
       elemento: "",
       subelemento: "",
       gestao: "140101",
       historico: "",
       dataProvisaoConcedida: "",
-      dataEmissao: "",
       credores: [],
     });
     setEditingId(null);
@@ -237,17 +209,17 @@ export default function NotasEmpenho() {
       return;
     }
 
+    // Sem dataPagamento/dataEmissao (T29): a NE não tem mais essas datas, e o
+    // servidor preserva as já gravadas em NEs antigas quando elas não vêm.
     const payload = {
       numero: data.numeroNE,
       valor: data.valorNE,
-      dataPagamento: data.dataPagamento || null,
       unidadeOrcamentaria: data.unidadeOrcamentaria,
       elemento: data.elemento,
       subelemento: data.subelemento,
       gestao: data.gestao,
       historico: data.historico,
       dataProvisaoConcedida: data.dataProvisaoConcedida || null,
-      dataEmissao: data.dataEmissao || null,
       ...montarPayloadCredores(credores),
     };
 
@@ -315,7 +287,7 @@ export default function NotasEmpenho() {
               Início &gt; Gestão Financeira &gt; <span className="text-blue-900 ml-1">Notas de Empenho</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight">
-              Emissão de Notas de Empenho
+              Cadastro de Nota de Empenho
             </h1>
           </div>
           <div className="mt-6 md:mt-0 flex items-center gap-3">
@@ -343,21 +315,6 @@ export default function NotasEmpenho() {
             </button>
           </div>
         </div>
-
-        {showAlerta && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl flex items-start gap-3 shadow-sm">
-            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-            <div>
-              <h3 className="text-red-800 font-bold text-sm">
-                Atenção: Prazo de Execução Expirado
-              </h3>
-              <p className="text-red-700 text-sm mt-1">
-                O recurso desta Nota de Empenho já percorreu o prazo de 60 dias
-                para ser executado. Verifique a situação da Ordem de Pagamento.
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* FORM SECTION (Glass Panel) */}
         <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
@@ -427,20 +384,6 @@ export default function NotasEmpenho() {
               />
               {errors.dataProvisaoConcedida && <p id="ne-data-provisao-error" className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataProvisaoConcedida.message as string}</p>}
             </div>
-            <div>
-              <label htmlFor="ne-data-emissao" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
-                Data de Emissão
-              </label>
-              <input
-                id="ne-data-emissao"
-                type="date"
-                {...register("dataEmissao")}
-                aria-invalid={!!errors.dataEmissao}
-                aria-describedby={errors.dataEmissao ? "ne-data-emissao-error" : undefined}
-                className={`w-full px-4 py-3 rounded-xl border text-sm font-bold text-slate-500 focus:outline-none focus:ring-4 transition-all duration-300 ${errors.dataEmissao ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10'}`}
-              />
-              {errors.dataEmissao && <p id="ne-data-emissao-error" className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataEmissao.message as string}</p>}
-            </div>
 
             <NeCredoresField />
 
@@ -505,45 +448,14 @@ export default function NotasEmpenho() {
                 </p>
               )}
             </div>
-            {mostrarCampoSubelemento && (
-              <div className="md:col-span-2">
-                <label htmlFor="ne-subelemento" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Subelemento</label>
-                <select
-                  id="ne-subelemento"
-                  {...register("subelemento")}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-bold focus:outline-none focus:ring-4 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10 text-slate-700 transition-all duration-300"
-                >
-                  <option value="">Selecione o Subelemento</option>
-                  {subelementosDisponiveis.map((sub) => (
-                    <option key={sub.codigo} value={sub.valor}>{sub.valor}</option>
-                  ))}
-                  {!!subelementoWatch && !subelementoReconhecido && (
-                    <option value={subelementoWatch}>(legado) {subelementoWatch}</option>
-                  )}
-                </select>
-              </div>
-            )}
-            <div className="md:col-span-1">
-              <label htmlFor="ne-data-pagamento" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
-                Data de Pagamento
-              </label>
-              <input
-                id="ne-data-pagamento"
-                type="date"
-                {...register("dataPagamento")}
-                aria-invalid={!!errors.dataPagamento}
-                aria-describedby={errors.dataPagamento ? "ne-data-pagamento-error" : undefined}
-                className={`w-full px-4 py-3 rounded-xl border text-sm font-bold text-slate-500 focus:outline-none focus:ring-4 transition-all duration-300 ${errors.dataPagamento ? 'border-red-300 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20' : 'bg-slate-50 border-slate-200/50 focus:border-blue-800 focus:bg-white focus:ring-blue-900/10'}`}
-              />
-              {errors.dataPagamento && <p id="ne-data-pagamento-error" className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataPagamento.message as string}</p>}
-            </div>
+            <SubelementoCampo subelementos={subelementosDisponiveis} />
 
             <div className="md:col-span-4">
-              <label htmlFor="ne-historico" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Especificação</label>
+              <label htmlFor="ne-historico" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Observações</label>
               <textarea
                 id="ne-historico"
                 rows={3}
-                placeholder="Descreva o histórico do empenho..."
+                placeholder="Observações do empenho..."
                 {...register("historico")}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-medium focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300 resize-none text-slate-700"
               ></textarea>
@@ -598,9 +510,9 @@ export default function NotasEmpenho() {
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="pb-4 pl-2 text-sm font-black text-slate-500 uppercase tracking-widest">Número</th>
-                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Data</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Cadastro</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Quem Atualizou</th>
-                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Especificação</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Observações</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Credores</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Valor</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-center">Status</th>
@@ -649,7 +561,7 @@ export default function NotasEmpenho() {
                         {ne.numero}
                       </td>
                       <td className={`py-5 font-semibold ${isCancelado ? textStyle : 'text-slate-500'}`}>
-                        {formatDate(ne.dataPagamento)}
+                        {formatDate(ne.criadaEm || "")}
                       </td>
                       <td className={`py-5 font-semibold ${isCancelado ? textStyle : 'text-slate-600'}`}>
                         {ne.quemAtualizou || "Sistema"}
@@ -695,14 +607,12 @@ export default function NotasEmpenho() {
                                 reset({
                                   numeroNE: ne.numero,
                                   valorNE: String(ne.valor),
-                                  dataPagamento: ne.dataPagamento ? ne.dataPagamento.split('T')[0] : "",
                                   unidadeOrcamentaria: ne.unidadeOrcamentaria,
                                   elemento: ne.elemento,
                                   subelemento: ne.subelemento,
                                   gestao: ne.gestao,
                                   historico: ne.historico,
                                   dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",
-                                  dataEmissao: ne.dataEmissao ? ne.dataEmissao.split('T')[0] : "",
                                   credores: credoresParaFormulario(ne),
                                 });
                                 window.scrollTo({ top: 0, behavior: 'smooth' });

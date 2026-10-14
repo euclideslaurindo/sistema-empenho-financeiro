@@ -258,6 +258,7 @@ export class NotasEmpenhoService {
         ne.unidade_orcamentaria as unidadeOrcamentaria,
         ne.elemento, ne.subelemento,
         ne.gestao, ne.status, ne.historico, ne.created_at,
+        DATE_FORMAT(ne.created_at, '%Y-%m-%d') as criadaEm,
         ne.credor_nome as credorNome, ne.cpf_cnpj as cpfCnpj,
         (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel,
         u.nome as quemAtualizou
@@ -307,6 +308,7 @@ export class NotasEmpenhoService {
          ne.unidade_orcamentaria as unidadeOrcamentaria,
          ne.elemento, ne.subelemento,
          ne.gestao, ne.status, ne.historico,
+         DATE_FORMAT(ne.created_at, '%Y-%m-%d') as criadaEm,
          ne.credor_nome as credorNome, ne.cpf_cnpj as cpfCnpj,
          (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel
        FROM notas_empenho ne
@@ -364,7 +366,11 @@ export class NotasEmpenhoService {
         const legadoCpf = brutos ? linhas[0].cpfCnpj : cpfCnpj?.trim() || null;
 
         const id = crypto.randomUUID();
-        const exercicio = dataPagamento ? dataPagamento.substring(0, 4) : new Date().getFullYear().toString();
+        // D42: ano do número da NE (2026NE000123 -> 2026); senão o da Data de
+        // Provisão; senão o ano corrente.
+        const anoDoNumero = /^(20\d{2})/.exec(numero.trim())?.[1];
+        const anoDaProvisao = dataProvisaoConcedida ? String(dataProvisaoConcedida).substring(0, 4) : null;
+        const exercicio = anoDoNumero ?? anoDaProvisao ?? new Date().getFullYear().toString();
         const usuarioId = await resolveUsuarioId(conn, usuarioIdSolicitante);
 
         await conn.execute(
@@ -402,6 +408,7 @@ export class NotasEmpenhoService {
     // `status` do payload é ignorado: ele é derivado do saldo mais abaixo
     // (antes, a tela mandava sempre EMITIDO e reabria NE parcial/liquidada/cancelada).
     const { numero, valor, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, dataProvisaoConcedida, dataEmissao, credorNome, cpfCnpj } = body;
+    const veio = (campo: string) => Object.prototype.hasOwnProperty.call(body ?? {}, campo);
 
     const valorDecimal = parseFormNumber(valor);
     if (valorDecimal <= 0) {
@@ -529,16 +536,28 @@ export class NotasEmpenhoService {
 
         const usuarioId = await resolveUsuarioId(conn, usuarioIdSolicitante);
 
+        // T29: a tela não tem mais Data de Pagamento/Data de Emissão. Essas
+        // colunas só são gravadas se a chave vier no payload (compatibilidade);
+        // sem ela, o valor de NEs antigas fica como está.
+        const colunas: Record<string, any> = {
+          numero: numero?.trim() || '',
+          valor: valorDecimal,
+          data_provisao_concedida: dataProvisaoConcedida || null,
+          unidade_orcamentaria: unidadeOrcamentaria?.trim() || '',
+          elemento: elemento?.trim() || '',
+          subelemento: subelemento?.trim() || '',
+          gestao: gestao?.trim() || '',
+          status,
+          historico: historico?.trim() || '',
+          usuario_id: usuarioId,
+          ...(veio('dataPagamento') ? { data_pagamento: dataPagamento || null } : {}),
+          ...(veio('dataEmissao') ? { data_emissao: dataEmissao || null } : {}),
+          credor_nome: legadoNome,
+          cpf_cnpj: legadoCpf,
+        };
         await conn.execute(
-          `UPDATE notas_empenho
-           SET numero = ?, valor = ?, data_pagamento = ?, data_provisao_concedida = ?, data_emissao = ?,
-               unidade_orcamentaria = ?, elemento = ?, subelemento = ?, gestao = ?, status = ?, historico = ?, usuario_id = ?,
-               credor_nome = ?, cpf_cnpj = ?
-           WHERE id = ?`,
-          [numero?.trim() || '', valorDecimal, dataPagamento || null, dataProvisaoConcedida || null, dataEmissao || null,
-           unidadeOrcamentaria?.trim() || '', elemento?.trim() || '', subelemento?.trim() || '',
-           gestao?.trim() || '', status, historico?.trim() || '', usuarioId,
-           legadoNome, legadoCpf, id]
+          `UPDATE notas_empenho SET ${Object.keys(colunas).map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
+          [...Object.values(colunas), id]
         );
 
         // A FK fk_op_ne em database.sql já possui ON UPDATE CASCADE,
