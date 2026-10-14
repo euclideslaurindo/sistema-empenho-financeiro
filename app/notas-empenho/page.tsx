@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { jsPDF } from "jspdf";
@@ -8,6 +8,7 @@ import { useElementos } from "@/hooks/use-elementos";
 import { notaEmpenhoSchema, type NotaEmpenhoFormValues } from "@/lib/schemas";
 import {
   Plus,
+  Save,
   Search,
   Trash2,
   Eye,
@@ -20,10 +21,6 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import { maskCurrency } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
-import { formatarBRL, toCents } from "@/lib/money";
-import { diferencaBrutos, montarPayloadCredores, type CredorFormulario } from "@/lib/ne-credores";
-import type { NeCredorResposta } from "@/lib/types/db";
-import { BotaoSalvarNe, NeCredoresField } from "@/components/ne-form/NeCredoresField";
 import { SubelementoCampo } from "@/components/ne-form/SubelementoCampo";
 
 interface NotaEmpenho {
@@ -41,21 +38,19 @@ interface NotaEmpenho {
   historico: string;
   dataProvisaoConcedida?: string;
   quemAtualizou?: string;
-  credorNome?: string;
-  cpfCnpj?: string;
-  credores?: NeCredorResposta[];
 }
 
-const credoresParaFormulario = (ne: NotaEmpenho): CredorFormulario[] =>
-  (ne.credores || []).map((c) => ({
-    cpfCnpj: c.cpfCnpj,
-    nome: c.nome,
-    valorBruto: maskCurrency(Number(c.valorBruto)),
-    valorPago: Number(c.valorPago) || 0,
-    doCadastro: false,
-    legado: !!c.legado,
-    isMei: !!c.isMei,
-  }));
+/** Valores do formulário a partir de uma NE gravada (editar ou "carregar dados da NE"). */
+const formularioDaNe = (ne: NotaEmpenho) => ({
+  numeroNE: ne.numero,
+  valorNE: String(ne.valor),
+  unidadeOrcamentaria: ne.unidadeOrcamentaria || "",
+  elemento: ne.elemento || "",
+  subelemento: ne.subelemento || "",
+  gestao: ne.gestao || "",
+  historico: ne.historico || "",
+  dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split("T")[0] : "",
+});
 
 export default function NotasEmpenho() {
   const router = useRouter();
@@ -76,11 +71,9 @@ export default function NotasEmpenho() {
       subelemento: "",
       gestao: "140101",
       historico: "",
-      credores: [],
     }
   });
   const { register, handleSubmit, reset, setValue, control, formState: { errors } } = methods;
-  const [credoresExpandidos, setCredoresExpandidos] = useState<string | null>(null);
 
   const { elementos, loading: elementosLoading, erro: elementosErro, recarregar: recarregarElementos } = useElementos();
 
@@ -114,13 +107,9 @@ export default function NotasEmpenho() {
     fetchNotas(searchTerm, currentPage);
   }, [fetchNotas, currentPage]);
 
-  // detecta se ja tem uma NE com o mesmo valor no banco (possivel duplicata)
-  // Debounce API check para duplicidade
+  // Aviso de NE parecida (D33, T30): mesmo valor + elemento + subelemento.
+  // Debounce de 500 ms na consulta.
   const valorNEWatch = useWatch({ control, name: "valorNE" });
-  // Só o 1º credor (nome/CPF não mudam enquanto digita o bruto): observar a
-  // lista inteira re-renderizaria a página a cada tecla.
-  const credorNomeWatch = useWatch({ control, name: "credores.0.nome" });
-  const credorCpfWatch = useWatch({ control, name: "credores.0.cpfCnpj" });
   const subelementoWatch = useWatch({ control, name: "subelemento" });
   const elementoWatch = useWatch({ control, name: "elemento" });
 
@@ -147,8 +136,7 @@ export default function NotasEmpenho() {
         const num = parseFloat(String(valorNEWatch).replace(/[^\d,]/g, '').replace(',', '.'));
         if (isNaN(num)) return;
         const params = new URLSearchParams({ valor: String(num) });
-        if (credorNomeWatch) params.append('credor', credorNomeWatch);
-        if (credorCpfWatch) params.append('cpfCnpj', credorCpfWatch);
+        if (elementoWatch) params.append('elemento', elementoWatch);
         if (subelementoWatch) params.append('subelemento', subelementoWatch);
         const res = await fetch(`/api/notas-empenho/duplicidade?${params.toString()}`);
         const data = await res.json();
@@ -163,20 +151,12 @@ export default function NotasEmpenho() {
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timer);
-  }, [valorNEWatch, credorNomeWatch, credorCpfWatch, subelementoWatch]);
+  }, [valorNEWatch, elementoWatch, subelementoWatch]);
 
+  // A consulta de duplicidade devolve os dados da NE parecida (T30); antes
+  // vinham só número e data, e o formulário ficava quase vazio.
   const handleLoadDuplicate = (ne: NotaEmpenho) => {
-    reset({
-      numeroNE: ne.numero,
-      valorNE: String(ne.valor),
-      unidadeOrcamentaria: ne.unidadeOrcamentaria || "",
-      elemento: ne.elemento || "",
-      subelemento: ne.subelemento || "",
-      gestao: ne.gestao || "",
-      historico: ne.historico || "",
-      dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",
-      credores: credoresParaFormulario(ne),
-    });
+    reset(formularioDaNe(ne));
     setEditingId(ne.id || "");
     toast.success("Dados preenchidos com base na NE " + ne.numero);
   };
@@ -191,26 +171,15 @@ export default function NotasEmpenho() {
       gestao: "140101",
       historico: "",
       dataProvisaoConcedida: "",
-      credores: [],
     });
     setEditingId(null);
   };
 
   const onSubmit = async (data: any) => {
-    // O resolver já converteu valorNE em número; os brutos continuam mascarados.
-    const credores: CredorFormulario[] = data.credores || [];
-    if (credores.length === 0) {
-      toast.error("Adicione ao menos um credor.");
-      return;
-    }
-    const conferencia = diferencaBrutos(credores.map((c) => c.valorBruto), data.valorNE);
-    if (conferencia.diferencaCents !== 0) {
-      toast.error(`A soma dos valores brutos não fecha com o valor da NE: ${conferencia.texto}.`);
-      return;
-    }
-
-    // Sem dataPagamento/dataEmissao (T29): a NE não tem mais essas datas, e o
-    // servidor preserva as já gravadas em NEs antigas quando elas não vêm.
+    // O resolver já converteu valorNE em número. Sem credor (T30): a NE pode
+    // ser salva sem credor e sem consumir o valor todo; os credores são
+    // escolhidos na Ordem de Pagamento. Sem dataPagamento/dataEmissao (T29):
+    // o servidor preserva as já gravadas em NEs antigas.
     const payload = {
       numero: data.numeroNE,
       valor: data.valorNE,
@@ -220,7 +189,6 @@ export default function NotasEmpenho() {
       gestao: data.gestao,
       historico: data.historico,
       dataProvisaoConcedida: data.dataProvisaoConcedida || null,
-      ...montarPayloadCredores(credores),
     };
 
     try {
@@ -297,10 +265,13 @@ export default function NotasEmpenho() {
             >
               <Plus className="w-4 h-4" /> Limpar
             </button>
-            <BotaoSalvarNe
+            <button
+              type="button"
               onClick={handleSalvar}
-              className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-900"
-            />
+              className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" /> Salvar
+            </button>
             <button 
               onClick={() => { document.getElementById('search-notas')?.focus(); }}
               className="bg-white hover:bg-slate-50 text-blue-900 text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm border border-slate-200 transition-all flex items-center gap-2"
@@ -384,8 +355,6 @@ export default function NotasEmpenho() {
               />
               {errors.dataProvisaoConcedida && <p id="ne-data-provisao-error" className="text-red-500 text-xs mt-1.5 font-bold">{errors.dataProvisaoConcedida.message as string}</p>}
             </div>
-
-            <NeCredoresField />
 
             <div className="md:col-span-2">
               <label htmlFor="ne-unidade" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Unidade Orçamentária</label>
@@ -513,7 +482,6 @@ export default function NotasEmpenho() {
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Cadastro</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Quem Atualizou</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Observações</th>
-                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Credores</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Valor</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-center">Status</th>
                   <th className="pb-4 pr-2 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Ações</th>
@@ -522,13 +490,13 @@ export default function NotasEmpenho() {
               <tbody className="divide-y divide-slate-50">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400 font-bold">
+                    <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
                        Carregando...
                     </td>
                   </tr>
                 ) : notas.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400 font-bold">
+                    <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
                       Nenhuma nota encontrada.
                     </td>
                   </tr>
@@ -539,11 +507,7 @@ export default function NotasEmpenho() {
                       ? 'bg-red-50/30 hover:bg-red-50/60 opacity-80' 
                       : (selecionadoId === ne.id ? 'bg-blue-50/50' : 'hover:bg-blue-50/50');
                     const textStyle = isCancelado ? 'line-through decoration-red-300 text-red-400' : '';
-                    const credores = ne.credores || [];
-                    const expandida = credoresExpandidos === ne.id;
-
                     return (
-                    <Fragment key={ne.id}>
                     <tr
                       key={ne.id}
                       onClick={() => setSelecionadoId(ne.id)}
@@ -569,26 +533,6 @@ export default function NotasEmpenho() {
                       <td className={`py-5 font-medium truncate max-w-[200px] ${isCancelado ? textStyle : 'text-slate-500'}`}>
                         {ne.historico || "-"}
                       </td>
-                      <td className={`py-5 font-semibold ${isCancelado ? textStyle : 'text-slate-600'}`}>
-                        {credores.length === 0 ? (
-                          "-"
-                        ) : credores.length === 1 ? (
-                          <span className="truncate max-w-[180px] inline-block align-bottom">{credores[0].nome}</span>
-                        ) : (
-                          <button
-                            type="button"
-                            aria-expanded={expandida}
-                            aria-controls={`ne-credores-${ne.id}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setCredoresExpandidos(expandida ? null : ne.id);
-                            }}
-                            className="inline-flex items-center gap-1 text-blue-900 hover:underline"
-                          >
-                            {credores.length} credores {expandida ? "▾" : "▸"}
-                          </button>
-                        )}
-                      </td>
                       <td className={`py-5 font-black text-right ${isCancelado ? textStyle : 'text-slate-700'}`}>
                         {Number(ne.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </td>
@@ -604,17 +548,7 @@ export default function NotasEmpenho() {
                                 e.stopPropagation();
                                 setSelecionadoId(ne.id);
                                 setEditingId(ne.id);
-                                reset({
-                                  numeroNE: ne.numero,
-                                  valorNE: String(ne.valor),
-                                  unidadeOrcamentaria: ne.unidadeOrcamentaria,
-                                  elemento: ne.elemento,
-                                  subelemento: ne.subelemento,
-                                  gestao: ne.gestao,
-                                  historico: ne.historico,
-                                  dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split('T')[0] : "",
-                                  credores: credoresParaFormulario(ne),
-                                });
+                                reset(formularioDaNe(ne));
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }}
                               className="p-1.5 text-slate-400 hover:text-blue-900 hover:bg-white rounded-md transition-all"
@@ -625,35 +559,6 @@ export default function NotasEmpenho() {
                         </div>
                       </td>
                     </tr>
-                    {expandida && (
-                      <tr id={`ne-credores-${ne.id}`} className="bg-slate-50/60">
-                        <td colSpan={8} className="px-4 py-3">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="text-slate-500 uppercase tracking-widest">
-                                <th className="py-1 text-left font-black">Credor</th>
-                                <th className="py-1 text-left font-black">CPF/CNPJ</th>
-                                <th className="py-1 text-right font-black">Bruto</th>
-                                <th className="py-1 text-right font-black">Pago</th>
-                                <th className="py-1 text-right font-black">Saldo</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {credores.map((c) => (
-                                <tr key={c.cpfCnpj} className="text-slate-700 font-semibold">
-                                  <td className="py-1">{c.nome}</td>
-                                  <td className="py-1">{c.cpfCnpj}</td>
-                                  <td className="py-1 text-right">R$ {formatarBRL(toCents(c.valorBruto))}</td>
-                                  <td className="py-1 text-right">R$ {formatarBRL(toCents(c.valorPago))}</td>
-                                  <td className="py-1 text-right">R$ {formatarBRL(toCents(c.saldo))}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </td>
-                      </tr>
-                    )}
-                    </Fragment>
                   );
                 })
               )}
