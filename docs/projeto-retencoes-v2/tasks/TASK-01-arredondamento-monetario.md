@@ -84,4 +84,11 @@ Regras:
 - Se o usuário confirmar com a equipe (Henrique) outra regra de casas decimais, só `calcPercentCents` muda.
 
 ## Decisões em aberto relacionadas
-Nenhuma (regra confirmada: 3º decimal ≥ 5 sobe).
+Nenhuma. Regra **confirmada pelo usuário**: valem as duas decisões já combinadas (3º decimal ≥ 5 sobe), sem arredondamento em dois passos.
+
+> **Diferença conhecida em relação à planilha EJA Campo (TASK-28):** a planilha arredonda primeiro para 3 casas e depois para 2. Com a regra desta task, **5 dos 68 motoristas** com retenção ficam 1 centavo abaixo da planilha em algum item (Gilmar Cavalcante Ferreira, José Ernando Rodrigues dos Santos, Juvenal Leite da Silva, Willams Cavalcante Silva e José Eufrásio da Silva). O teste da T28 aceita essa tolerância de R$ 0,01 e **lista esses 5 casos** em vez de escondê-los.
+
+## Atualização de escopo (decisões de 07/10/2026) — precisão intermediária
+O cálculo do 3.3.90.33 (T25) encadeia passos com mais de 2 casas (ex.: base INSS = 20% do bruto pode ter 3 casas; a base do IRRF idem). Para não arredondar **antes da hora**, além das funções acima o módulo deve exportar uma pequena aritmética decimal exata (BigInt, escala fixa de 6 casas):
+- `toMicros(valor)`, `mulPercentMicros(micros, percentual)`, `somarMicros(...)`, `maxMicros(a, b)`, `microsToCents(micros)` (aplica a regra do 3º decimal, uma única vez, no final).
+- Teste: base de 3.768,07 × 20% = 753,614 **não** pode virar 753,61 antes de multiplicar por 11%.
