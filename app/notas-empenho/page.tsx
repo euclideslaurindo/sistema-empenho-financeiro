@@ -249,7 +249,6 @@ export default function NotasEmpenho() {
       dataProvisaoConcedida: data.dataProvisaoConcedida || null,
       dataEmissao: data.dataEmissao || null,
       ...montarPayloadCredores(credores),
-      status: "EMITIDO",
     };
 
     try {

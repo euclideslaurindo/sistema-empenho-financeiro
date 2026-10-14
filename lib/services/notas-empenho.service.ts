@@ -5,6 +5,7 @@ import { NotaEmpenhoDB, NeCredorResposta } from '@/lib/types/db';
 import { parseFormNumber } from '@/lib/utils';
 import { toCents, fromCents, formatarBRL } from '@/lib/money';
 import { somenteDigitos, mensagemSomaBrutos } from '@/lib/ne-credores';
+import { statusPeloSaldo } from '@/lib/status-ne';
 
 export type ServiceResult<T = any> =
   | { success: true; data: T; status?: number }
@@ -330,7 +331,9 @@ export class NotasEmpenhoService {
     }
 
     const parsed = criarNotaEmpenhoSchema.parse(rawData);
-    const { numero, valor: valorDecimal, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao, credorNome, cpfCnpj, credores } = parsed;
+    // `status` do payload é ignorado: NE nova ainda não tem OP, então é sempre EMITIDO.
+    const { numero, valor: valorDecimal, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, dataProvisaoConcedida, dataEmissao, credorNome, cpfCnpj, credores } = parsed;
+    const status = 'EMITIDO';
     const valorCents = toCents(valorDecimal);
 
     let brutos: Array<{ digitos: string; cpfCnpj: string; brutoCents: number }> | null = null;
@@ -369,14 +372,14 @@ export class NotasEmpenhoService {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [id, exercicio, numero.trim(), valorDecimal, dataPagamento || null, dataProvisaoConcedida || null, dataEmissao || null,
            unidadeOrcamentaria?.trim() || '', elemento?.trim() || '', subelemento?.trim() || '',
-           gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', usuarioId, legadoNome, legadoCpf]
+           gestao?.trim() || '', status, historico?.trim() || '', usuarioId, legadoNome, legadoCpf]
         );
 
         await inserirLinhasCredores(conn, numero.trim(), linhas, usuarioId);
 
         await registrarAuditoriaNe(conn, id, 'CREATE', null, {
           id, numero: numero.trim(), valor: valorDecimal, elemento: elemento?.trim() || '', subelemento: subelemento?.trim() || '',
-          status: status || 'EMITIDO', credorNome: legadoNome, cpfCnpj: legadoCpf, credores: linhasParaAuditoria(linhas),
+          status, credorNome: legadoNome, cpfCnpj: legadoCpf, credores: linhasParaAuditoria(linhas),
         }, usuarioId);
 
         return { id };
@@ -396,7 +399,9 @@ export class NotasEmpenhoService {
       return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
     }
 
-    const { numero, valor, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, status, dataProvisaoConcedida, dataEmissao, credorNome, cpfCnpj } = body;
+    // `status` do payload é ignorado: ele é derivado do saldo mais abaixo
+    // (antes, a tela mandava sempre EMITIDO e reabria NE parcial/liquidada/cancelada).
+    const { numero, valor, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, dataProvisaoConcedida, dataEmissao, credorNome, cpfCnpj } = body;
 
     const valorDecimal = parseFormNumber(valor);
     if (valorDecimal <= 0) {
@@ -442,6 +447,7 @@ export class NotasEmpenhoService {
         if (valorDecimal < totalPago) {
           throw { status: 409, error: `Não é possível reduzir o valor da NE para R$ ${valorDecimal.toFixed(2)} pois já foram geradas OPs no valor total de R$ ${totalPago.toFixed(2)}.` };
         }
+        const status = statusPeloSaldo(valorCents, toCents(totalPago), neAntes.status);
 
         // tabela de dotação ainda não existe no banco — sem ajuste de saldo aqui
 
@@ -531,7 +537,7 @@ export class NotasEmpenhoService {
            WHERE id = ?`,
           [numero?.trim() || '', valorDecimal, dataPagamento || null, dataProvisaoConcedida || null, dataEmissao || null,
            unidadeOrcamentaria?.trim() || '', elemento?.trim() || '', subelemento?.trim() || '',
-           gestao?.trim() || '', status || 'EMITIDO', historico?.trim() || '', usuarioId,
+           gestao?.trim() || '', status, historico?.trim() || '', usuarioId,
            legadoNome, legadoCpf, id]
         );
 
@@ -552,7 +558,7 @@ export class NotasEmpenhoService {
           { ...neAntes, credores: linhasParaAuditoria(linhasAtuais) },
           {
             id, numero: numeroNovo, valor: valorDecimal, elemento: elemento?.trim() || '', subelemento: subelemento?.trim() || '',
-            status: status || 'EMITIDO', credorNome: legadoNome, cpfCnpj: legadoCpf, credores: linhasParaAuditoria(linhasFinais),
+            status, credorNome: legadoNome, cpfCnpj: legadoCpf, credores: linhasParaAuditoria(linhasFinais),
           },
           usuarioId
         );

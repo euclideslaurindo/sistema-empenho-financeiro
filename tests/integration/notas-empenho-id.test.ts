@@ -105,6 +105,66 @@ describe('Integração API Notas de Empenho [id]', () => {
     });
   });
 
+  describe('PUT — status da NE (PR 0 da T31)', () => {
+    // Antes, a tela mandava sempre status "EMITIDO" e o serviço gravava,
+    // reabrindo NE parcial, liquidada e cancelada. Agora vem do saldo.
+    function editarCom(ne: { valor: string; status: string }, totalPago: number, body: any = {}) {
+      const chamadas: Array<[string, any[]]> = [];
+      (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
+      (withTransaction as any).mockImplementationOnce(async (cb: any) =>
+        cb({
+          execute: vi.fn(async (sql: string, params: any[] = []) => {
+            chamadas.push([sql, params]);
+            if (sql.includes('FROM notas_empenho WHERE id = ? FOR UPDATE')) return [[{ id: 'ne-123', numero: 'NE-001', ...ne }]];
+            if (sql.includes('SUM(op.valor_pagamento)')) return [[{ total_pago: totalPago }]];
+            if (sql.includes('SELECT id FROM usuarios')) return [[{ id: '123' }]];
+            return [[]];
+          }),
+        })
+      );
+      const req = new NextRequest('http://localhost:3000/api/notas-empenho/ne-123', {
+        method: 'PUT',
+        body: JSON.stringify({ numero: 'NE-001', valor: Number(ne.valor), ...body }),
+      });
+      return { chamadas, resposta: PUT(req, { params: Promise.resolve({ id: 'ne-123' }) }) as Promise<any> };
+    }
+    const statusGravado = (chamadas: Array<[string, any[]]>) =>
+      chamadas.find(([sql]) => sql.includes('UPDATE notas_empenho'))![1][9];
+    const statusAuditado = (chamadas: Array<[string, any[]]>) =>
+      JSON.parse(chamadas.find(([sql]) => sql.includes('INSERT INTO auditoria_financeira'))![1][5]).status;
+
+    test('NE parcial editada continua PARCIALMENTE PAGO (a tela mandaria EMITIDO)', async () => {
+      const { chamadas, resposta } = editarCom({ valor: '10000.00', status: 'PARCIALMENTE PAGO' }, 3000, { status: 'EMITIDO' });
+      expect((await resposta).status).toBe(200);
+      expect(statusGravado(chamadas)).toBe('PARCIALMENTE PAGO');
+      expect(statusAuditado(chamadas)).toBe('PARCIALMENTE PAGO');
+    });
+
+    test('NE liquidada editada sem mudar o valor continua LIQUIDADO', async () => {
+      const { chamadas, resposta } = editarCom({ valor: '10000.00', status: 'LIQUIDADO' }, 10000);
+      expect((await resposta).status).toBe(200);
+      expect(statusGravado(chamadas)).toBe('LIQUIDADO');
+    });
+
+    test('NE liquidada com valor aumentado passa a PARCIALMENTE PAGO', async () => {
+      const { chamadas, resposta } = editarCom({ valor: '10000.00', status: 'LIQUIDADO' }, 10000, { valor: 12000 });
+      expect((await resposta).status).toBe(200);
+      expect(statusGravado(chamadas)).toBe('PARCIALMENTE PAGO');
+    });
+
+    test('NE cancelada editada continua CANCELADO', async () => {
+      const { chamadas, resposta } = editarCom({ valor: '500.00', status: 'CANCELADO' }, 0, { status: 'EMITIDO' });
+      expect((await resposta).status).toBe(200);
+      expect(statusGravado(chamadas)).toBe('CANCELADO');
+    });
+
+    test('status vindo do cliente é ignorado: NE sem OP fica EMITIDO mesmo pedindo CANCELADO', async () => {
+      const { chamadas, resposta } = editarCom({ valor: '500.00', status: 'EMITIDO' }, 0, { status: 'CANCELADO' });
+      expect((await resposta).status).toBe(200);
+      expect(statusGravado(chamadas)).toBe('EMITIDO');
+    });
+  });
+
   describe('PUT — vários credores (T15)', () => {
     const CADASTRO = [
       { cpf_cnpj: '11.111.111/0001-11', nome: 'Maria Cavalcanti ME', ativo: 1 },
