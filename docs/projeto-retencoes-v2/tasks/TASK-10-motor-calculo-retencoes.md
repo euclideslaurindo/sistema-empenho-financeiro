@@ -1,4 +1,4 @@
-# TASK-10 — Motor de cálculo de retenções no servidor
+# TASK-10 — Motor de cálculo de retenções no servidor (estratégias, MEI e patronal informativa)
 <!-- milestone: M4 - Ordem de Pagamento | labels: backend,calculo,financeiro,P0 -->
 
 | Fase | Prioridade | Estimativa | Depende de | Requisito |
@@ -41,9 +41,14 @@ interface EntradaCalculo {
   regras: Record<string, CampoTributario[]>;   // de elemento_retencoes
   informados: Partial<Record<CampoTributario|CampoDesconto, number /*cents*/>>;
   perfil: 'ADMIN'|'GESTOR'|'CONSULTA';
+  perfilCalculo: 'SIMPLES'|'TRANSPORTE_AUTONOMO';   // de elementos_despesa.perfil_calculo
+  credorIsMei: boolean;                             // de credores.is_mei, lido na transação
+  municipioCredor?: string | null;                  // usado pela estratégia TRANSPORTE_AUTONOMO (ISS por município)
+  dataReferencia: string;                           // data_pagamento > data_emissao > hoje (vigência das tabelas)
 }
 interface ResultadoCalculo {
-  itens: Record<string, number>;               // cents por campo
+  itens: Record<string, number>;               // cents por campo (inclui informativos, ex.: patronal)
+  informativos: string[];                      // campos com desconta_credor = 0 (fora do total)
   totalDescontosCents: number;
   liquidoCents: number;
   avisos: string[];
@@ -52,6 +57,8 @@ interface ResultadoCalculo {
 ```
 
 ### Regras (na ordem)
+0. **Credor MEI** (`credores.is_mei = 1`, lido do banco dentro da transação, nunca do cliente): **todas as retenções tributárias valem 0** (IRRF, ISS, INSS 11%, Patronal, SEST/SENAT) em **qualquer elemento**, com `aviso: 'Isento (MEI)'`. Taxa bancária, Taxa PIX e Outros continuam digitáveis (suposição; confirmar). O ADMIN ainda pode sobrescrever manualmente, com aviso.
+0b. **Estratégia pelo perfil do elemento:** `SIMPLES` (as regras abaixo, percentuais sobre o bruto) ou `TRANSPORTE_AUTONOMO` (T25). Até a T25 existir, o 3.3.90.33 usa `SIMPLES`.
 1. **Elemento desconhecido** (`null` ou sem linha em `elementos_despesa`): nenhum imposto automático; devolver aviso e **exigir valores digitados** apenas se o campo for editável; não assumir "todos os impostos".
 2. Para cada campo tributário **ativo**:
    - se o elemento não o aplica → `0` (mesmo que o cliente envie valor);
@@ -59,7 +66,7 @@ interface ResultadoCalculo {
    - se não automático → valor informado (obrigatório, `0 ≤ v ≤ bruto`).
 3. **Sobrescrita manual:** se `editavel_operador` **ou** `perfil = ADMIN`, e o cliente enviou valor, usar o enviado (validado). Caso contrário, ignorar o enviado.
 4. Campos de desconto (`outros`, `taxa_bancaria`, `taxa_pix`): independem do elemento; usar o valor informado se o campo estiver ativo e permitido (`editavel_operador` ou ADMIN); senão `0`.
-5. `total = Σ itens`; `líquido = bruto − total`. Se `total > bruto` → **422** "Total de descontos maior que o valor a pagar".
+5. `total = Σ itens com desconta_credor = 1` (a **patronal é informativa e não entra**); `líquido = bruto − total`. Se `total > bruto` → **422** "Total de descontos maior que o valor a pagar". Cada item é **arredondado primeiro** (T01) e só depois somado, como a planilha faz.
 6. O `snapshot` guarda alíquotas, flags e valores usados.
 
 ### Integração em `OrdemPagamentoService`
@@ -82,6 +89,9 @@ interface ResultadoCalculo {
 - [ ] Alterar a alíquota no admin muda as OPs **novas** e não muda as gravadas.
 - [ ] `taxa_bancaria` e `taxa_pix` são gravadas, entram em `total_descontos` e reduzem `valor_liquido`.
 - [ ] `retencoes_snapshot` preenchido nas OPs novas.
+- [ ] Credor MEI: todas as retenções 0 em qualquer elemento, com aviso "Isento (MEI)".
+- [ ] Patronal calculada e gravada, mas **fora** de `total_descontos` e do líquido (caso A do README: descontos 200,00, líquido 800,00, patronal 200,00 só informativa).
+- [ ] Elemento sem perfil conhecido cai em `SIMPLES` e registra aviso.
 - [ ] Todos os testes antigos relevantes foram atualizados e passam.
 
 ## Plano de testes
@@ -92,4 +102,12 @@ Unitários do motor (tabela por elemento × perfil × flags), integração de `c
 - Mudar o `INSERT`/`UPDATE` exige atualizar todos os mocks de SQL por trecho nos testes existentes.
 
 ## Decisões em aberto relacionadas
-D1, D2, D11, D12, D13.
+D1, D2, D11, D12, D13. **Fechadas:** D15 (patronal informativa), D16 (MEI isento de tudo).
+
+## Atualização de escopo (decisões de 07/10/2026)
+- **Prévia no servidor:** criar `POST /api/ordens-pagamento/previa-retencoes` (ADMIN/GESTOR), que recebe `numeroNe`, `credorCpfCnpj`, `valorPagamento` e os campos digitados (taxa bancária, PIX, outros) e devolve os valores calculados pelo **mesmo motor** da gravação. É o que o formulário (T11) usa; assim o navegador não precisa conhecer tabelas do IRRF nem regras do transporte.
+- A estratégia `TRANSPORTE_AUTONOMO` é implementada na **T25**; a regra do **MEI** (regra 0) já vale aqui e a tela dela está na **T26**.
+- O leitor de configuração (`obterConfigRetencoes`) continua sem cache de servidor.
+
+## Correção (13/10/2026, D43)
+O que foi implementado difere do item "Prévia no servidor" acima: a rota é **`POST /api/ordens-pagamento/previa`** (não existe `previa-retencoes`), e a tela usa a prévia do servidor **só no 3.3.90.33** (`PreviaTransporteEffect`); nos demais elementos o cálculo é feito **no navegador** (`AutoCalcEffect`, mesmas regras do motor). A gravação continua sendo a autoridade (o servidor recalcula ao salvar). Decisão mantida na rodada 2 (D43): na emissão em lote, NE do .33 usa `POST /api/ordens-pagamento/previa-lote`; os demais elementos calculam localmente por linha (T34/T35).

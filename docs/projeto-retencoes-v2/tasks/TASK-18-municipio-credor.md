@@ -1,9 +1,9 @@
 # TASK-18 — Município do credor
-<!-- milestone: M7 - Município | labels: backend,frontend,credores,P2 -->
+<!-- milestone: M7 - Município | labels: backend,frontend,credores,P1 -->
 
 | Fase | Prioridade | Estimativa | Depende de | Requisito |
 |---|---|---|---|---|
-| 7 Município | P2 | ~3 h | – | R8 |
+| 7 Município | P1 | ~3 h | – | R8, R13 |
 
 ## Objetivo
 Garantir que o **município** do credor seja salvo, editado, listado e visível nas telas onde o credor aparece.
@@ -46,3 +46,13 @@ Se a auditoria não encontrar nenhum defeito, a task se resume a **exibir** o mu
 
 ## Decisões em aberto relacionadas
 D10.
+
+## Atualização de escopo (decisões de 07/10/2026)
+O município deixou de ser só informativo: no **3.3.90.33** ele define o ISS e a **taxa de expediente da prefeitura** (T24/T25). Por isso, além do que está acima:
+- **Normalização para comparação:** minúsculas, sem acentos, sem espaços duplicados, sem sufixo de UF (ex.: "Águas Belas/PE" ≡ "aguas belas"), com apelidos conhecidos (ex.: "SBU" → "São Bento do Una").
+- Credor com município que **não existe** na tabela de ISS: a OP usa o ISS padrão e **avisa** "município sem cadastro de ISS", em vez de falhar.
+- A tela de credores pode oferecer sugestão a partir dos municípios cadastrados na T24 (sem impedir texto livre).
+- Passa a ser **P1** (era P2) por influenciar valores de OP.
+
+## Atualização de escopo (rodada 2, 13/10/2026)
+O **Município** do cadastro (endereço) e o novo **Município (Expediente)** são coisas diferentes. A taxa de expediente da prefeitura passa a vir **somente** do Município (Expediente) (T33); a `cidade` do endereço **não** é mais usada no cálculo. A normalização e a tabela `iss_municipios` continuam valendo.
