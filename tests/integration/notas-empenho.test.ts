@@ -66,6 +66,44 @@ describe('Integração API Notas de Empenho', () => {
       expect(chamadas.some(([sql]) => sql.includes('INSERT INTO ne_credores'))).toBe(false);
     });
 
+    describe('datas e exercício (T29)', () => {
+      const inserida = (chamadas: Array<[string, any[]]>) => chamadas.find(([sql]) => sql.includes('INSERT INTO notas_empenho'))![1];
+
+      test('NE sem nenhuma data -> 201, datas NULL', async () => {
+        const chamadas = conexaoCriar();
+        const res = await postar({ numero: '2026NE000123', valor: '100.00', elemento: '3.3.90.36' });
+        expect(res.status).toBe(201);
+        const p = inserida(chamadas);
+        expect([p[4], p[5], p[6]]).toEqual([null, null, null]); // data_pagamento, data_provisao, data_emissao
+      });
+
+      test('exercício vem do número da NE (D42)', async () => {
+        const chamadas = conexaoCriar();
+        await postar({ numero: '2025NE000777', valor: '100.00', dataProvisaoConcedida: '2026-01-15' });
+        expect(inserida(chamadas)[1]).toBe('2025');
+      });
+
+      test('número sem ano: exercício da Data de Provisão', async () => {
+        const chamadas = conexaoCriar();
+        await postar({ numero: 'NE-777', valor: '100.00', dataProvisaoConcedida: '2024-08-01' });
+        expect(inserida(chamadas)[1]).toBe('2024');
+      });
+
+      test('sem ano no número nem provisão: ano corrente', async () => {
+        const chamadas = conexaoCriar();
+        await postar({ numero: 'NE-778', valor: '100.00' });
+        expect(inserida(chamadas)[1]).toBe(String(new Date().getFullYear()));
+      });
+
+      test('compatibilidade: dataPagamento/dataEmissao vindas no payload são gravadas', async () => {
+        const chamadas = conexaoCriar();
+        await postar({ numero: '2026NE000124', valor: '100.00', dataPagamento: '2026-12-31', dataEmissao: '2026-12-01' });
+        const p = inserida(chamadas);
+        expect(p[4]).toBe('2026-12-31');
+        expect(p[6]).toBe('2026-12-01');
+      });
+    });
+
     test('status do payload é ignorado: NE nova é sempre EMITIDO', async () => {
       const chamadas = conexaoCriar();
       const res = await postar({ numero: 'NE-2026-002', valor: '100.00', elemento: '3.3.90.36', status: 'LIQUIDADO' });
@@ -278,6 +316,18 @@ describe('Integração API Notas de Empenho', () => {
       expect(res.status).toBe(200);
       expect(data.ne.saldoDisponivel).toBe(5000);
       expect(data.ne.credores).toEqual([]);
+    });
+
+    test('lista e busca por número trazem a data de cadastro (criadaEm) — coluna "Cadastro" (T29)', async () => {
+      mockLeitura([{ id: 'ne-1', numero: 'NE-001', valor: '100.00', criadaEm: '2026-10-14' }], [], []);
+      const lista: any = await GET(new NextRequest('http://localhost:3000/api/notas-empenho'));
+      expect((await lista.json()).notas[0].criadaEm).toBe('2026-10-14');
+      await GET(new NextRequest('http://localhost:3000/api/notas-empenho?numero=NE-001'));
+      const consultas = (query as any).mock.calls.map((c: any[]) => c[0] as string).filter((s: string) => s.includes('FROM notas_empenho ne'));
+      expect(consultas.length).toBeGreaterThanOrEqual(2);
+      for (const sql of consultas.filter((s: string) => !s.includes('COUNT(*)'))) {
+        expect(sql).toContain("DATE_FORMAT(ne.created_at, '%Y-%m-%d') as criadaEm");
+      }
     });
 
     test('GET com ?numero= NE não existente retorna 404', async () => {

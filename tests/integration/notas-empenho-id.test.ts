@@ -15,6 +15,13 @@ vi.mock('@/lib/auth', () => ({
 import { getAuthUser } from '@/lib/auth';
 import { withTransaction } from '@/lib/db';
 
+/** Colunas e valores do `UPDATE notas_empenho … SET a = ?, b = ? … WHERE id = ?`, por nome. */
+function gravadoNoUpdate(chamadas: Array<[string, any[]]>): Record<string, any> {
+  const [sql, valores] = chamadas.find(([s]) => s.includes('UPDATE notas_empenho'))!;
+  const colunas = sql.match(/SET (.*) WHERE/s)![1].split(',').map((c) => c.replace('= ?', '').trim());
+  return Object.fromEntries(colunas.map((c, i) => [c, valores[i]]));
+}
+
 describe('Integração API Notas de Empenho [id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -128,8 +135,7 @@ describe('Integração API Notas de Empenho [id]', () => {
       });
       return { chamadas, resposta: PUT(req, { params: Promise.resolve({ id: 'ne-123' }) }) as Promise<any> };
     }
-    const statusGravado = (chamadas: Array<[string, any[]]>) =>
-      chamadas.find(([sql]) => sql.includes('UPDATE notas_empenho'))![1][9];
+    const statusGravado = (chamadas: Array<[string, any[]]>) => gravadoNoUpdate(chamadas).status;
     const statusAuditado = (chamadas: Array<[string, any[]]>) =>
       JSON.parse(chamadas.find(([sql]) => sql.includes('INSERT INTO auditoria_financeira'))![1][5]).status;
 
@@ -162,6 +168,52 @@ describe('Integração API Notas de Empenho [id]', () => {
       const { chamadas, resposta } = editarCom({ valor: '500.00', status: 'EMITIDO' }, 0, { status: 'CANCELADO' });
       expect((await resposta).status).toBe(200);
       expect(statusGravado(chamadas)).toBe('EMITIDO');
+    });
+  });
+
+  describe('PUT — datas da NE (T29)', () => {
+    function editar(body: any) {
+      const chamadas: Array<[string, any[]]> = [];
+      (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
+      (withTransaction as any).mockImplementationOnce(async (cb: any) =>
+        cb({
+          execute: vi.fn(async (sql: string, params: any[] = []) => {
+            chamadas.push([sql, params]);
+            if (sql.includes('FROM notas_empenho WHERE id = ? FOR UPDATE')) {
+              return [[{ id: 'ne-123', numero: 'NE-001', valor: '100.00', status: 'EMITIDO', data_pagamento: '2026-03-10', data_emissao: '2026-03-01' }]];
+            }
+            if (sql.includes('SUM(op.valor_pagamento)')) return [[{ total_pago: 0 }]];
+            if (sql.includes('SELECT id FROM usuarios')) return [[{ id: '123' }]];
+            return [[]];
+          }),
+        })
+      );
+      const resposta = PUT(
+        new NextRequest('http://localhost:3000/api/notas-empenho/ne-123', {
+          method: 'PUT',
+          body: JSON.stringify({ numero: 'NE-001', valor: 100, ...body }),
+        }),
+        { params: Promise.resolve({ id: 'ne-123' }) }
+      ) as Promise<any>;
+      return { chamadas, resposta };
+    }
+
+    test('sem dataPagamento/dataEmissao no payload, o UPDATE não toca nessas colunas (NE antiga mantém as datas)', async () => {
+      const { chamadas, resposta } = editar({ dataProvisaoConcedida: '2026-02-01', historico: 'Obs' });
+      expect((await resposta).status).toBe(200);
+      const gravado = gravadoNoUpdate(chamadas);
+      expect(gravado).not.toHaveProperty('data_pagamento');
+      expect(gravado).not.toHaveProperty('data_emissao');
+      expect(gravado.data_provisao_concedida).toBe('2026-02-01');
+      expect(gravado).not.toHaveProperty('exercicio');
+    });
+
+    test('com as chaves no payload (compatibilidade), grava as datas', async () => {
+      const { chamadas, resposta } = editar({ dataPagamento: '2026-05-05', dataEmissao: null });
+      expect((await resposta).status).toBe(200);
+      const gravado = gravadoNoUpdate(chamadas);
+      expect(gravado.data_pagamento).toBe('2026-05-05');
+      expect(gravado.data_emissao).toBeNull();
     });
   });
 
