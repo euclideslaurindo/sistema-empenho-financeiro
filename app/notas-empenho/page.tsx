@@ -22,6 +22,8 @@ import { useAppStore } from "@/lib/store";
 import { maskCurrency } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
 import { SubelementoCampo } from "@/components/ne-form/SubelementoCampo";
+import { FaixaSaldoNe, percentualDaBarra } from "@/components/ne-form/FaixaSaldoNe";
+import { formatarBRL, toCents } from "@/lib/money";
 
 interface NotaEmpenho {
   id: string;
@@ -38,6 +40,8 @@ interface NotaEmpenho {
   historico: string;
   dataProvisaoConcedida?: string;
   quemAtualizou?: string;
+  /** T31: valor, gasto (soma das OPs), restante, % gasto e quantidade de OPs. */
+  saldo?: { valor: number; gasto: number; restante: number; percentualGasto: number; qtdOps: number };
 }
 
 /** Valores do formulário a partir de uma NE gravada (editar ou "carregar dados da NE"). */
@@ -82,6 +86,8 @@ export default function NotasEmpenho() {
   const [modalVisible, setModalVisible] = useState(false);
   const filterItems = () => notas;
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Gasto (OPs já emitidas) da NE aberta no formulário; 0 em NE nova (T31).
+  const [gastoNeCents, setGastoNeCents] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
 
   const fetchNotas = useCallback(async (busca = "", page = 1) => {
@@ -158,6 +164,12 @@ export default function NotasEmpenho() {
   const handleLoadDuplicate = (ne: NotaEmpenho) => {
     reset(formularioDaNe(ne));
     setEditingId(ne.id || "");
+    setGastoNeCents(0);
+    // A consulta de duplicidade não traz o saldo: busca o da NE carregada.
+    apiClient
+      .get(`/api/notas-empenho/saldo?numero=${encodeURIComponent(ne.numero)}`)
+      .then((d: any) => setGastoNeCents(toCents(d?.saldo?.gasto ?? 0)))
+      .catch(() => setGastoNeCents(0));
     toast.success("Dados preenchidos com base na NE " + ne.numero);
   };
 
@@ -173,6 +185,7 @@ export default function NotasEmpenho() {
       dataProvisaoConcedida: "",
     });
     setEditingId(null);
+    setGastoNeCents(0);
   };
 
   const onSubmit = async (data: any) => {
@@ -429,6 +442,8 @@ export default function NotasEmpenho() {
                 className="w-full px-4 py-3 rounded-xl border border-slate-200/50 bg-slate-50 text-sm font-medium focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300 resize-none text-slate-700"
               ></textarea>
             </div>
+
+            <FaixaSaldoNe valorCents={toCents(valorNEWatch ?? "")} gastoCents={gastoNeCents} />
           </form>
 
           {duplicatedNe && (
@@ -483,6 +498,8 @@ export default function NotasEmpenho() {
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Quem Atualizou</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Observações</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Valor</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Gasto</th>
+                  <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Restante</th>
                   <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-center">Status</th>
                   <th className="pb-4 pr-2 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Ações</th>
                 </tr>
@@ -490,13 +507,13 @@ export default function NotasEmpenho() {
               <tbody className="divide-y divide-slate-50">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
+                    <td colSpan={9} className="py-12 text-center text-slate-400 font-bold">
                        Carregando...
                     </td>
                   </tr>
                 ) : notas.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400 font-bold">
+                    <td colSpan={9} className="py-12 text-center text-slate-400 font-bold">
                       Nenhuma nota encontrada.
                     </td>
                   </tr>
@@ -536,6 +553,21 @@ export default function NotasEmpenho() {
                       <td className={`py-5 font-black text-right ${isCancelado ? textStyle : 'text-slate-700'}`}>
                         {Number(ne.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </td>
+                      <td className={`py-5 font-semibold text-right ${isCancelado ? textStyle : 'text-slate-600'}`}>
+                        {ne.saldo ? `R$ ${formatarBRL(toCents(ne.saldo.gasto))}` : "-"}
+                      </td>
+                      <td className={`py-5 text-right ${isCancelado ? textStyle : ''}`}>
+                        {ne.saldo ? (
+                          <div className="inline-flex flex-col items-end gap-1">
+                            <span className={`font-black ${ne.saldo.restante < 0 ? 'text-red-600' : 'text-emerald-700'}`}>R$ {formatarBRL(toCents(ne.saldo.restante))}</span>
+                            <span className="block h-1.5 w-20 rounded-full bg-slate-200 overflow-hidden" aria-hidden="true">
+                              <span className="block h-full bg-blue-800" style={{ width: `${percentualDaBarra(toCents(ne.saldo.valor), toCents(ne.saldo.gasto))}%` }} />
+                            </span>
+                          </div>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
                       <td className="py-5 text-center">
                         {getStatusBadge(ne.status)}
                       </td>
@@ -549,6 +581,7 @@ export default function NotasEmpenho() {
                                 setSelecionadoId(ne.id);
                                 setEditingId(ne.id);
                                 reset(formularioDaNe(ne));
+                                setGastoNeCents(toCents(ne.saldo?.gasto ?? 0));
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                               }}
                               className="p-1.5 text-slate-400 hover:text-blue-900 hover:bg-white rounded-md transition-all"

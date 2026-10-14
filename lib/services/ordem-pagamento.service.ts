@@ -6,6 +6,7 @@ import { calcularRetencoesDaOp } from '@/lib/services/calculo-op.service';
 import type { CampoTributario, CampoDesconto } from '@/lib/retencoes';
 import { toCents, fromCents } from '@/lib/money';
 import { calcularProximoNumeroOp } from '@/lib/services/numeracao-op';
+import { recalcularStatusNe } from '@/lib/services/saldo-ne';
 import { entraDarfDaConfig, removerDarfDaOp, sincronizarDarfDaOp } from '@/lib/services/darf.service';
 
 export type ServiceResult<T = any> = 
@@ -257,15 +258,16 @@ export class OrdemPagamentoService {
           'SELECT COALESCE(SUM(valor_pagamento), 0) as total_pago FROM ordens_pagamento WHERE numero_ne = ? FOR UPDATE',
           [neReal]
         );
-        const totalJaPago = parseFloat(paidRows[0]?.total_pago) || 0;
-        const saldoDisponivel = Math.round((valorNe - totalJaPago) * 100) / 100;
+        // Saldo em centavos inteiros (T31), nunca `valor - pago` em ponto flutuante.
+        const saldoCents = toCents(valorNe) - toCents(paidRows[0]?.total_pago ?? 0);
+        const saldoDisponivel = fromCents(saldoCents);
         // Mesma conversão de sempre, mas passando por centavos inteiros (T01)
         // em vez de só Math.round(x*100)/100 — é o valor que entra no motor
         // de retenções, bom já higienizar aqui.
         const brutoCents = toCents(vPagamento);
         const vPagamentoArredondado = fromCents(brutoCents);
 
-        if (vPagamentoArredondado > saldoDisponivel) {
+        if (brutoCents > saldoCents) {
           throw {
             status: 422,
             error: `Saldo insuficiente. Saldo disponível da NE: R$ ${saldoDisponivel.toFixed(2).replace('.', ',')}. Valor solicitado: R$ ${vPagamentoArredondado.toFixed(2).replace('.', ',')}`
@@ -377,9 +379,8 @@ export class OrdemPagamentoService {
           { entraDarf: entraDarfDaConfig(configCampos) }
         );
 
-        const saldoRestante = Math.round((saldoDisponivel - vPagamentoArredondado) * 100) / 100;
-        const novoStatus = saldoRestante <= 0 ? 'LIQUIDADO' : saldoRestante < valorNe ? 'PARCIALMENTE PAGO' : 'EMITIDO';
-        await conn.execute('UPDATE notas_empenho SET status = ? WHERE numero = ?', [novoStatus, neReal]);
+        const saldoRestante = fromCents(saldoCents - brutoCents);
+        await recalcularStatusNe(conn, neReal);
 
         return {
           success: true as const,
@@ -482,8 +483,10 @@ export class OrdemPagamentoService {
           if (neObj.status === 'CANCELADO') {
             throw { status: 409, error: `Não é possível atualizar OP da NE "${neSegura}" pois ela foi CANCELADA.` };
           }
-          saldoDisp = Math.round(parseFloat(neObj.saldoDisponivel) * 100) / 100;
-          if (vPagamentoArredondado > saldoDisp) {
+          // Em centavos (T31). O SQL já soma em DECIMAL; aqui só se compara.
+          const saldoCents = toCents(neObj.saldoDisponivel ?? 0);
+          saldoDisp = fromCents(saldoCents);
+          if (brutoCents > saldoCents) {
             throw { status: 409, error: `Valor do pagamento excede o saldo disponível da NE (R$ ${saldoDisp.toFixed(2)}).` };
           }
           elementoGravado = neObj.elemento || '';
@@ -610,25 +613,8 @@ export class OrdemPagamentoService {
           );
         }
 
-        // atualiza status da NE conforme saldo restante
-        const [neData] = await conn.execute<any[]>(
-          `SELECT ne.valor,
-                  (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel
-           FROM notas_empenho ne
-           LEFT JOIN (SELECT numero_ne, SUM(valor_pagamento) as total_pago FROM ordens_pagamento GROUP BY numero_ne) op_sum
-             ON op_sum.numero_ne = ne.numero
-           WHERE ne.numero = ? FOR UPDATE`,
-          [neSegura]
-        );
-
-        if (neData && (neData as any[]).length > 0) {
-          const saldo = Math.round(parseFloat((neData as any[])[0].saldoDisponivel) * 100) / 100;
-          const valorTotal = Math.round(parseFloat((neData as any[])[0].valor) * 100) / 100;
-          let novoStatus = 'EMITIDO';
-          if (saldo <= 0) novoStatus = 'LIQUIDADO';
-          else if (saldo < valorTotal) novoStatus = 'PARCIALMENTE PAGO';
-          await conn.execute('UPDATE notas_empenho SET status = ? WHERE numero = ?', [novoStatus, neSegura]);
-        }
+        // atualiza o status da NE conforme o saldo (regra única, T31)
+        await recalcularStatusNe(conn, neSegura);
 
         return { success: true as const, data: null, status: 200 };
       });
@@ -676,26 +662,8 @@ export class OrdemPagamentoService {
           [crypto.randomUUID(), 'ordens_pagamento', id, 'DELETE', JSON.stringify(oldOp), null, usuarioId]
         );
 
-        const [neData] = await conn.execute<any[]>(
-          `SELECT ne.valor,
-                  (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel
-           FROM notas_empenho ne
-           LEFT JOIN (SELECT numero_ne, SUM(valor_pagamento) as total_pago FROM ordens_pagamento GROUP BY numero_ne) op_sum
-             ON op_sum.numero_ne = ne.numero
-           WHERE ne.numero = ? FOR UPDATE`,
-          [numeroNe]
-        );
-
-        if (neData && (neData as any[]).length > 0) {
-          const saldo = Math.round(parseFloat((neData as any[])[0].saldoDisponivel) * 100) / 100;
-          const valorTotal = Math.round(parseFloat((neData as any[])[0].valor) * 100) / 100;
-
-          let novoStatus = 'EMITIDO';
-          if (saldo <= 0) novoStatus = 'LIQUIDADO';
-          else if (saldo < valorTotal) novoStatus = 'PARCIALMENTE PAGO';
-
-          await conn.execute('UPDATE notas_empenho SET status = ? WHERE numero = ?', [novoStatus, numeroNe]);
-        }
+        // devolve o saldo à NE e recalcula o status (regra única, T31)
+        await recalcularStatusNe(conn, numeroNe);
         return { success: true as const, data: null, status: 200 };
       });
 
