@@ -30,7 +30,6 @@ const NE_ANTIGA = {
   unidadeOrcamentaria: 'Secretaria de Educação', elemento: '3.3.90.36 - Outros serviços PF', subelemento: 'Locação',
   gestao: '140101', status: 'EMITIDO', historico: 'Observação antiga', dataProvisaoConcedida: '2026-02-01',
   dataPagamento: '2026-03-10', dataEmissao: '2026-03-01',
-  credores: [{ cpfCnpj: '222.222.222-22', nome: 'José Silva', valorBruto: 100, valorPago: 0, saldo: 100 }],
 };
 
 describe('Tela da Nota de Empenho (T29)', () => {
@@ -90,5 +89,62 @@ describe('Tela da Nota de Empenho (T29)', () => {
     expect(payload).not.toHaveProperty('dataPagamento');
     expect(payload).not.toHaveProperty('dataEmissao');
     expect(payload).toMatchObject({ historico: 'Observação antiga', subelemento: 'Locação', dataProvisaoConcedida: '2026-02-01' });
+  });
+});
+
+describe('Tela da Nota de Empenho — NE sem credor (T30)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.scrollTo = vi.fn() as any;
+    global.fetch = vi.fn(async () => ({ json: async () => ({ duplicado: false }) })) as any;
+    (apiClient.get as any).mockResolvedValue({ notas: [NE_ANTIGA], pagination: { totalPages: 1 } });
+  });
+
+  test('sem seção de credores no formulário e sem coluna "Credores" na lista', async () => {
+    render(<NotasEmpenho />);
+    await screen.findByText('2026NE000001');
+    expect(screen.queryByText(/Adicionar credor|Soma dos brutos/i)).toBeNull();
+    const cabecalhos = screen.getAllByRole('columnheader').map((th: HTMLElement) => th.textContent);
+    expect(cabecalhos).not.toContain('Credores');
+  });
+
+  test('salva uma NE nova sem credor (POST sem credores)', async () => {
+    (apiClient.post as any).mockResolvedValue({ success: true, id: 'ne-novo' });
+    render(<NotasEmpenho />);
+    await screen.findByRole('heading', { name: 'Cadastro de Nota de Empenho' });
+    fireEvent.change(screen.getByLabelText('Número da NE'), { target: { value: '2026NE000300' } });
+    fireEvent.change(screen.getByLabelText('Valor R$'), { target: { value: '100,00' } });
+    const salvar = screen.getByRole('button', { name: /salvar/i });
+    expect(salvar).not.toBeDisabled();
+    fireEvent.click(salvar);
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
+    const [url, payload] = (apiClient.post as any).mock.calls[0];
+    expect(url).toBe('/api/notas-empenho');
+    expect(payload).toMatchObject({ numero: '2026NE000300' });
+    expect(payload).not.toHaveProperty('credores');
+    expect(payload).not.toHaveProperty('cpfCnpj');
+    expect(payload).not.toHaveProperty('credorNome');
+  });
+
+  test('aviso de duplicidade envia valor + elemento e o botão "Carregar dados" preenche o formulário', async () => {
+    const parecida = {
+      id: 'ne-9', numero: '2026NE000009', valor: '100.00', elemento: '3.3.90.36 - Outros serviços PF', subelemento: 'Locação',
+      unidadeOrcamentaria: 'Secretaria de Educação', gestao: '140101', historico: 'Obs da parecida', dataProvisaoConcedida: '2026-02-01',
+    };
+    global.fetch = vi.fn(async () => ({ json: async () => ({ duplicado: true, nota: parecida }) })) as any;
+    render(<NotasEmpenho />);
+    await screen.findByRole('heading', { name: 'Cadastro de Nota de Empenho' });
+    fireEvent.change(screen.getByLabelText('Elemento'), { target: { value: '3.3.90.36 - Outros serviços PF' } });
+    fireEvent.change(screen.getByLabelText('Valor R$'), { target: { value: '100,00' } });
+
+    const carregar = await screen.findByText(/Carregar dados da NE 2026NE000009/, {}, { timeout: 2000 });
+    const url = String((global.fetch as any).mock.calls.at(-1)[0]);
+    expect(url).toContain('elemento=');
+    expect(url).not.toContain('credor');
+
+    fireEvent.click(carregar);
+    await waitFor(() => expect((screen.getByLabelText('Observações') as HTMLTextAreaElement).value).toBe('Obs da parecida'));
+    expect((screen.getByLabelText('Número da NE') as HTMLInputElement).value).toBe('2026NE000009');
+    expect((screen.getByLabelText('Subelemento') as HTMLInputElement).value).toBe('Locação');
   });
 });

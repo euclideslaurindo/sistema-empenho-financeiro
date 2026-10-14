@@ -4,8 +4,7 @@ import { z } from 'zod';
 import { extrairCodigoElemento } from '@/lib/elementos';
 import { calcularRetencoesDaOp } from '@/lib/services/calculo-op.service';
 import type { CampoTributario, CampoDesconto } from '@/lib/retencoes';
-import { toCents, fromCents, formatarBRL } from '@/lib/money';
-import { somenteDigitos } from '@/lib/ne-credores';
+import { toCents, fromCents } from '@/lib/money';
 import { calcularProximoNumeroOp } from '@/lib/services/numeracao-op';
 import { entraDarfDaConfig, removerDarfDaOp, sincronizarDarfDaOp } from '@/lib/services/darf.service';
 
@@ -81,54 +80,6 @@ function montarInformados(parsedData: any): Partial<Record<CampoTributario | Cam
     }
   }
   return informados;
-}
-
-/**
- * NE com vários credores (T17): o credor da OP tem que estar em ne_credores
- * e o total pago a ele na NE não pode passar do bruto dele. NE sem linhas em
- * ne_credores (anterior à T15) continua livre — só vale o saldo total.
- * Roda dentro da transação, depois da trava da NE (FOR UPDATE), então duas
- * OPs simultâneas da mesma NE enxergam uma à outra.
- */
-async function validarSaldoCredor(
-  conn: PoolConnection,
-  numeroNe: string,
-  credorCpfCnpj: string,
-  valorCents: number,
-  opIdIgnorar?: string
-) {
-  const [linhas]: any = await conn.execute(
-    'SELECT credor_cpf_cnpj, credor_nome, valor_bruto FROM ne_credores WHERE numero_ne = ? FOR UPDATE',
-    [numeroNe]
-  );
-  if (!linhas || linhas.length === 0) return;
-
-  const digitos = somenteDigitos(credorCpfCnpj);
-  const alvo = linhas.find((l: any) => somenteDigitos(l.credor_cpf_cnpj) === digitos);
-  if (!alvo) {
-    throw { status: 422, error: `O credor ${credorCpfCnpj} não pertence à NE "${numeroNe}".` };
-  }
-
-  const [pagos]: any = await conn.execute(
-    `SELECT credor_cpf_cnpj, COALESCE(SUM(valor_pagamento), 0) as total_pago
-       FROM ordens_pagamento
-      WHERE numero_ne = ?${opIdIgnorar ? ' AND id <> ?' : ''}
-      GROUP BY credor_cpf_cnpj`,
-    opIdIgnorar ? [numeroNe, opIdIgnorar] : [numeroNe]
-  );
-  const pagoCents = (pagos || [])
-    .filter((p: any) => somenteDigitos(p.credor_cpf_cnpj) === digitos)
-    .reduce((t: number, p: any) => t + toCents(p.total_pago), 0);
-  const brutoCents = toCents(alvo.valor_bruto);
-
-  if (pagoCents + valorCents > brutoCents) {
-    throw {
-      status: 422,
-      error:
-        `Saldo do credor insuficiente. Bruto R$ ${formatarBRL(brutoCents)}, ` +
-        `já pago R$ ${formatarBRL(pagoCents)}, restante R$ ${formatarBRL(brutoCents - pagoCents)}.`,
-    };
-  }
 }
 
 export class OrdemPagamentoService {
@@ -321,7 +272,6 @@ export class OrdemPagamentoService {
           };
         }
 
-        await validarSaldoCredor(conn, neReal, credorCpfCnpj, brutoCents);
 
         let totalItensCalc = 0;
         if (itens && Array.isArray(itens)) {
@@ -541,7 +491,6 @@ export class OrdemPagamentoService {
           elementoCodigo = extrairCodigoElemento(elementoGravado);
         }
 
-        await validarSaldoCredor(conn, neSegura, credorCpfCnpj, brutoCents, id);
 
         let totalItensCalc = 0;
         if (itens && Array.isArray(itens)) {
