@@ -148,3 +148,42 @@ describe('Tela da Nota de Empenho — NE sem credor (T30)', () => {
     expect((screen.getByLabelText('Subelemento') as HTMLInputElement).value).toBe('Locação');
   });
 });
+
+describe('Tela da Nota de Empenho — saldo (T31)', () => {
+  const NE_COM_OPS = { ...NE_ANTIGA, id: 'ne-2', numero: '2026NE000002', saldo: { valor: 100, gasto: 90, restante: 10, percentualGasto: 90, qtdOps: 3 } };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.scrollTo = vi.fn() as any;
+    global.fetch = vi.fn(async () => ({ json: async () => ({ duplicado: false }) })) as any;
+    (apiClient.get as any).mockResolvedValue({ notas: [NE_COM_OPS], pagination: { totalPages: 1 } });
+  });
+
+  test('a lista mostra as colunas Gasto e Restante', async () => {
+    render(<NotasEmpenho />);
+    const linha = (await screen.findByText('2026NE000002')).closest('tr')!;
+    const cabecalhos = screen.getAllByRole('columnheader').map((th: HTMLElement) => th.textContent);
+    expect(cabecalhos).toEqual(expect.arrayContaining(['Gasto', 'Restante']));
+    expect(within(linha).getByText('R$ 90,00')).toBeInTheDocument();
+    expect(within(linha).getByText('R$ 10,00')).toBeInTheDocument();
+  });
+
+  test('NE nova: faixa com gasto zero e restante acompanhando o valor digitado', async () => {
+    render(<NotasEmpenho />);
+    await screen.findByText('2026NE000002');
+    fireEvent.change(screen.getByLabelText('Valor R$'), { target: { value: '250,00' } });
+    const faixa = screen.getByTestId('faixa-saldo-ne');
+    expect(within(faixa).getAllByText('R$ 250,00')).toHaveLength(2);
+    expect(within(faixa).getByText('R$ 0,00')).toBeInTheDocument();
+  });
+
+  test('editar uma NE com OPs: faixa com o gasto dela', async () => {
+    render(<NotasEmpenho />);
+    const linha = (await screen.findByText('2026NE000002')).closest('tr')!;
+    fireEvent.click(within(linha).getByTitle('Editar'));
+    const faixa = await screen.findByTestId('faixa-saldo-ne');
+    await waitFor(() => expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '90'));
+    expect(within(faixa).getByText('R$ 90,00')).toBeInTheDocument();
+    expect(within(faixa).getByText('R$ 10,00')).toBeInTheDocument();
+  });
+});

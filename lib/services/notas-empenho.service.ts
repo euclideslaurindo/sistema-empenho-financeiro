@@ -5,6 +5,13 @@ import { NotaEmpenhoDB } from '@/lib/types/db';
 import { parseFormNumber } from '@/lib/utils';
 import { toCents } from '@/lib/money';
 import { statusPeloSaldo } from '@/lib/status-ne';
+import { montarSaldo, saldoParaResposta } from '@/lib/services/saldo-ne';
+
+/** Acrescenta `saldo` (valor, gasto, restante, % gasto, qtd. de OPs) a partir das colunas da própria consulta (T31). */
+const comSaldo = <T extends Record<string, any>>(ne: T) => {
+  const { gasto, qtdOps, ...resto } = ne;
+  return { ...resto, saldo: saldoParaResposta(montarSaldo(ne.valor, gasto, qtdOps)) };
+};
 
 export type ServiceResult<T = any> =
   | { success: true; data: T; status?: number }
@@ -77,7 +84,9 @@ const SELECT_NE = `
         ne.gestao, ne.status, ne.historico,
         DATE_FORMAT(ne.created_at, '%Y-%m-%d') as criadaEm,
         ne.credor_nome as credorNome, ne.cpf_cnpj as cpfCnpj,
-        (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel`;
+        (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel,
+        COALESCE(op_sum.total_pago, 0) as gasto,
+        COALESCE(op_sum.qtd, 0) as qtdOps`;
 
 export class NotasEmpenhoService {
   static async listar(params: { busca?: string; page?: number; limit?: number }) {
@@ -94,7 +103,7 @@ export class NotasEmpenhoService {
       FROM notas_empenho ne
       LEFT JOIN usuarios u ON ne.usuario_id = u.id
       LEFT JOIN (
-        SELECT numero_ne, SUM(valor_pagamento) as total_pago
+        SELECT numero_ne, SUM(valor_pagamento) as total_pago, COUNT(*) as qtd
         FROM ordens_pagamento
         GROUP BY numero_ne
       ) op_sum ON op_sum.numero_ne = ne.numero
@@ -115,7 +124,7 @@ export class NotasEmpenhoService {
     sql += ' ORDER BY ne.created_at DESC LIMIT ? OFFSET ?';
     sqlParams.push(limit, offset);
 
-    const notas = await query<Partial<NotaEmpenhoDB>[]>(sql, sqlParams);
+    const notas = (await query<Partial<NotaEmpenhoDB>[]>(sql, sqlParams)).map(comSaldo);
 
     return {
       success: true as const,
@@ -131,7 +140,7 @@ export class NotasEmpenhoService {
       `SELECT ${SELECT_NE}
        FROM notas_empenho ne
        LEFT JOIN (
-         SELECT numero_ne, SUM(valor_pagamento) as total_pago
+         SELECT numero_ne, SUM(valor_pagamento) as total_pago, COUNT(*) as qtd
          FROM ordens_pagamento
          GROUP BY numero_ne
        ) op_sum ON op_sum.numero_ne = ne.numero
@@ -141,7 +150,7 @@ export class NotasEmpenhoService {
     if (!rows || rows.length === 0) {
       return { success: false, error: 'NE não encontrada.', status: 404 };
     }
-    return { success: true, data: rows[0] };
+    return { success: true, data: comSaldo(rows[0]) };
   }
 
   static async criar(rawData: any, usuarioIdSolicitante: string, perfilSolicitante: string): Promise<ServiceResult> {
@@ -239,12 +248,12 @@ export class NotasEmpenhoService {
            WHERE ne.id = ?`,
           [id]
         );
-        const totalPago = parseFloat(opSum[0]?.total_pago || 0);
-
-        if (valorDecimal < totalPago) {
-          throw { status: 409, error: `Não é possível reduzir o valor da NE para R$ ${valorDecimal.toFixed(2)} pois já foram geradas OPs no valor total de R$ ${totalPago.toFixed(2)}.` };
+        // Comparação em centavos (T31). Continua 409 com a mesma mensagem (D46).
+        const gastoCents = toCents(opSum[0]?.total_pago ?? 0);
+        if (valorCents < gastoCents) {
+          throw { status: 409, error: `Não é possível reduzir o valor da NE para R$ ${valorDecimal.toFixed(2)} pois já foram geradas OPs no valor total de R$ ${(gastoCents / 100).toFixed(2)}.` };
         }
-        const status = statusPeloSaldo(valorCents, toCents(totalPago), neAntes.status);
+        const status = statusPeloSaldo(valorCents, gastoCents, neAntes.status);
 
         // tabela de dotação ainda não existe no banco — sem ajuste de saldo aqui
 

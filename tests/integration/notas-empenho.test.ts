@@ -232,6 +232,28 @@ describe('Integração API Notas de Empenho', () => {
       expect(data.ne).not.toHaveProperty('credores');
     });
 
+    test('lista e busca devolvem saldo (valor, gasto, restante, %, qtd) da mesma consulta, sem consulta extra (T31)', async () => {
+      mockLeitura(
+        [
+          { id: 'ne-1', numero: 'NE-001', valor: '100.00', gasto: '90.00', qtdOps: 3 },
+          { id: 'ne-2', numero: 'NE-002', valor: '50.00', gasto: '0', qtdOps: 0 },
+        ],
+        [],
+        []
+      );
+      const res: any = await GET(new NextRequest('http://localhost:3000/api/notas-empenho'));
+      const { notas } = await res.json();
+      expect(notas[0].saldo).toEqual({ valor: 100, gasto: 90, restante: 10, percentualGasto: 90, qtdOps: 3 });
+      expect(notas[1].saldo).toEqual({ valor: 50, gasto: 0, restante: 50, percentualGasto: 0, qtdOps: 0 });
+      expect(notas[0]).not.toHaveProperty('gasto');
+      expect(notas[0]).not.toHaveProperty('qtdOps');
+      // 1 consulta de contagem + 1 da página; o gasto vem do LEFT JOIN agregado já existente
+      expect((query as any).mock.calls).toHaveLength(2);
+      const sqlPagina = (query as any).mock.calls.map((c: any[]) => c[0] as string).find((s: string) => s.includes('LIMIT ?'));
+      expect(sqlPagina).toContain('COALESCE(op_sum.total_pago, 0) as gasto');
+      expect(sqlPagina).toContain('COUNT(*) as qtd');
+    });
+
     test('lista e busca por número trazem a data de cadastro (criadaEm) — coluna "Cadastro" (T29)', async () => {
       mockLeitura([{ id: 'ne-1', numero: 'NE-001', valor: '100.00', criadaEm: '2026-10-14' }], [], []);
       const lista: any = await GET(new NextRequest('http://localhost:3000/api/notas-empenho'));
