@@ -30,6 +30,8 @@ export interface CredorDB {
   conta_corrente: string | null;
   pix: string | null;
   is_mei: number;
+  /** Município (Expediente): define a taxa de expediente no 3.3.90.33 (T33). camelCase de propósito (D41). */
+  municipioExpediente: string | null;
   usuario_id: string | null;
   ativo: number;
   created_at: Date;
