@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { AlertTriangle, Calculator, ShieldCheck } from "lucide-react";
 import {
@@ -23,8 +23,10 @@ import {
   camposInformativos,
   ehCampoRetencao,
   estadoCampoOp,
+  idNaLinha,
   informadosEmCentavos,
   mascararValorDigitado,
+  nomeNaLinha,
   rotuloCampoDoElemento,
   somarDescontosCents,
   type CampoRetencao,
@@ -34,6 +36,18 @@ import type { ConfigRetencoes } from "@/hooks/use-retencoes-config";
 
 const NOMES_FORM = CAMPOS_RETENCAO.map((c) => CAMPO_FORM[c]);
 
+// Nomes dos campos POR CREDOR (T35-A). elemento, empenho e dataEmissao são da
+// emissão e ficam sempre na raiz.
+function useNomesDaLinha(basePath: string) {
+  return useMemo(
+    () => ({
+      n: (nome: string) => nomeNaLinha(basePath, nome),
+      nomesForm: NOMES_FORM.map((nome) => nomeNaLinha(basePath, nome)),
+    }),
+    [basePath]
+  );
+}
+
 function mesmaLista(a: string[], b: string[]) {
   return a.length === b.length && a.every((x) => b.includes(x));
 }
@@ -41,14 +55,15 @@ function mesmaLista(a: string[], b: string[]) {
 // Isolado do resto do formulário (só ele re-renderiza com os watches) e sem
 // DOM. Usa o MESMO motor do servidor (lib/retencoes.ts), então o valor
 // mostrado é o valor que vai ser gravado.
-function AutoCalcEffect({ config, perfil }: { config: ConfigRetencoes; perfil: Perfil }) {
+function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes; perfil: Perfil; basePath: string }) {
   const { control, setValue, getValues } = useFormContext<any>();
-  const valorPagamento = useWatch({ control, name: "valorPagamento" });
+  const { n, nomesForm } = useNomesDaLinha(basePath);
+  const valorPagamento = useWatch({ control, name: n("valorPagamento") });
   const elemento = useWatch({ control, name: "elemento" });
-  const camposInformados: string[] = useWatch({ control, name: "camposInformados" }) || [];
-  const credorMei: boolean = !!useWatch({ control, name: "credorMei" });
-  const sobrescreverMei: boolean = !!useWatch({ control, name: "sobrescreverMei" });
-  const valoresCampos = useWatch({ control, name: NOMES_FORM });
+  const camposInformados: string[] = useWatch({ control, name: n("camposInformados") }) || [];
+  const credorMei: boolean = !!useWatch({ control, name: n("credorMei") });
+  const sobrescreverMei: boolean = !!useWatch({ control, name: n("sobrescreverMei") });
+  const valoresCampos = useWatch({ control, name: nomesForm });
   const chaveValores = JSON.stringify(valoresCampos);
   const chaveInformados = camposInformados.join("|");
 
@@ -73,7 +88,7 @@ function AutoCalcEffect({ config, perfil }: { config: ConfigRetencoes; perfil: P
           elementoCodigo,
           config: config.campos,
           regras: config.regras,
-          informados: informadosEmCentavos(getValues(), informadosValidos),
+          informados: informadosEmCentavos((basePath ? getValues(basePath) : getValues()) || {}, informadosValidos),
           perfil,
           credorMei,
           sobrescreverMei,
@@ -86,16 +101,16 @@ function AutoCalcEffect({ config, perfil }: { config: ConfigRetencoes; perfil: P
         if (informadosValidos.includes(campo)) continue;
         const cents = resultado.itens[campo] ?? 0;
         const novo = cents > 0 ? maskCurrency(cents / 100) : "";
-        if (getValues(CAMPO_FORM[campo]) !== novo) setValue(CAMPO_FORM[campo], novo);
+        if (getValues(n(CAMPO_FORM[campo])) !== novo) setValue(n(CAMPO_FORM[campo]), novo);
       }
       if (!mesmaLista(informadosValidos, camposInformados)) {
-        setValue("camposInformados", informadosValidos);
+        setValue(n("camposInformados"), informadosValidos);
       }
     }, 350);
     return () => clearTimeout(timer);
     // chaveValores/chaveInformados representam os arrays observados (identidade muda a cada render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [valorPagamento, elemento, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues]);
+  }, [valorPagamento, elemento, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues, n, basePath]);
 
   return null;
 }
@@ -105,18 +120,19 @@ function AutoCalcEffect({ config, perfil }: { config: ConfigRetencoes; perfil: P
  * do credor e vigência, que só o servidor tem — pede a prévia (mesmo cálculo
  * do salvar, sem gravar). Descarta resposta atrasada de um estado anterior.
  */
-function PreviaTransporteEffect({ config, perfil }: { config: ConfigRetencoes; perfil: Perfil }) {
+function PreviaTransporteEffect({ config, perfil, basePath }: { config: ConfigRetencoes; perfil: Perfil; basePath: string }) {
   const { control, setValue, getValues } = useFormContext<any>();
+  const { n, nomesForm } = useNomesDaLinha(basePath);
   const elemento = useWatch({ control, name: "elemento" });
   const empenho = useWatch({ control, name: "empenho" });
-  const cpfCnpj = useWatch({ control, name: "cpfCnpj" });
-  const valorPagamento = useWatch({ control, name: "valorPagamento" });
-  const dataPagamento = useWatch({ control, name: "dataPagamento" });
+  const cpfCnpj = useWatch({ control, name: n("cpfCnpj") });
+  const valorPagamento = useWatch({ control, name: n("valorPagamento") });
+  const dataPagamento = useWatch({ control, name: n("dataPagamento") });
   const dataEmissao = useWatch({ control, name: "dataEmissao" });
-  const camposInformados: string[] = useWatch({ control, name: "camposInformados" }) || [];
-  const credorMei: boolean = !!useWatch({ control, name: "credorMei" });
-  const sobrescreverMei: boolean = !!useWatch({ control, name: "sobrescreverMei" });
-  const valoresCampos = useWatch({ control, name: NOMES_FORM });
+  const camposInformados: string[] = useWatch({ control, name: n("camposInformados") }) || [];
+  const credorMei: boolean = !!useWatch({ control, name: n("credorMei") });
+  const sobrescreverMei: boolean = !!useWatch({ control, name: n("sobrescreverMei") });
+  const valoresCampos = useWatch({ control, name: nomesForm });
   const chaveValores = JSON.stringify(valoresCampos);
   const chaveInformados = camposInformados.join("|");
 
@@ -127,7 +143,7 @@ function PreviaTransporteEffect({ config, perfil }: { config: ConfigRetencoes; p
 
     const limparCalculados = (informadosValidos: string[]) => {
       for (const campo of CAMPOS_RETENCAO) {
-        if (!informadosValidos.includes(campo) && getValues(CAMPO_FORM[campo]) !== "") setValue(CAMPO_FORM[campo], "");
+        if (!informadosValidos.includes(campo) && getValues(n(CAMPO_FORM[campo])) !== "") setValue(n(CAMPO_FORM[campo]), "");
       }
     };
 
@@ -137,18 +153,18 @@ function PreviaTransporteEffect({ config, perfil }: { config: ConfigRetencoes; p
         const cfg = configPorCampo.get(campo);
         return !!cfg && cfg.ativo && estadoCampoOp(cfg, elementoCodigo, config.regras, perfil, { credorMei, sobrescreverMei }).editavel;
       });
-      if (!mesmaLista(informadosValidos, camposInformados)) setValue("camposInformados", informadosValidos);
+      if (!mesmaLista(informadosValidos, camposInformados)) setValue(n("camposInformados"), informadosValidos);
 
       const bruto = toCents(valorPagamento);
       if (!cpfCnpj || !empenho || bruto <= 0) {
         limparCalculados(informadosValidos);
-        setValue("previaAvisos", [
+        setValue(n("previaAvisos"), [
           !cpfCnpj ? "Escolha o credor para calcular o transporte." : "Informe o valor a pagar para calcular o transporte.",
         ]);
         return;
       }
 
-      const valores = getValues();
+      const valores = (basePath ? getValues(basePath) : getValues()) || {};
       const retencoesInformadas: Record<string, number> = {};
       for (const campo of informadosValidos) {
         if (ehCampoRetencao(campo)) retencoesInformadas[CAMPO_FORM[campo]] = toCents(valores[CAMPO_FORM[campo]]) / 100;
@@ -172,13 +188,13 @@ function PreviaTransporteEffect({ config, perfil }: { config: ConfigRetencoes; p
           if (informadosValidos.includes(campo)) continue;
           const cents = toCents(previa.itens?.[campo] ?? 0);
           const novo = cents > 0 ? maskCurrency(cents / 100) : "";
-          if (getValues(CAMPO_FORM[campo]) !== novo) setValue(CAMPO_FORM[campo], novo);
+          if (getValues(n(CAMPO_FORM[campo])) !== novo) setValue(n(CAMPO_FORM[campo]), novo);
         }
-        setValue("previaAvisos", previa.avisos || []);
+        setValue(n("previaAvisos"), previa.avisos || []);
       } catch (e: any) {
         if (cancelado) return;
         limparCalculados(informadosValidos);
-        setValue("previaAvisos", [e?.message || "Não foi possível calcular a prévia do transporte."]);
+        setValue(n("previaAvisos"), [e?.message || "Não foi possível calcular a prévia do transporte."]);
       }
     }, 350);
 
@@ -188,16 +204,17 @@ function PreviaTransporteEffect({ config, perfil }: { config: ConfigRetencoes; p
     };
     // chaveValores/chaveInformados representam os arrays observados (identidade muda a cada render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elemento, empenho, cpfCnpj, valorPagamento, dataPagamento, dataEmissao, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues]);
+  }, [elemento, empenho, cpfCnpj, valorPagamento, dataPagamento, dataEmissao, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues, n, basePath]);
 
   return null;
 }
 
-function TaxesTotalSummary() {
+function TaxesTotalSummary({ basePath }: { basePath: string }) {
   const { control } = useFormContext<any>();
-  const valorPagamento = useWatch({ control, name: "valorPagamento" });
+  const { n, nomesForm } = useNomesDaLinha(basePath);
+  const valorPagamento = useWatch({ control, name: n("valorPagamento") });
   const elemento = useWatch({ control, name: "elemento" });
-  const valoresCampos: unknown[] = useWatch({ control, name: NOMES_FORM }) || [];
+  const valoresCampos: unknown[] = useWatch({ control, name: nomesForm }) || [];
 
   const valores = Object.fromEntries(NOMES_FORM.map((nome, i) => [nome, valoresCampos[i]]));
   const brutoCents = toCents(valorPagamento);
@@ -238,16 +255,19 @@ function CampoRetencaoInput({
   editavel,
   obrigatorio,
   dica,
+  basePath,
 }: {
   campo: CampoRetencao;
   rotulo: string;
   editavel: boolean;
   obrigatorio: boolean;
   dica: string | null;
+  basePath: string;
 }) {
   const { register, setValue, getValues } = useFormContext<any>();
-  const nome = CAMPO_FORM[campo];
-  const inputId = `op-retencao-${campo}`;
+  const { n } = useNomesDaLinha(basePath);
+  const nome = n(CAMPO_FORM[campo]);
+  const inputId = idNaLinha(basePath, `op-retencao-${campo}`);
   const dicaId = `${inputId}-dica`;
 
   // onChange via setValue (não via o onChange do register): o do register roda
@@ -258,9 +278,9 @@ function CampoRetencaoInput({
     const mascarado = mascararValorDigitado(e.target.value, apagando);
     e.target.value = mascarado;
     setValue(nome, mascarado, { shouldDirty: true });
-    const atuais: string[] = getValues("camposInformados") || [];
+    const atuais: string[] = getValues(n("camposInformados")) || [];
     const semEste = atuais.filter((c) => c !== campo);
-    setValue("camposInformados", mascarado ? [...semEste, campo] : semEste);
+    setValue(n("camposInformados"), mascarado ? [...semEste, campo] : semEste);
   };
 
   return (
@@ -289,14 +309,15 @@ function CampoRetencaoInput({
   );
 }
 
-function BannerMei({ perfil, sobrescreverMei }: { perfil: Perfil; sobrescreverMei: boolean }) {
+function BannerMei({ perfil, sobrescreverMei, basePath }: { perfil: Perfil; sobrescreverMei: boolean; basePath: string }) {
   const { setValue, getValues } = useFormContext<any>();
+  const { n } = useNomesDaLinha(basePath);
   const [confirmando, setConfirmando] = useState(false);
 
   const desfazer = () => {
-    setValue("sobrescreverMei", false);
+    setValue(n("sobrescreverMei"), false);
     const tributarios = CAMPOS_TRIBUTARIOS as string[];
-    setValue("camposInformados", (getValues("camposInformados") || []).filter((c: string) => !tributarios.includes(c)));
+    setValue(n("camposInformados"), (getValues(n("camposInformados")) || []).filter((c: string) => !tributarios.includes(c)));
   };
 
   return (
@@ -334,7 +355,7 @@ function BannerMei({ perfil, sobrescreverMei }: { perfil: Perfil; sobrescreverMe
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => setValue("sobrescreverMei", true)}>Liberar retenção manual</AlertDialogAction>
+            <AlertDialogAction onClick={() => setValue(n("sobrescreverMei"), true)}>Liberar retenção manual</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -342,12 +363,13 @@ function BannerMei({ perfil, sobrescreverMei }: { perfil: Perfil; sobrescreverMe
   );
 }
 
-function CamposRetencao({ config, perfil }: { config: ConfigRetencoes; perfil: Perfil }) {
+function CamposRetencao({ config, perfil, basePath }: { config: ConfigRetencoes; perfil: Perfil; basePath: string }) {
   const { control } = useFormContext<any>();
+  const { n } = useNomesDaLinha(basePath);
   const elemento = useWatch({ control, name: "elemento" });
-  const previaAvisos: string[] = useWatch({ control, name: "previaAvisos" }) || [];
-  const credorMei: boolean = !!useWatch({ control, name: "credorMei" });
-  const sobrescreverMei: boolean = !!useWatch({ control, name: "sobrescreverMei" });
+  const previaAvisos: string[] = useWatch({ control, name: n("previaAvisos") }) || [];
+  const credorMei: boolean = !!useWatch({ control, name: n("credorMei") });
+  const sobrescreverMei: boolean = !!useWatch({ control, name: n("sobrescreverMei") });
   const elementoCodigo = extrairCodigoElemento(elemento);
   const elementoConhecido = elementoCodigo !== null && config.regras[elementoCodigo] !== undefined;
   const transporte = perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO";
@@ -358,7 +380,7 @@ function CamposRetencao({ config, perfil }: { config: ConfigRetencoes; perfil: P
 
   return (
     <>
-      {credorMei && <BannerMei perfil={perfil} sobrescreverMei={sobrescreverMei} />}
+      {credorMei && <BannerMei perfil={perfil} sobrescreverMei={sobrescreverMei} basePath={basePath} />}
       {!elemento ? (
         <p className="mb-6 text-sm font-semibold text-slate-500">Selecione a NE para calcular as retenções.</p>
       ) : transporte ? (
@@ -393,13 +415,14 @@ function CamposRetencao({ config, perfil }: { config: ConfigRetencoes; perfil: P
               editavel={estado.editavel}
               obrigatorio={estado.obrigatorio}
               dica={estado.dica}
+              basePath={basePath}
             />
           );
         })}
       </div>
 
-      <AutoCalcEffect config={config} perfil={perfil} />
-      <PreviaTransporteEffect config={config} perfil={perfil} />
+      <AutoCalcEffect config={config} perfil={perfil} basePath={basePath} />
+      <PreviaTransporteEffect config={config} perfil={perfil} basePath={basePath} />
     </>
   );
 }
@@ -408,10 +431,13 @@ export default function OpTaxesSection({
   userRole,
   config,
   erroConfig,
+  basePath = "",
 }: {
   userRole: string;
   config: ConfigRetencoes | null;
   erroConfig: string | null;
+  /** Prefixo da linha do credor (ex.: `credores.2`); vazio = campos na raiz. */
+  basePath?: string;
 }) {
   const perfil = userRole as Perfil;
 
@@ -425,7 +451,7 @@ export default function OpTaxesSection({
       </div>
 
       {config ? (
-        <CamposRetencao config={config} perfil={perfil} />
+        <CamposRetencao config={config} perfil={perfil} basePath={basePath} />
       ) : erroConfig ? (
         <p role="alert" className="text-sm font-semibold text-red-600">
           Não foi possível carregar a configuração de retenções ({erroConfig}). O servidor calculará as retenções ao salvar.
@@ -434,7 +460,7 @@ export default function OpTaxesSection({
         <p className="text-sm font-semibold text-slate-500">Carregando configuração de retenções...</p>
       )}
 
-      <TaxesTotalSummary />
+      <TaxesTotalSummary basePath={basePath} />
     </div>
   );
 }

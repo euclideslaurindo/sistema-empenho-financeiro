@@ -4,16 +4,17 @@ import { useFormContext, useFieldArray, useWatch } from "react-hook-form";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { maskCurrency, parseFormNumber, formatCurrency } from "@/lib/utils";
+import { idNaLinha, nomeNaLinha } from "@/lib/retencoes-form";
 import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 // Componente isolado para calcular e exibir o total (evita re-render da tabela inteira)
-function TotalItensInfo({ control, setValue }: { control: any, setValue: any }) {
-  const wItens = useWatch({ control, name: "itens" }) || [];
+function TotalItensInfo({ control, setValue, basePath }: { control: any, setValue: any, basePath: string }) {
+  const wItens = useWatch({ control, name: nomeNaLinha(basePath, "itens") }) || [];
   const totalItens = wItens.reduce((acc: number, item: any) => {
     return acc + (Number(item?.quantidade) || 0) * parseFormNumber(item?.valorUnitario);
   }, 0);
 
-  const valorPg = parseFormNumber(useWatch({ control, name: "valorPagamento" }));
+  const valorPg = parseFormNumber(useWatch({ control, name: nomeNaLinha(basePath, "valorPagamento") }));
 
   const handleConfirmarItens = () => {
     if (totalItens <= 0) {
@@ -21,7 +22,7 @@ function TotalItensInfo({ control, setValue }: { control: any, setValue: any }) 
       return;
     }
     const formatado = maskCurrency(totalItens);
-    setValue('valorPagamento', formatado as any, { shouldDirty: true, shouldValidate: true });
+    setValue(nomeNaLinha(basePath, 'valorPagamento'), formatado as any, { shouldDirty: true, shouldValidate: true });
     toast.success(`Valor a Pagar atualizado para ${formatCurrency(totalItens)}`);
   };
 
@@ -50,9 +51,11 @@ function TotalItensInfo({ control, setValue }: { control: any, setValue: any }) 
 }
 
 // Componente de Linha Isolado (evita que a digitação de um item re-renderize os outros)
-function ItemRow({ field, index, remove, control, register, setValue, onRemoveClick, itemErrors }: any) {
-  const qty = useWatch({ control, name: `itens.${index}.quantidade` }) || 0;
-  const unitVal = useWatch({ control, name: `itens.${index}.valorUnitario` }) || 0;
+function ItemRow({ field, index, remove, control, register, setValue, onRemoveClick, itemErrors, basePath }: any) {
+  const nomeItem = (campo: string) => nomeNaLinha(basePath, `itens.${index}.${campo}`);
+  const idErro = (campo: string) => idNaLinha(basePath, `item-${index}-${campo}-error`);
+  const qty = useWatch({ control, name: nomeItem("quantidade") }) || 0;
+  const unitVal = useWatch({ control, name: nomeItem("valorUnitario") }) || 0;
   const total = Number(qty) * parseFormNumber(unitVal);
   const especificacaoError = itemErrors?.especificacao;
   const unidadeError = itemErrors?.unidade;
@@ -63,20 +66,20 @@ function ItemRow({ field, index, remove, control, register, setValue, onRemoveCl
       <td className="py-3 pr-2">
         <input
           type="text"
-          {...register(`itens.${index}.especificacao` as const)}
+          {...register(nomeItem("especificacao"))}
           placeholder="Descrição do item"
           aria-invalid={!!especificacaoError}
-          aria-describedby={especificacaoError ? `item-${index}-especificacao-error` : undefined}
+          aria-describedby={especificacaoError ? idErro("especificacao") : undefined}
           className={`w-full px-3 py-2 rounded-lg border bg-slate-50 focus:border-blue-800 transition-colors text-sm ${especificacaoError ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
         />
-        {especificacaoError && <p id={`item-${index}-especificacao-error`} className="text-red-500 text-xs mt-1 font-semibold">{especificacaoError.message}</p>}
+        {especificacaoError && <p id={idErro("especificacao")} className="text-red-500 text-xs mt-1 font-semibold">{especificacaoError.message}</p>}
       </td>
       <td className="py-3 pr-2">
         <input
           type="number"
-          {...register(`itens.${index}.quantidade` as const)}
+          {...register(nomeItem("quantidade"))}
           onChange={(e) => {
-            setValue(`itens.${index}.quantidade`, e.target.value, { shouldValidate: true, shouldDirty: true });
+            setValue(nomeItem("quantidade"), e.target.value, { shouldValidate: true, shouldDirty: true });
           }}
           className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:border-blue-800 transition-colors text-sm"
         />
@@ -84,22 +87,22 @@ function ItemRow({ field, index, remove, control, register, setValue, onRemoveCl
       <td className="py-3 pr-2">
         <input
           type="text"
-          {...register(`itens.${index}.unidade` as const)}
+          {...register(nomeItem("unidade"))}
           aria-invalid={!!unidadeError}
-          aria-describedby={unidadeError ? `item-${index}-unidade-error` : undefined}
+          aria-describedby={unidadeError ? idErro("unidade") : undefined}
           className={`w-full px-3 py-2 rounded-lg border bg-slate-50 focus:border-blue-800 transition-colors text-sm ${unidadeError ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
         />
-        {unidadeError && <p id={`item-${index}-unidade-error`} className="text-red-500 text-xs mt-1 font-semibold">{unidadeError.message}</p>}
+        {unidadeError && <p id={idErro("unidade")} className="text-red-500 text-xs mt-1 font-semibold">{unidadeError.message}</p>}
       </td>
       <td className="py-3 pr-2">
         <input
           type="text"
           placeholder="0,00"
-          {...register(`itens.${index}.valorUnitario` as const)}
+          {...register(nomeItem("valorUnitario"))}
           onChange={(e) => {
             const val = maskCurrency(e.target.value);
             e.target.value = val;
-            setValue(`itens.${index}.valorUnitario`, val, { shouldValidate: true, shouldDirty: true });
+            setValue(nomeItem("valorUnitario"), val, { shouldValidate: true, shouldDirty: true });
           }}
           className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 focus:border-blue-800 transition-colors text-sm"
         />
@@ -121,13 +124,13 @@ function ItemRow({ field, index, remove, control, register, setValue, onRemoveCl
   );
 }
 
-export default function OpItemsTable({ errors }: { errors?: any } = {}) {
+export default function OpItemsTable({ errors, basePath = "" }: { errors?: any; basePath?: string } = {}) {
   const { register, control, setValue } = useFormContext<any>();
   const [indexParaRemover, setIndexParaRemover] = useState<number | null>(null);
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: "itens"
+    name: nomeNaLinha(basePath, "itens")
   });
 
   const handleConfirmRemove = () => {
@@ -177,12 +180,13 @@ export default function OpItemsTable({ errors }: { errors?: any } = {}) {
                 setValue={setValue}
                 onRemoveClick={setIndexParaRemover}
                 itemErrors={errors?.itens?.[index]}
+                basePath={basePath}
               />
             ))}
           </tbody>
         </table>
 
-        <TotalItensInfo control={control} setValue={setValue} />
+        <TotalItensInfo control={control} setValue={setValue} basePath={basePath} />
       </div>
 
       <AlertDialog open={indexParaRemover !== null} onOpenChange={(open) => !open && setIndexParaRemover(null)}>
