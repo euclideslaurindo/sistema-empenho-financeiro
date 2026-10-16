@@ -94,7 +94,7 @@ export interface EntradaTransporte {
   parametros: ParametrosTransporte;
   faixas: FaixaIrrf[];
   issMunicipio: IssMunicipio | null; // null = município sem cadastro
-  municipioCredor: string | null;
+  municipioCredor: string | null; // Município (Expediente) do credor (T33); null = não informado
   credorMei: boolean;
   /** T26: ADMIN confirmou reter mesmo sendo MEI (só valores digitados). */
   sobrescreverMei?: boolean;
@@ -133,8 +133,12 @@ export function calcularTransporteAutonomo(e: EntradaTransporte): ResultadoCalcu
   const descAdicional = maior(0n, p.redutor_constante - mul(p.redutor_coeficiente, bruto));
   const irrf = maior(0n, irrfTabela - descAdicional);
 
-  // 10: ISS do município + taxa de expediente da prefeitura
-  if (!e.issMunicipio) avisos.push("Município sem cadastro de ISS: usada a alíquota padrão (5%) sem taxa de expediente.");
+  // 10: ISS do município + taxa de expediente da prefeitura. Sem Município
+  // (Expediente) no credor é o caso normal ("se for o caso"): taxa 0, sem
+  // aviso (D45). Só avisa se foi informado e não tem cadastro de ISS.
+  if (!e.issMunicipio && e.municipioCredor?.trim()) {
+    avisos.push("Município de expediente sem cadastro de ISS: usada a alíquota padrão (5%) sem taxa de expediente.");
+  }
   const issAliquota = dec(e.issMunicipio?.aliquota ?? ISS_ALIQUOTA_PADRAO);
   const taxaExpediente = dec(e.issMunicipio?.taxaExpediente ?? 0);
   const iss = pct(bruto, issAliquota) + taxaExpediente;

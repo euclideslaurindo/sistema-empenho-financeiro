@@ -1,0 +1,1394 @@
+{
+  "origem": "Planilha EJA Campo - 5ª parcela/2026 - NE 28925 (aba Total)",
+  "observacoes": [
+    "Nomes dos motoristas removidos de propósito (dados pessoais).",
+    "isento=true: todas as retenções zeradas na planilha (tratados como MEI).",
+    "patronal é informativa: não entra no total de descontos nem no líquido.",
+    "divergenciaConhecida=true: a planilha arredonda em 2 passos (3 casas e depois 2); o sistema difere em até R$ 0,01."
+  ],
+  "perfilCalculo": "TRANSPORTE_AUTONOMO",
+  "vigencia": "2026-01-01",
+  "toleranciaCentavos": 1,
+  "totaisPlanilha": {
+    "bruto": 799918.45,
+    "irrf": 32443.43,
+    "iss": 30869.61,
+    "inss": 13537.66,
+    "patronal": 24613.85,
+    "sest": 1846.06,
+    "senat": 1230.73,
+    "liquido": 719990.96
+  },
+  "linhas": [
+    {
+      "id": "motorista-01",
+      "municipio": "Águas Belas",
+      "bruto": 11970,
+      "isento": false,
+      "esperado": {
+        "irrf": 899.34,
+        "iss": 598.5,
+        "inss": 263.34,
+        "patronal": 478.8,
+        "sest": 35.91,
+        "senat": 23.94,
+        "liquido": 10148.97
+      }
+    },
+    {
+      "id": "motorista-02",
+      "municipio": "Águas Belas",
+      "bruto": 14098,
+      "isento": false,
+      "esperado": {
+        "irrf": 1250.46,
+        "iss": 704.9,
+        "inss": 310.16,
+        "patronal": 563.92,
+        "sest": 42.29,
+        "senat": 28.2,
+        "liquido": 11761.99
+      }
+    },
+    {
+      "id": "motorista-03",
+      "municipio": "Águas Belas",
+      "bruto": 15162,
+      "isento": false,
+      "esperado": {
+        "irrf": 1426.02,
+        "iss": 758.1,
+        "inss": 333.56,
+        "patronal": 606.48,
+        "sest": 45.49,
+        "senat": 30.32,
+        "liquido": 12568.51
+      }
+    },
+    {
+      "id": "motorista-04",
+      "municipio": "Águas Belas",
+      "bruto": 11704,
+      "isento": false,
+      "esperado": {
+        "irrf": 855.45,
+        "iss": 585.2,
+        "inss": 257.49,
+        "patronal": 468.16,
+        "sest": 35.11,
+        "senat": 23.41,
+        "liquido": 9947.34
+      }
+    },
+    {
+      "id": "motorista-05",
+      "municipio": "Águas Belas",
+      "bruto": 14098,
+      "isento": false,
+      "esperado": {
+        "irrf": 1250.46,
+        "iss": 704.9,
+        "inss": 310.16,
+        "patronal": 563.92,
+        "sest": 42.29,
+        "senat": 28.2,
+        "liquido": 11761.99
+      }
+    },
+    {
+      "id": "motorista-06",
+      "municipio": "Águas Belas",
+      "bruto": 14098,
+      "isento": false,
+      "esperado": {
+        "irrf": 1250.46,
+        "iss": 704.9,
+        "inss": 310.16,
+        "patronal": 563.92,
+        "sest": 42.29,
+        "senat": 28.2,
+        "liquido": 11761.99
+      }
+    },
+    {
+      "id": "motorista-07",
+      "municipio": "Águas Belas",
+      "bruto": 15162,
+      "isento": false,
+      "esperado": {
+        "irrf": 1426.02,
+        "iss": 758.1,
+        "inss": 333.56,
+        "patronal": 606.48,
+        "sest": 45.49,
+        "senat": 30.32,
+        "liquido": 12568.51
+      }
+    },
+    {
+      "id": "motorista-08",
+      "municipio": "Canhotinho",
+      "bruto": 6317.5,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 331.08,
+        "inss": 138.99,
+        "patronal": 252.7,
+        "sest": 18.95,
+        "senat": 12.64,
+        "liquido": 5815.84
+      }
+    },
+    {
+      "id": "motorista-09",
+      "municipio": "Bom Conselho",
+      "bruto": 6288.3,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 6288.3
+      }
+    },
+    {
+      "id": "motorista-10",
+      "municipio": "Bom Conselho",
+      "bruto": 8631,
+      "isento": false,
+      "esperado": {
+        "irrf": 353.08,
+        "iss": 431.55,
+        "inss": 189.88,
+        "patronal": 345.24,
+        "sest": 25.89,
+        "senat": 17.26,
+        "liquido": 7613.34
+      }
+    },
+    {
+      "id": "motorista-11",
+      "municipio": "Bom Conselho",
+      "bruto": 4932,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 246.6,
+        "inss": 108.5,
+        "patronal": 197.28,
+        "sest": 14.8,
+        "senat": 9.86,
+        "liquido": 4552.24
+      }
+    },
+    {
+      "id": "motorista-12",
+      "municipio": "Bom Conselho",
+      "bruto": 11259,
+      "isento": false,
+      "esperado": {
+        "irrf": 782.03,
+        "iss": 562.95,
+        "inss": 247.7,
+        "patronal": 450.36,
+        "sest": 33.78,
+        "senat": 22.52,
+        "liquido": 9610.02
+      }
+    },
+    {
+      "id": "motorista-13",
+      "municipio": "Bom Conselho",
+      "bruto": 7255.8,
+      "isento": false,
+      "esperado": {
+        "irrf": 155.24,
+        "iss": 362.79,
+        "inss": 159.63,
+        "patronal": 290.23,
+        "sest": 21.77,
+        "senat": 14.51,
+        "liquido": 6541.86
+      }
+    },
+    {
+      "id": "motorista-14",
+      "municipio": "Bom Conselho",
+      "bruto": 4878.9,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 243.95,
+        "inss": 107.34,
+        "patronal": 195.16,
+        "sest": 14.64,
+        "senat": 9.76,
+        "liquido": 4503.21
+      }
+    },
+    {
+      "id": "motorista-15",
+      "municipio": "Bom Conselho",
+      "bruto": 6165,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 6165
+      }
+    },
+    {
+      "id": "motorista-16",
+      "municipio": "Bom Conselho",
+      "bruto": 10281.6,
+      "isento": false,
+      "esperado": {
+        "irrf": 620.75,
+        "iss": 514.08,
+        "inss": 226.2,
+        "patronal": 411.26,
+        "sest": 30.85,
+        "senat": 20.56,
+        "liquido": 8869.16
+      },
+      "divergenciaConhecida": true
+    },
+    {
+      "id": "motorista-17",
+      "municipio": "Bom Conselho",
+      "bruto": 6129.9,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 306.5,
+        "inss": 134.86,
+        "patronal": 245.2,
+        "sest": 18.39,
+        "senat": 12.26,
+        "liquido": 5657.89
+      }
+    },
+    {
+      "id": "motorista-18",
+      "municipio": "Bom Conselho",
+      "bruto": 5254.2,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 262.71,
+        "inss": 115.59,
+        "patronal": 210.17,
+        "sest": 15.76,
+        "senat": 10.51,
+        "liquido": 4849.63
+      }
+    },
+    {
+      "id": "motorista-19",
+      "municipio": "Bom Conselho",
+      "bruto": 5004,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 250.2,
+        "inss": 110.09,
+        "patronal": 200.16,
+        "sest": 15.01,
+        "senat": 10.01,
+        "liquido": 4618.69
+      }
+    },
+    {
+      "id": "motorista-20",
+      "municipio": "Bom Conselho",
+      "bruto": 6255,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 312.75,
+        "inss": 137.61,
+        "patronal": 250.2,
+        "sest": 18.77,
+        "senat": 12.51,
+        "liquido": 5773.36
+      }
+    },
+    {
+      "id": "motorista-21",
+      "municipio": "Bom Conselho",
+      "bruto": 6288.3,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 6288.3
+      }
+    },
+    {
+      "id": "motorista-22",
+      "municipio": "Bom Conselho",
+      "bruto": 8631,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 8631
+      }
+    },
+    {
+      "id": "motorista-23",
+      "municipio": "Bom Conselho",
+      "bruto": 4932,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 4932
+      }
+    },
+    {
+      "id": "motorista-24",
+      "municipio": "Bom Conselho",
+      "bruto": 8757,
+      "isento": false,
+      "esperado": {
+        "irrf": 370.09,
+        "iss": 437.85,
+        "inss": 192.65,
+        "patronal": 350.28,
+        "sest": 26.27,
+        "senat": 17.51,
+        "liquido": 7712.63
+      }
+    },
+    {
+      "id": "motorista-25",
+      "municipio": "Bom Conselho",
+      "bruto": 7005.6,
+      "isento": false,
+      "esperado": {
+        "irrf": 99.41,
+        "iss": 350.28,
+        "inss": 154.12,
+        "patronal": 280.22,
+        "sest": 21.02,
+        "senat": 14.01,
+        "liquido": 6366.76
+      },
+      "divergenciaConhecida": true
+    },
+    {
+      "id": "motorista-26",
+      "municipio": "Bom Conselho",
+      "bruto": 5879.7,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 293.99,
+        "inss": 129.35,
+        "patronal": 235.19,
+        "sest": 17.64,
+        "senat": 11.76,
+        "liquido": 5426.96
+      }
+    },
+    {
+      "id": "motorista-27",
+      "municipio": "Bom Conselho",
+      "bruto": 5548.5,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 277.43,
+        "inss": 122.07,
+        "patronal": 221.94,
+        "sest": 16.65,
+        "senat": 11.1,
+        "liquido": 5121.25
+      }
+    },
+    {
+      "id": "motorista-28",
+      "municipio": "Bom Conselho",
+      "bruto": 15012,
+      "isento": false,
+      "esperado": {
+        "irrf": 1401.27,
+        "iss": 750.6,
+        "inss": 330.26,
+        "patronal": 600.48,
+        "sest": 45.04,
+        "senat": 30.02,
+        "liquido": 12454.81
+      }
+    },
+    {
+      "id": "motorista-29",
+      "municipio": "Bom Conselho",
+      "bruto": 6004.8,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 300.24,
+        "inss": 132.11,
+        "patronal": 240.19,
+        "sest": 18.01,
+        "senat": 12.01,
+        "liquido": 5542.43
+      }
+    },
+    {
+      "id": "motorista-30",
+      "municipio": "Bom Conselho",
+      "bruto": 9257.4,
+      "isento": false,
+      "esperado": {
+        "irrf": 451.76,
+        "iss": 462.87,
+        "inss": 203.66,
+        "patronal": 370.3,
+        "sest": 27.77,
+        "senat": 18.52,
+        "liquido": 8092.82
+      },
+      "divergenciaConhecida": true
+    },
+    {
+      "id": "motorista-31",
+      "municipio": "Bom Conselho",
+      "bruto": 8137.8,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 8137.8
+      }
+    },
+    {
+      "id": "motorista-32",
+      "municipio": "Bom Conselho",
+      "bruto": 7881.3,
+      "isento": false,
+      "esperado": {
+        "irrf": 251.87,
+        "iss": 394.07,
+        "inss": 173.39,
+        "patronal": 315.25,
+        "sest": 23.64,
+        "senat": 15.76,
+        "liquido": 7022.57
+      }
+    },
+    {
+      "id": "motorista-33",
+      "municipio": "Bom Conselho",
+      "bruto": 3753,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 187.65,
+        "inss": 82.57,
+        "patronal": 150.12,
+        "sest": 11.26,
+        "senat": 7.51,
+        "liquido": 3464.01
+      }
+    },
+    {
+      "id": "motorista-34",
+      "municipio": "Bom Conselho",
+      "bruto": 6880.5,
+      "isento": false,
+      "esperado": {
+        "irrf": 71.49,
+        "iss": 344.03,
+        "inss": 151.37,
+        "patronal": 275.22,
+        "sest": 20.64,
+        "senat": 13.76,
+        "liquido": 6279.21
+      }
+    },
+    {
+      "id": "motorista-35",
+      "municipio": "Caetés",
+      "bruto": 12384,
+      "isento": false,
+      "esperado": {
+        "irrf": 967.65,
+        "iss": 619.2,
+        "inss": 272.45,
+        "patronal": 495.36,
+        "sest": 37.15,
+        "senat": 24.77,
+        "liquido": 10462.78
+      }
+    },
+    {
+      "id": "motorista-36",
+      "municipio": "Caetés",
+      "bruto": 8064,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 8064
+      }
+    },
+    {
+      "id": "motorista-37",
+      "municipio": "Caetés",
+      "bruto": 8280,
+      "isento": false,
+      "esperado": {
+        "irrf": 305.69,
+        "iss": 414,
+        "inss": 182.16,
+        "patronal": 331.2,
+        "sest": 24.84,
+        "senat": 16.56,
+        "liquido": 7336.75
+      }
+    },
+    {
+      "id": "motorista-38",
+      "municipio": "Caetés",
+      "bruto": 11088,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 11088
+      }
+    },
+    {
+      "id": "motorista-39",
+      "municipio": "Caetés",
+      "bruto": 11520,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 11520
+      }
+    },
+    {
+      "id": "motorista-40",
+      "municipio": "Capoeiras",
+      "bruto": 7182,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 7182
+      }
+    },
+    {
+      "id": "motorista-41",
+      "municipio": "Caetés",
+      "bruto": 8694,
+      "isento": false,
+      "esperado": {
+        "irrf": 361.58,
+        "iss": 434.7,
+        "inss": 191.27,
+        "patronal": 347.76,
+        "sest": 26.08,
+        "senat": 17.39,
+        "liquido": 7662.98
+      }
+    },
+    {
+      "id": "motorista-42",
+      "municipio": "Caetés",
+      "bruto": 8208,
+      "isento": false,
+      "esperado": {
+        "irrf": 295.97,
+        "iss": 410.4,
+        "inss": 180.58,
+        "patronal": 328.32,
+        "sest": 24.62,
+        "senat": 16.42,
+        "liquido": 7280.01
+      }
+    },
+    {
+      "id": "motorista-43",
+      "municipio": "Caetés",
+      "bruto": 7113.6,
+      "isento": false,
+      "esperado": {
+        "irrf": 123.5,
+        "iss": 355.68,
+        "inss": 156.5,
+        "patronal": 284.54,
+        "sest": 21.34,
+        "senat": 14.23,
+        "liquido": 6442.35
+      }
+    },
+    {
+      "id": "motorista-44",
+      "municipio": "Caetés",
+      "bruto": 10152,
+      "isento": false,
+      "esperado": {
+        "irrf": 599.37,
+        "iss": 507.6,
+        "inss": 223.34,
+        "patronal": 406.08,
+        "sest": 30.46,
+        "senat": 20.3,
+        "liquido": 8770.93
+      }
+    },
+    {
+      "id": "motorista-45",
+      "municipio": "Canhotinho",
+      "bruto": 7904,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 7904
+      }
+    },
+    {
+      "id": "motorista-46",
+      "municipio": "Canhotinho",
+      "bruto": 9690,
+      "isento": false,
+      "esperado": {
+        "irrf": 523.14,
+        "iss": 499.7,
+        "inss": 213.18,
+        "patronal": 387.6,
+        "sest": 29.07,
+        "senat": 19.38,
+        "liquido": 8405.53
+      }
+    },
+    {
+      "id": "motorista-47",
+      "municipio": "Capoeiras",
+      "bruto": 9310,
+      "isento": false,
+      "esperado": {
+        "irrf": 460.44,
+        "iss": 469.44,
+        "inss": 204.82,
+        "patronal": 372.4,
+        "sest": 27.93,
+        "senat": 18.62,
+        "liquido": 8128.75
+      }
+    },
+    {
+      "id": "motorista-48",
+      "municipio": "Capoeiras",
+      "bruto": 11305,
+      "isento": false,
+      "esperado": {
+        "irrf": 789.62,
+        "iss": 569.19,
+        "inss": 248.71,
+        "patronal": 452.2,
+        "sest": 33.92,
+        "senat": 22.61,
+        "liquido": 9640.95
+      }
+    },
+    {
+      "id": "motorista-49",
+      "municipio": "Capoeiras",
+      "bruto": 16150,
+      "isento": false,
+      "esperado": {
+        "irrf": 1589.04,
+        "iss": 811.44,
+        "inss": 355.3,
+        "patronal": 646,
+        "sest": 48.45,
+        "senat": 32.3,
+        "liquido": 13313.47
+      }
+    },
+    {
+      "id": "motorista-50",
+      "municipio": "Capoeiras",
+      "bruto": 9842,
+      "isento": false,
+      "esperado": {
+        "irrf": 548.22,
+        "iss": 496.04,
+        "inss": 216.52,
+        "patronal": 393.68,
+        "sest": 29.53,
+        "senat": 19.68,
+        "liquido": 8532.01
+      }
+    },
+    {
+      "id": "motorista-51",
+      "municipio": "Capoeiras",
+      "bruto": 14630,
+      "isento": false,
+      "esperado": {
+        "irrf": 1338.24,
+        "iss": 735.44,
+        "inss": 321.86,
+        "patronal": 585.2,
+        "sest": 43.89,
+        "senat": 29.26,
+        "liquido": 12161.31
+      }
+    },
+    {
+      "id": "motorista-52",
+      "municipio": "Garanhuns",
+      "bruto": 7282.8,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 7282.8
+      }
+    },
+    {
+      "id": "motorista-53",
+      "municipio": "Garanhuns",
+      "bruto": 8438.8,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 8438.8
+      }
+    },
+    {
+      "id": "motorista-54",
+      "municipio": "Garanhuns",
+      "bruto": 4746.4,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 4746.4
+      }
+    },
+    {
+      "id": "motorista-55",
+      "municipio": "Garanhuns",
+      "bruto": 3570,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 178.5,
+        "inss": 78.54,
+        "patronal": 142.8,
+        "sest": 10.71,
+        "senat": 7.14,
+        "liquido": 3295.11
+      }
+    },
+    {
+      "id": "motorista-56",
+      "municipio": "Garanhuns",
+      "bruto": 3768.05,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 188.4,
+        "inss": 82.9,
+        "patronal": 150.72,
+        "sest": 11.3,
+        "senat": 7.54,
+        "liquido": 3477.91
+      }
+    },
+    {
+      "id": "motorista-57",
+      "municipio": "Iati",
+      "bruto": 11088,
+      "isento": false,
+      "esperado": {
+        "irrf": 753.81,
+        "iss": 561.3,
+        "inss": 243.94,
+        "patronal": 443.52,
+        "sest": 33.26,
+        "senat": 22.18,
+        "liquido": 9473.51
+      }
+    },
+    {
+      "id": "motorista-58",
+      "municipio": "Iati",
+      "bruto": 10080,
+      "isento": false,
+      "esperado": {
+        "irrf": 587.49,
+        "iss": 510.9,
+        "inss": 221.76,
+        "patronal": 403.2,
+        "sest": 30.24,
+        "senat": 20.16,
+        "liquido": 8709.45
+      }
+    },
+    {
+      "id": "motorista-59",
+      "municipio": "Iati",
+      "bruto": 4896,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 251.7,
+        "inss": 107.71,
+        "patronal": 195.84,
+        "sest": 14.69,
+        "senat": 9.79,
+        "liquido": 4512.11
+      }
+    },
+    {
+      "id": "motorista-60",
+      "municipio": "Iati",
+      "bruto": 11520,
+      "isento": false,
+      "esperado": {
+        "irrf": 825.09,
+        "iss": 582.9,
+        "inss": 253.44,
+        "patronal": 460.8,
+        "sest": 34.56,
+        "senat": 23.04,
+        "liquido": 9800.97
+      }
+    },
+    {
+      "id": "motorista-61",
+      "municipio": "Lajedo",
+      "bruto": 6804,
+      "isento": false,
+      "esperado": {
+        "irrf": 54.42,
+        "iss": 340.2,
+        "inss": 149.69,
+        "patronal": 272.16,
+        "sest": 20.41,
+        "senat": 13.61,
+        "liquido": 6225.67
+      }
+    },
+    {
+      "id": "motorista-62",
+      "municipio": "Lajedo",
+      "bruto": 6786,
+      "isento": false,
+      "esperado": {
+        "irrf": 50.4,
+        "iss": 339.3,
+        "inss": 149.29,
+        "patronal": 271.44,
+        "sest": 20.36,
+        "senat": 13.57,
+        "liquido": 6213.08
+      }
+    },
+    {
+      "id": "motorista-63",
+      "municipio": "São Bento do Una",
+      "bruto": 5950,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 5950
+      }
+    },
+    {
+      "id": "motorista-64",
+      "municipio": "São Bento do Una",
+      "bruto": 11900,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 11900
+      }
+    },
+    {
+      "id": "motorista-65",
+      "municipio": "São Bento do Una",
+      "bruto": 14280,
+      "isento": false,
+      "esperado": {
+        "irrf": 1280.49,
+        "iss": 714,
+        "inss": 314.16,
+        "patronal": 571.2,
+        "sest": 42.84,
+        "senat": 28.56,
+        "liquido": 11899.95
+      }
+    },
+    {
+      "id": "motorista-66",
+      "municipio": "São Bento do Una",
+      "bruto": 9520,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 9520
+      }
+    },
+    {
+      "id": "motorista-67",
+      "municipio": "São Bento do Una",
+      "bruto": 10710,
+      "isento": false,
+      "esperado": {
+        "irrf": 691.44,
+        "iss": 535.5,
+        "inss": 235.62,
+        "patronal": 428.4,
+        "sest": 32.13,
+        "senat": 21.42,
+        "liquido": 9193.89
+      }
+    },
+    {
+      "id": "motorista-68",
+      "municipio": "São Bento do Una",
+      "bruto": 11900,
+      "isento": false,
+      "esperado": {
+        "irrf": 887.79,
+        "iss": 595,
+        "inss": 261.8,
+        "patronal": 476,
+        "sest": 35.7,
+        "senat": 23.8,
+        "liquido": 10095.91
+      }
+    },
+    {
+      "id": "motorista-69",
+      "municipio": "Capoeiras",
+      "bruto": 8113,
+      "isento": false,
+      "esperado": {
+        "irrf": 283.15,
+        "iss": 409.59,
+        "inss": 178.49,
+        "patronal": 324.52,
+        "sest": 24.34,
+        "senat": 16.23,
+        "liquido": 7201.2
+      }
+    },
+    {
+      "id": "motorista-70",
+      "municipio": "Caetés",
+      "bruto": 6480,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 324,
+        "inss": 142.56,
+        "patronal": 259.2,
+        "sest": 19.44,
+        "senat": 12.96,
+        "liquido": 5981.04
+      }
+    },
+    {
+      "id": "motorista-71",
+      "municipio": "Caetés",
+      "bruto": 8640,
+      "isento": false,
+      "esperado": {
+        "irrf": 354.29,
+        "iss": 432,
+        "inss": 190.08,
+        "patronal": 345.6,
+        "sest": 25.92,
+        "senat": 17.28,
+        "liquido": 7620.43
+      }
+    },
+    {
+      "id": "motorista-72",
+      "municipio": "Águas Belas",
+      "bruto": 8645,
+      "isento": false,
+      "esperado": {
+        "irrf": 354.97,
+        "iss": 432.25,
+        "inss": 190.19,
+        "patronal": 345.8,
+        "sest": 25.94,
+        "senat": 17.29,
+        "liquido": 7624.36
+      }
+    },
+    {
+      "id": "motorista-73",
+      "municipio": "Caetés",
+      "bruto": 7128,
+      "isento": false,
+      "esperado": {
+        "irrf": 126.72,
+        "iss": 356.4,
+        "inss": 156.82,
+        "patronal": 285.12,
+        "sest": 21.38,
+        "senat": 14.26,
+        "liquido": 6452.42
+      }
+    },
+    {
+      "id": "motorista-74",
+      "municipio": "Capoeiras",
+      "bruto": 13965,
+      "isento": false,
+      "esperado": {
+        "irrf": 1228.52,
+        "iss": 702.19,
+        "inss": 307.23,
+        "patronal": 558.6,
+        "sest": 41.9,
+        "senat": 27.93,
+        "liquido": 11657.23
+      }
+    },
+    {
+      "id": "motorista-75",
+      "municipio": "São Bento do Una",
+      "bruto": 11900,
+      "isento": false,
+      "esperado": {
+        "irrf": 887.79,
+        "iss": 595,
+        "inss": 261.8,
+        "patronal": 476,
+        "sest": 35.7,
+        "senat": 23.8,
+        "liquido": 10095.91
+      }
+    },
+    {
+      "id": "motorista-76",
+      "municipio": "Iati",
+      "bruto": 12600,
+      "isento": false,
+      "esperado": {
+        "irrf": 1003.29,
+        "iss": 636.9,
+        "inss": 277.2,
+        "patronal": 504,
+        "sest": 37.8,
+        "senat": 25.2,
+        "liquido": 10619.61
+      }
+    },
+    {
+      "id": "motorista-77",
+      "municipio": "Caetés",
+      "bruto": 8323.2,
+      "isento": false,
+      "esperado": {
+        "irrf": 311.52,
+        "iss": 416.16,
+        "inss": 183.11,
+        "patronal": 332.93,
+        "sest": 24.97,
+        "senat": 16.65,
+        "liquido": 7370.79
+      }
+    },
+    {
+      "id": "motorista-78",
+      "municipio": "Garanhuns",
+      "bruto": 8296,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 8296
+      }
+    },
+    {
+      "id": "motorista-79",
+      "municipio": "Lajedo",
+      "bruto": 9072,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 9072
+      }
+    },
+    {
+      "id": "motorista-80",
+      "municipio": "Bom Conselho",
+      "bruto": 5129.1,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 256.46,
+        "inss": 112.84,
+        "patronal": 205.16,
+        "sest": 15.39,
+        "senat": 10.26,
+        "liquido": 4734.15
+      }
+    },
+    {
+      "id": "motorista-81",
+      "municipio": "Bom Conselho",
+      "bruto": 6411.6,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 320.58,
+        "inss": 141.06,
+        "patronal": 256.46,
+        "sest": 19.24,
+        "senat": 12.82,
+        "liquido": 5917.9
+      },
+      "divergenciaConhecida": true
+    },
+    {
+      "id": "motorista-82",
+      "municipio": "Correntes",
+      "bruto": 5975.5,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 5975.5
+      }
+    },
+    {
+      "id": "motorista-83",
+      "municipio": "Brejão",
+      "bruto": 5472.3,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 273.62,
+        "inss": 120.39,
+        "patronal": 218.89,
+        "sest": 16.42,
+        "senat": 10.95,
+        "liquido": 5050.92
+      },
+      "divergenciaConhecida": true
+    },
+    {
+      "id": "motorista-84",
+      "municipio": "Brejão",
+      "bruto": 5236,
+      "isento": false,
+      "esperado": {
+        "irrf": 0,
+        "iss": 261.8,
+        "inss": 115.19,
+        "patronal": 209.44,
+        "sest": 15.71,
+        "senat": 10.47,
+        "liquido": 4832.83
+      }
+    },
+    {
+      "id": "motorista-85",
+      "municipio": "Garanhuns",
+      "bruto": 7752,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 7752
+      }
+    },
+    {
+      "id": "motorista-86",
+      "municipio": "Garanhuns",
+      "bruto": 7888,
+      "isento": false,
+      "esperado": {
+        "irrf": 252.77,
+        "iss": 394.4,
+        "inss": 173.54,
+        "patronal": 315.52,
+        "sest": 23.66,
+        "senat": 15.78,
+        "liquido": 7027.85
+      }
+    },
+    {
+      "id": "motorista-87",
+      "municipio": "Caetés",
+      "bruto": 7776,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 7776
+      }
+    },
+    {
+      "id": "motorista-88",
+      "municipio": "Águas Belas",
+      "bruto": 8778,
+      "isento": false,
+      "esperado": {
+        "irrf": 372.92,
+        "iss": 438.9,
+        "inss": 193.12,
+        "patronal": 351.12,
+        "sest": 26.33,
+        "senat": 17.56,
+        "liquido": 7729.17
+      }
+    },
+    {
+      "id": "motorista-89",
+      "municipio": "Jupi",
+      "bruto": 14256.0,
+      "isento": false,
+      "esperado": {
+        "irrf": 1276.53,
+        "iss": 719.56,
+        "inss": 313.63,
+        "patronal": 570.24,
+        "sest": 42.77,
+        "senat": 28.51,
+        "liquido": 11875
+      }
+    },
+    {
+      "id": "motorista-90",
+      "municipio": "Jucati",
+      "bruto": 6750,
+      "isento": false,
+      "esperado": {
+        "irrf": 42.37,
+        "iss": 340.5,
+        "inss": 148.5,
+        "patronal": 270,
+        "sest": 20.25,
+        "senat": 13.5,
+        "liquido": 6184.88
+      }
+    },
+    {
+      "id": "motorista-91",
+      "municipio": "São Bento do Una",
+      "bruto": 11662,
+      "isento": true,
+      "esperado": {
+        "irrf": 0,
+        "iss": 0,
+        "inss": 0,
+        "patronal": 0,
+        "sest": 0,
+        "senat": 0,
+        "liquido": 11662
+      }
+    }
+  ]
+}
