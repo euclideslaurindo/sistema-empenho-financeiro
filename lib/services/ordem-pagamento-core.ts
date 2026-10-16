@@ -1,7 +1,7 @@
 import type { PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 import { extrairCodigoElemento } from '@/lib/elementos';
-import { calcularRetencoesDaOp } from '@/lib/services/calculo-op.service';
+import { calcularRetencoesDaOp, type CacheCalculo } from '@/lib/services/calculo-op.service';
 import type { CampoTributario, CampoDesconto } from '@/lib/retencoes';
 import { toCents, fromCents } from '@/lib/money';
 import { calcularProximoNumeroOp } from '@/lib/services/numeracao-op';
@@ -101,6 +101,8 @@ export interface ContextoCriacaoOp {
   neRow: NeTravada;
   /** Cheque já conferido (não duplicado) por quem chama; null se não houver. */
   chequeFormatado: string | null;
+  /** Cache do cálculo da requisição (lote, T34-C); sem ele, lê tudo a cada OP. */
+  cache?: CacheCalculo;
 }
 
 export interface OpCriada {
@@ -132,7 +134,7 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
     saldoAnterior, valorEmpenho, valorPagamento: vPagamento,
     dataEmissao, dataPagamento,
   } = dados;
-  const { usuarioId, perfil, neRow, chequeFormatado } = ctx;
+  const { usuarioId, perfil, neRow, chequeFormatado, cache } = ctx;
 
   const valorNe = parseFloat(String(neRow.valor)) || 0;
   // Elemento/subelemento SEMPRE vêm da NE no servidor — nunca do
@@ -198,7 +200,7 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
     informados: montarInformados(dados),
     perfilUsuario: perfil as 'ADMIN' | 'GESTOR' | 'CONSULTA',
     sobrescreverMei: dados.sobrescreverMei,
-  });
+  }, cache);
 
   const finalIrrf = fromCents(resultado.itens.irrf ?? 0);
   const finalIss = fromCents(resultado.itens.iss ?? 0);
