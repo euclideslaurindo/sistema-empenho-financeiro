@@ -1,8 +1,10 @@
 import { describe, test, expect } from 'vitest';
 import {
   estadoCampo,
+  idNaLinha,
   informadosEmCentavos,
   mascararValorDigitado,
+  nomeNaLinha,
   rotuloCampo,
   somarDescontosCents,
 } from '@/lib/retencoes-form';
@@ -67,5 +69,16 @@ describe('rotuloCampo / somas', () => {
   });
   test('somarDescontosCents soma os 8 campos mascarados', () => {
     expect(somarDescontosCents({ irrf: '9,98', iss: '33,25', taxaBancaria: '8,50', taxaPix: '' })).toBe(5173);
+  });
+});
+
+describe('nomes e ids por linha (T35-A)', () => {
+  test('sem prefixo: nome e id de sempre', () => {
+    expect(nomeNaLinha('', 'valorPagamento')).toBe('valorPagamento');
+    expect(idNaLinha('', 'op-retencao-irrf')).toBe('op-retencao-irrf');
+  });
+  test('com prefixo: nome aninhado e id sem pontos', () => {
+    expect(nomeNaLinha('credores.2', 'itens')).toBe('credores.2.itens');
+    expect(idNaLinha('credores.2', 'op-retencao-irrf')).toBe('op-retencao-irrf-credores-2');
   });
 });
