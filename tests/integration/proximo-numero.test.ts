@@ -28,9 +28,9 @@ function mockBanco({ ne, maxOp, maxSub }: { ne: any | null; maxOp: number | null
   });
 }
 
-async function chamar(numeroNe?: string) {
+async function chamar(numeroNe?: string, extra = '') {
   const url = numeroNe
-    ? `http://localhost:3000/api/ordens-pagamento/proximo-numero?numeroNe=${encodeURIComponent(numeroNe)}`
+    ? `http://localhost:3000/api/ordens-pagamento/proximo-numero?numeroNe=${encodeURIComponent(numeroNe)}${extra}`
     : 'http://localhost:3000/api/ordens-pagamento/proximo-numero';
   const res: any = await GET(new NextRequest(url));
   return { status: res.status, body: await res.json() };
@@ -93,6 +93,42 @@ describe('GET /api/ordens-pagamento/proximo-numero', () => {
     expect((await chamar('2026NE000982')).status).toBe(403);
     (getAuthUser as any).mockResolvedValueOnce(null);
     expect((await chamar('2026NE000982')).status).toBe(401);
+  });
+});
+
+describe('proximo-numero?quantidade=N (T34-B)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getAuthUser as any).mockResolvedValue({ id: 'u1', perfil: 'GESTOR' });
+  });
+
+  test('quantidade=3: três números em sequência e a raiz igual ao primeiro', async () => {
+    mockBanco({ ne: { status: 'PARCIALMENTE PAGO' }, maxOp: 11, maxSub: 1 });
+    const { status, body } = await chamar('2026NE000982', '&quantidade=3');
+    expect(status).toBe(200);
+    expect(body.numeros).toEqual([
+      { numeroOp: `${ANO}.OP.0012`, sub: '02', rotulo: 'NE 2026NE000982/02' },
+      { numeroOp: `${ANO}.OP.0013`, sub: '03', rotulo: 'NE 2026NE000982/03' },
+      { numeroOp: `${ANO}.OP.0014`, sub: '04', rotulo: 'NE 2026NE000982/04' },
+    ]);
+    expect(body).toMatchObject({ numeroOp: `${ANO}.OP.0012`, sub: '02', rotulo: 'NE 2026NE000982/02', previsto: true });
+    const sqls = (query as any).mock.calls.map((c: any[]) => c[0] as string);
+    expect(sqls.length).toBe(3);
+    expect(sqls.some((s: string) => s.includes('FOR UPDATE'))).toBe(false);
+  });
+
+  test('sem quantidade: sem o campo numeros (formato antigo)', async () => {
+    mockBanco({ ne: { status: 'EMITIDO' }, maxOp: 1, maxSub: 1 });
+    const { body } = await chamar('2026NE000982');
+    expect(body).not.toHaveProperty('numeros');
+  });
+
+  test.each(['0', '101', 'abc', '1.5', ''])('quantidade=%s -> 400 sem consultar o banco', async (q: string) => {
+    mockBanco({ ne: { status: 'EMITIDO' }, maxOp: 1, maxSub: 1 });
+    const { status, body } = await chamar('2026NE000982', `&quantidade=${q}`);
+    expect(status).toBe(400);
+    expect(body.error).toContain('de 1 a 100');
+    expect(query).not.toHaveBeenCalled();
   });
 });
 
