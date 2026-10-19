@@ -65,3 +65,6 @@ Regras complementares:
 
 ## Decisões em aberto relacionadas
 D22, D23. **Fechadas:** D14, D17, D18, D19.
+
+## Atualização de escopo (rodada 2, 13/10/2026)
+O município usado no ISS e na **taxa de expediente** passa a ser o **Município (Expediente)** do credor (`credores.municipioExpediente`, camelCase, D41; T32/T33), e não mais a `cidade` do endereço. Sem ele: taxa de expediente 0, ISS na alíquota padrão (5%) e **sem aviso** (D45); o aviso só aparece se o campo estiver preenchido com um município sem cadastro.
