@@ -53,3 +53,14 @@ Mudanças de config feitas **enquanto** o operador preenche: o servidor é a aut
 
 ## Decisões em aberto relacionadas
 D1, D2, D11.
+
+## Atualização de escopo (decisões de 07/10/2026)
+- Os valores exibidos vêm da **prévia do servidor** (`POST /api/ordens-pagamento/previa-retencoes`, T10), com debounce, e não de um cálculo no navegador. Isso garante uma única implementação (necessário para o 3.3.90.33, MEI e IRRF por tabela).
+- A **patronal** aparece em linha separada, identificada como "encargo do órgão — não descontada", e **não** entra em "Total de descontos" nem no "Valor líquido".
+- Para credor MEI: banner "Isento (MEI)" e campos de retenção desabilitados (detalhes na T26).
+- No 3.3.90.33, mostrar o ISS com a **taxa de expediente da prefeitura** detalhada (ex.: "ISS 5% + taxa de expediente — Prefeitura de Canhotinho").
+
+## Atualização de escopo (rodada 2, 13/10/2026)
+A **T35** reorganiza o topo do formulário (sai o "Número da OP"; "Nº do cheque" e "Data do pagamento" passam a ser por credor) e troca o bloco Favorecido por uma **lista de credores**. Os componentes desta task (`OpTaxesSection`, `OpItemsTable`, `InputValorPagamento`) ganham um `basePath` para funcionarem por credor. O comportamento da prévia e dos campos de retenção **não muda**.
+
+**Correção (13/10/2026, D43):** ao contrário do primeiro item de "decisões de 07/10" acima, o formulário **não** usa a prévia do servidor para todos os elementos. Como foi implementado: prévia do servidor (`POST /api/ordens-pagamento/previa`, não `previa-retencoes`) **só no 3.3.90.33**; nos demais elementos, cálculo no navegador (`AutoCalcEffect`). Na emissão em lote (T35), NE do .33 usa `previa-lote` e os demais elementos calculam localmente por linha.
