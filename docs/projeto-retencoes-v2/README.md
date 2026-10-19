@@ -1,6 +1,6 @@
 # Projeto Retenções v2 — Plano de Implementação
 
-> **Status:** PLANEJAMENTO. Nenhum código, banco ou configuração foi alterado.
+> **Status (19/10/2026):** rodada 1 implementada (T01–T28, faltando o fechamento T22/T23); **rodada 2 implementada** (T28–T36, PRs #39 a #52) e em homologação pelo roteiro da T37 — ver [`HOMOLOGACAO-RODADA-2.md`](./HOMOLOGACAO-RODADA-2.md) e a seção 16.
 > **Base analisada:** `main` no commit `006d34c` (06/10/2026) para a rodada 1; **`main` no commit `caf215e` (13/10/2026)** para a rodada 2 (T29 a T37).
 > **Escopo:** retenções por elemento, tela de administração das taxas, taxas bancária/PIX, NE com vários credores, número previsto da OP, município do credor, status da DARF, novos elementos/subelementos e o **cálculo do transporte (3.3.90.33) conforme a planilha EJA Campo**, com IRRF por tabela, ISS por município e isenção de MEI.
 > **Atualizado em 07/10/2026** com as decisões da segunda rodada (ver seções 4 e 5).
@@ -88,6 +88,8 @@ Anotações manuscritas do usuário (4 fotos: tabela de elementos com marcaçõe
 22. Credor do .33 **sem** Município (Expediente): taxa 0 e **sem aviso**; o alerta de "60 dias" da Data de Pagamento da NE sai (D45).
 23. Reduzir o valor da NE abaixo do gasto continua **HTTP 409** (D46).
 24. A `migration_17` **não faz `MODIFY`**; os outros sistemas **não leem** as colunas de data/credor da NE (D47).
+25. A **edição de OP não está na tela** desde 09/2026 (commit `581c3ba`) e **não foi recriada** na T35-B; toda OP nova sai pela emissão em lote, inclusive com um credor só. A rota `PUT /api/ordens-pagamento/[id]` continua, com testes. Se a edição voltar a ser pedida, vira task própria (D48, 19/10/2026).
+26. **Sem ambiente de homologação separado:** a homologação é o roteiro de [`HOMOLOGACAO-RODADA-2.md`](./HOMOLOGACAO-RODADA-2.md) com dados de teste identificáveis e limpeza pela aplicação, até existir um banco de teste (D49, 19/10/2026).
 
 Detalhes de D41 a D47 na seção 5.
 
@@ -313,7 +315,7 @@ flowchart LR
 
 1. **T28 (teste de conformidade com a planilha EJA Campo):** feito em 14/10/2026 — `tests/unit/conformidade-eja-campo.test.ts` (63 exatas, 5 com 1 centavo, 23 isentas). A T33 muda a entrada desse teste (`municipioExpediente`) e a T37 o usa na regressão.
 2. **PR 0 da T31 — status da NE na edição:** `NotasEmpenhoService.atualizar` grava `status || 'EMITIDO'` e a tela sempre envia `"EMITIDO"`; editar uma NE parcial, liquidada **ou cancelada** a devolve a `EMITIDO`. Corrigir (status derivado do saldo; `CANCELADO` só via `cancelar`) e rodar as consultas de conferência da T31. Pode sair antes de tudo, independente da rodada 2.
-3. **`migration_17` em homologação** (T32) antes de qualquer código da T33.
+3. **`migration_17` em homologação** (T32) antes de qualquer código da T33. *Feito:* conferida em produção em 14/10/2026 (a coluna já existia).
 4. Os pendentes da rodada 1, **T22** e **T23**, continuam valendo (a T37 repete o processo para a rodada 2).
 
 ## 12. Fluxo de trabalho
@@ -396,3 +398,19 @@ O plano original previa as migrations 10 a 15 (por isso os títulos e nomes de a
 | `migration_15` | T19 | acompanhamento da DARF |
 | `migration_16` | T24 | parâmetros do transporte, IRRF e ISS por município |
 | **`migration_17`** | **T32** | garante `credores.municipioExpediente` (camelCase; já existe em produção — D41) e só **confere** as colunas nulas da NE, sem `MODIFY` (D47). Escrita e **executada em 14/10/2026** (a coluna já existia; só registrou a versão) |
+
+## 16. Estado da rodada 2 (19/10/2026)
+
+| Task | Entrega | PR |
+|---|---|---|
+| PR 0 (T31) | status da NE não volta a EMITIDO ao editar | #39 |
+| T28 | conformidade com a planilha EJA Campo | #40 |
+| T32 | `migration_17` (conferida em produção em 14/10) | #41 |
+| T33 | Município (Expediente) no credor | #43 |
+| T29–T31 | NE: título, sem datas, sem credor, saldo | #44 |
+| T34 (A, B, C) | core da OP, numeração múltipla, emissão e prévia em lote | #45, #47, #48 |
+| T35 (A, B) | `basePath` e tela de OP com lista de credores (3 rodadas) | #46, #49, #50, #51 |
+| T36 | consulta e impressão ("Imprimir esta emissão") | #52 |
+| T37 | rastreabilidade, roteiro de homologação, entrega e rollback | [`HOMOLOGACAO-RODADA-2.md`](./HOMOLOGACAO-RODADA-2.md), `database/consultas/conferencia_rodada2.sql` |
+
+**Falta para fechar:** o checklist da homologação aprovado pelo supervisor e a entrega em produção (roteiro na seção 5 do documento de homologação). Depois disso, o fechamento da rodada 1: **T22** e **T23**.

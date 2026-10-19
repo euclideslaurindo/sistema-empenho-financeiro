@@ -74,3 +74,12 @@ As próximas abordagens do documento podem focar em:
 3. **Módulo Completo de Testes (Bugs 118-127)** (Preparação para implantação de testes unitários que garantam o funcionamento matemático sem dependência manual).
 
 Este documento está persistido na raiz do projeto e pode ser referenciado para abrir a próxima sessão.
+
+---
+
+## 🆕 Atualização 19/10/2026 — Projeto Retenções v2, rodada 2 concluída
+
+- **Na `main`:** rodada 2 (T28 a T36, PRs #39 a #52). A NE é cadastrada sem credor e sem datas, com saldo (valor, gasto, restante). A Ordem de Pagamento emite **uma OP por credor, em lote**, numa transação só. O Município (Expediente) do credor define a taxa de expediente no 3.3.90.33. A impressão tem o "Imprimir esta emissão".
+- **Fechamento (T37):** `docs/projeto-retencoes-v2/HOMOLOGACAO-RODADA-2.md` e `database/consultas/conferencia_rodada2.sql` (só leitura).
+- **Pendente:** checklist de homologação aprovado pelo supervisor, entrega em produção e, depois, T22/T23 da rodada 1.
+- **Cuidado:** o ambiente local aponta para o banco compartilhado de produção. Recomendado um banco de teste (seção 7 do documento de homologação).
