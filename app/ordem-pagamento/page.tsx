@@ -184,8 +184,16 @@ export default function OrdemPagamento() {
     []
   );
 
+  // Acessibilidade: o foco vai para o 1º campo inválido da linha (ou para a
+  // própria linha, cujo alerta é lido pelo leitor de tela). Espera o React
+  // desenhar os erros antes de procurar o campo.
   const focarLinha = (indice: number) =>
-    setTimeout(() => document.querySelector(`[data-testid="linha-credor-${indice}"]`)?.scrollIntoView?.({ behavior: "smooth", block: "center" }), 0);
+    setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(`[data-testid="linha-credor-${indice}"]`);
+      if (!el) return;
+      el.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      (el.querySelector<HTMLElement>('[aria-invalid="true"]') ?? el).focus();
+    }, 50);
 
   const emitir = async () => {
     clearErrors();
@@ -256,7 +264,7 @@ export default function OrdemPagamento() {
 
   return (
     <div className="flex flex-col h-full bg-transparent">
-      <div className="p-8 max-w-[1400px] mx-auto w-full flex-1 space-y-8 animate-fade-in">
+      <div className="p-4 md:p-8 max-w-[1400px] mx-auto w-full flex-1 space-y-8 animate-fade-in">
         <div className="flex flex-col md:flex-row md:items-end justify-between">
           <div>
             <div className="flex items-center text-sm font-bold text-slate-500 uppercase tracking-widest mb-3">
@@ -278,7 +286,7 @@ export default function OrdemPagamento() {
         <FormProvider {...methods}>
           {/* Enter num campo não emite: só o botão Emitir. */}
           <form onSubmit={(e) => e.preventDefault()}>
-            <OpPaymentData errors={errors} saldo={saldo} erroSaldo={erroSaldo} onTrocarNe={limparLista} />
+            <OpPaymentData errors={errors} saldo={saldo} erroSaldo={erroSaldo} quantidadeCredores={fields.length} onTrocarNe={limparLista} />
             <CredoresOpLista
               chaves={fields.map((f) => f.chave)}
               neCarregada={neCarregada}
