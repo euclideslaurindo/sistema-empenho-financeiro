@@ -1,130 +1,97 @@
 "use client";
 import { useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { Search, Wallet, User } from "lucide-react";
+import { Search, Wallet } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { apiClient } from "@/lib/api-client";
-import { maskCurrency, parseFormNumber } from "@/lib/utils";
 import { useListboxKeyboardNav } from "@/hooks/use-listbox-keyboard-nav";
 import { useDebouncedCallback } from "@/hooks/use-debounce";
-import { FaixaNumeroPrevisto, placeholderNumeroOp } from "@/components/op-form/FaixaNumeroPrevisto";
-import { SeletorCredorOp, credorDaListaNe, selecionarCredorOp } from "@/components/op-form/SeletorCredorOp";
-import { formatarBRL, toCents } from "@/lib/money";
-import type { NeCredorResposta } from "@/lib/types/db";
-import { rotuloMunicipio } from "@/lib/credor-endereco";
 import { CamposElementoSubelemento } from "@/components/op-form/CamposElementoSubelemento";
-import { InputValorPagamento } from "@/components/op-form/InputValorPagamento";
+import { FaixaSaldoEmissao } from "@/components/op-form/FaixaSaldoEmissao";
+import type { SaldoNe } from "@/hooks/use-saldo-ne";
 
-function InputNumeroOp({ control }: { control: any }) {
-  const previsao = useWatch({ control, name: "previsaoNumero" });
-  return (
-    <input
-      type="text"
-      placeholder={placeholderNumeroOp(previsao)}
-      disabled
-      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed transition-all duration-300"
-    />
-  );
-}
+const CAMPO_LEITURA =
+  "w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed transition-all duration-300";
 
-function IndicadorSaldo({ control }: { control: any }) {
-  const empenho = useWatch({ control, name: "empenho" });
-  const saldoAnterior = useWatch({ control, name: "saldoAnterior" });
-  const valorPagamento = useWatch({ control, name: "valorPagamento" });
-  const credoresNe: NeCredorResposta[] = useWatch({ control, name: "credoresNe" }) || [];
-  const cpfCnpj = useWatch({ control, name: "cpfCnpj" });
-
-  if (!empenho) return null;
-
-  const valorPg = parseFormNumber(valorPagamento);
-  const saldoAtual = Number(saldoAnterior) || 0;
-  const credor = credorDaListaNe(credoresNe, cpfCnpj);
-  const saldoCredorAposCents = credor ? toCents(credor.saldo) - toCents(valorPagamento) : null;
-  const ultrapassouSaldo =
-    (valorPg > saldoAtual && saldoAtual > 0) || (saldoCredorAposCents !== null && saldoCredorAposCents < 0);
-
-  return (
-    <div className={`p-4 rounded-xl border flex items-center gap-4 mb-8 ${ultrapassouSaldo ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
-      <Wallet className="w-6 h-6" />
-      <div>
-        <p className="text-sm font-bold uppercase tracking-widest opacity-80">Saldo Anterior da NE</p>
-        <p className="text-2xl font-black">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldoAtual)}</p>
-      </div>
-      <div className="ml-auto text-right">
-        <p className="text-sm font-bold uppercase tracking-widest opacity-80">Saldo Restante Após Pagamento</p>
-        <p className="text-xl font-bold">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(saldoAtual - valorPg)}</p>
-      </div>
-      {credor && saldoCredorAposCents !== null && (
-        <div className="text-right pl-6 border-l border-current/20" data-testid="saldo-credor">
-          <p className="text-sm font-bold uppercase tracking-widest opacity-80">Saldo do Credor Após Pagamento</p>
-          <p className="text-xl font-bold">R$ {formatarBRL(saldoCredorAposCents)}</p>
-          <p className="text-xs font-semibold opacity-80">{credor.nome}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function OpPaymentData({ errors }: { errors: any }) {
+/**
+ * Dados da emissão (T35-B): a pesquisa da NE fica no lugar do antigo "Número
+ * da OP" (o número agora é por credor). Unidade, gestão, elemento e
+ * subelemento vêm da NE, somente leitura — é o que o servidor grava na OP.
+ * Trocar de NE com credores na lista pede confirmação e limpa a lista.
+ */
+export default function OpPaymentData({
+  errors,
+  saldo,
+  erroSaldo,
+  onTrocarNe,
+}: {
+  errors: any;
+  saldo: SaldoNe | null;
+  erroSaldo?: string | null;
+  onTrocarNe: () => void;
+}) {
   const { register, setValue, getValues, control } = useFormContext<any>();
-
+  const credores: unknown[] = useWatch({ control, name: "credores" }) || [];
   const [neSuggestions, setNeSuggestions] = useState<any[]>([]);
   const [showNeSuggestions, setShowNeSuggestions] = useState(false);
+  const [nePendente, setNePendente] = useState<any | null>(null);
 
-  const [credorSuggestions, setCredorSuggestions] = useState<any[]>([]);
-  const [showCredorSuggestions, setShowCredorSuggestions] = useState(false);
+  const aplicarNe = (ne: any) => {
+    setValue("empenho", ne.numero);
+    setValue("neCarregada", ne.numero);
+    setValue("historicoNe", ne.historico || "");
+    setValue("unidadeOrcamentaria", ne.unidadeOrcamentaria || "");
+    setValue("gestao", ne.gestao || "");
+    setValue("elemento", ne.elemento || "");
+    setValue("subelemento", ne.subelemento || "");
+    toast.success(`Dados da NE ${ne.numero} carregados.`);
+  };
 
-  const [cpfSuggestions, setCpfSuggestions] = useState<any[]>([]);
-  const [showCpfSuggestions, setShowCpfSuggestions] = useState(false);
-
-  // aceita numero opcional para evitar race condition quando chamado do selectNe
   const loadNe = async (overrideNumero?: string) => {
     const raw = overrideNumero || getValues("empenho");
-    const numero = raw != null ? String(raw).trim() : '';
-    if (!numero) { toast.error("Digite o número da NE para buscar."); return; }
+    const numero = raw != null ? String(raw).trim() : "";
+    if (!numero) {
+      toast.error("Digite o número da NE para buscar.");
+      return;
+    }
     try {
       const apiData = await apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(numero)}`);
-      if (apiData && apiData.ne) {
-        const ne = apiData.ne;
-        setValue("empenho", ne.numero);
-        setValue("saldoAnterior", Number(ne.saldoDisponivel) || 0);
-        setValue("valorEmpenho", Number(ne.valor) || 0);
-        setValue("historico", ne.historico || '');
-        setValue("unidadeOrcamentaria", ne.unidadeOrcamentaria || '');
-        setValue("gestao", ne.gestao || '');
-        setValue("elemento", ne.elemento || '');
-        setValue("subelemento", ne.subelemento || '');
-        setValue("neCarregada", ne.numero);
-
-        // NE com credores (T15+): o seletor mostra bruto/pago/restante; com um
-        // só, ele já vem escolhido. NE antiga (só credor sintetizado/legado)
-        // segue livre, como antes.
-        const credoresNe: NeCredorResposta[] = (ne.credores || []).filter((c: NeCredorResposta) => !c.legado);
-        setValue("credoresNe", credoresNe);
-        if (credoresNe.length === 1) {
-          await selecionarCredorOp(setValue, credoresNe[0]);
-        }
-
-        // Valor a Pagar e o valor unitário do item NÃO são preenchidos
-        // automaticamente: a OP pode ser um pagamento parcial do saldo da
-        // NE, então o usuário precisa digitar o valor real que vai pagar.
-        // Preencher com o saldo total fazia "Saldo Restante Após Pagamento"
-        // sempre mostrar R$ 0,00, já que valorPagamento = saldoAnterior.
-        const currentItens = getValues("itens") || [];
-        const newItens = [...currentItens];
-        newItens[0] = {
-          especificacao: ne.historico || 'Pagamento referente ao empenho ' + ne.numero,
-          quantidade: 1,
-          unidade: 'UN',
-          valorUnitario: ''
-        };
-        setValue("itens", newItens);
-
-        toast.success(`Dados da NE ${ne.numero} carregados.`);
+      const ne = apiData?.ne;
+      if (!ne) throw new Error();
+      if (ne.status === "CANCELADO") {
+        toast.error(`A NE ${ne.numero} está CANCELADA.`);
         return;
       }
-    } catch { }
-    toast.error('NE não encontrada.');
+      const atual = getValues("neCarregada");
+      if (credores.length > 0 && atual && atual !== ne.numero) {
+        setNePendente(ne); // confirma antes de descartar a lista
+        return;
+      }
+      aplicarNe(ne);
+    } catch {
+      toast.error("NE não encontrada.");
+    }
+  };
+
+  const confirmarTroca = () => {
+    if (!nePendente) return;
+    onTrocarNe();
+    aplicarNe(nePendente);
+    setNePendente(null);
+  };
+
+  const cancelarTroca = () => {
+    setValue("empenho", getValues("neCarregada") || "");
+    setNePendente(null);
   };
 
   const buscarNeSugestoes = useDebouncedCallback(async (val: string) => {
@@ -134,13 +101,14 @@ export default function OpPaymentData({ errors }: { errors: any }) {
         setNeSuggestions(data.notas);
         setShowNeSuggestions(true);
       }
-    } catch (err) {}
+    } catch {}
   }, 400);
 
   const handleNeSearchChange = (val: string) => {
     setValue("empenho", val);
-    setValue("neCarregada", "");
-    setValue("credoresNe", []);
+    // Sem credores na lista, digitar outra NE já descarrega a anterior.
+    // Com credores, a NE carregada só muda ao confirmar a troca.
+    if (credores.length === 0) setValue("neCarregada", "");
     if (val.length >= 2) {
       buscarNeSugestoes(val);
     } else {
@@ -156,127 +124,32 @@ export default function OpPaymentData({ errors }: { errors: any }) {
     loadNe(ne.numero);
   };
 
-  const buscarCpfSugestoes = useDebouncedCallback(async (val: string) => {
-    try {
-      const data = await apiClient.get(`/api/credores?busca=${encodeURIComponent(val)}&limit=8`);
-      if (data?.credores?.length > 0) {
-        setCpfSuggestions(data.credores);
-        setShowCpfSuggestions(true);
-      }
-    } catch {}
-  }, 350);
-
-  // Digitar outro credor à mão: o MEI fica desconhecido (o servidor decide pelo cadastro).
-  const esquecerMei = () => {
-    setValue("credorMei", false);
-    setValue("sobrescreverMei", false);
-  };
-
-  const handleCpfChange = (val: string) => {
-    setValue("cpfCnpj", val);
-    esquecerMei();
-    setCpfSuggestions([]);
-    setShowCpfSuggestions(false);
-    const digits = val.replace(/\D/g, '');
-    if (digits.length >= 4) {
-      buscarCpfSugestoes(val);
-    }
-  };
-
-  const buscarCredorSugestoes = useDebouncedCallback(async (val: string) => {
-    try {
-      const data = await apiClient.get(`/api/credores?busca=${encodeURIComponent(val)}&limit=8`);
-      if (data && data.credores && data.credores.length > 0) {
-        setCredorSuggestions(data.credores);
-        setShowCredorSuggestions(true);
-      } else {
-        setCredorSuggestions([]);
-        setShowCredorSuggestions(false);
-      }
-    } catch (err) {}
-  }, 350);
-
-  const handleCredorNameChange = (val: string) => {
-    setValue("nomeCredor", val);
-    esquecerMei();
-    if (val.length >= 2) {
-      buscarCredorSugestoes(val);
-    } else {
-      setCredorSuggestions([]);
-      setShowCredorSuggestions(false);
-    }
-  };
-
-  const selectCredor = (credor: any) => {
-    setValue("nomeCredor", credor.nome);
-    setValue("cpfCnpj", credor.cpf_cnpj || credor.cpfCnpj || '');
-    setValue("credorMei", !!Number(credor.isMei ?? credor.is_mei));
-    setValue("sobrescreverMei", false);
-    setValue("rgCredor", credor.rg || '');
-    setValue("enderecoCredor", credor.endereco || '');
-    setCredorSuggestions([]);
-    setShowCredorSuggestions(false);
-  };
-
   const neNav = useListboxKeyboardNav(neSuggestions, selectNe);
-  const cpfNav = useListboxKeyboardNav(cpfSuggestions, (c: any) => {
-    selectCredor(c);
-    setCpfSuggestions([]);
-    setShowCpfSuggestions(false);
-  });
-  const credorNav = useListboxKeyboardNav(credorSuggestions, selectCredor);
 
   return (
-    <>
-      <IndicadorSaldo control={control} />
-
-      <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
-        <div className="flex items-center mb-8 pb-4 border-b border-slate-100">
+    <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
+      <div className="flex items-center mb-8 pb-4 border-b border-slate-100">
         <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-900 mr-3">
           <Wallet className="w-4 h-4" />
         </div>
-        <h2 className="text-lg font-bold text-slate-800">
-          Dados do Pagamento
-        </h2>
+        <h2 className="text-lg font-bold text-slate-800">Dados da Emissão</h2>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-
-        <FaixaNumeroPrevisto />
-
-        <div className="col-span-12 md:col-span-3">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Número da OP</label>
-          <InputNumeroOp control={control} />
-        </div>
-        <div className="col-span-12 md:col-span-3">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Data Emissão OP</label>
-          <input
-            type="date"
-            {...register("dataEmissao")}
-            aria-invalid={!!errors?.dataEmissao}
-            aria-describedby={errors?.dataEmissao ? "op-data-emissao-error" : undefined}
-            className={`w-full px-4 py-3 rounded-xl border bg-slate-50 focus:border-blue-800 transition-all duration-300 ${errors?.dataEmissao ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
-          />
-          {errors?.dataEmissao && <p id="op-data-emissao-error" className="text-red-500 text-xs mt-1 font-semibold">{errors.dataEmissao.message}</p>}
-        </div>
-        <div className="col-span-12 md:col-span-3">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nº do Cheque</label>
-          <input type="text" placeholder="Ex: 852963" {...register("numeroCheque")} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" />
-        </div>
-        <div className="col-span-12 md:col-span-3">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Data do Pagamento</label>
-          <input type="date" {...register("dataPagamento")} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" />
-        </div>
-
-        <div className="col-span-12 md:col-span-4 relative">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nota de Empenho (NE)</label>
+        <div className="col-span-12 md:col-span-6 relative">
+          <label htmlFor="op-empenho" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+            Nota de Empenho (NE)
+          </label>
           <div className="relative flex">
             <input
+              id="op-empenho"
               type="text"
               placeholder="Buscar NE (ex: 2024NE000123)"
               {...register("empenho")}
               onChange={(e) => handleNeSearchChange(e.target.value)}
-              onFocus={() => { if(getValues("empenho")?.length >= 2) setShowNeSuggestions(true); }}
+              onFocus={() => {
+                if (getValues("empenho")?.length >= 2) setShowNeSuggestions(true);
+              }}
               onBlur={() => setTimeout(() => setShowNeSuggestions(false), 200)}
               onKeyDown={neNav.onKeyDown}
               role="combobox"
@@ -285,11 +158,22 @@ export default function OpPaymentData({ errors }: { errors: any }) {
               aria-activedescendant={neNav.highlightedIndex >= 0 ? `ne-option-${neNav.highlightedIndex}` : undefined}
               aria-invalid={!!errors?.empenho}
               aria-describedby={errors?.empenho ? "op-empenho-error" : undefined}
-              className={`w-full pl-4 pr-12 py-3 rounded-xl border bg-slate-50 focus:border-blue-800 transition-all duration-300 ${errors?.empenho ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
+              className={`w-full pl-4 pr-12 py-3 rounded-xl border bg-slate-50 focus:border-blue-800 transition-all duration-300 ${errors?.empenho ? "border-red-400 bg-red-50" : "border-slate-200"}`}
             />
-            <button onClick={() => loadNe()} type="button" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><Search className="w-4 h-4" /></button>
+            <button
+              onClick={() => loadNe()}
+              type="button"
+              aria-label="Carregar a NE"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-blue-500 hover:bg-blue-50 rounded-lg"
+            >
+              <Search className="w-4 h-4" />
+            </button>
           </div>
-          {errors?.empenho && <p id="op-empenho-error" className="text-red-500 text-xs mt-1 font-semibold">{errors.empenho.message}</p>}
+          {errors?.empenho && (
+            <p id="op-empenho-error" className="text-red-500 text-xs mt-1 font-semibold">
+              {errors.empenho.message}
+            </p>
+          )}
           {showNeSuggestions && neSuggestions.length > 0 && (
             <div id="ne-suggestions-listbox" role="listbox" className="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 max-h-60 overflow-y-auto">
               {neSuggestions.map((ne, i) => (
@@ -300,138 +184,70 @@ export default function OpPaymentData({ errors }: { errors: any }) {
                   aria-selected={neNav.highlightedIndex === i}
                   onClick={() => selectNe(ne)}
                   onMouseEnter={() => neNav.setHighlightedIndex(i)}
-                  className={`p-3 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${neNav.highlightedIndex === i ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
+                  className={`p-3 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${neNav.highlightedIndex === i ? "bg-blue-50" : "hover:bg-blue-50"}`}
                 >
                   <div className="font-bold text-slate-700">{ne.numero}</div>
-                  <div className="text-xs text-slate-500 truncate">{ne.historico || 'Sem especificação'}</div>
-                  <div className="text-xs font-black text-emerald-600 mt-1">{new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(ne.saldoDisponivel)} disponível</div>
+                  <div className="text-xs text-slate-500 truncate">{ne.historico || "Sem observações"}</div>
+                  <div className="text-xs font-black text-emerald-600 mt-1">
+                    {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(ne.saldo?.restante ?? ne.saldoDisponivel) || 0)}{" "}
+                    disponível
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        <div className="col-span-12 md:col-span-4">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Unid. Orçamentária</label>
-          <input type="text" {...register("unidadeOrcamentaria")} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" />
+        <div className="col-span-12 md:col-span-3">
+          <label htmlFor="op-data-emissao" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+            Data Emissão OP
+          </label>
+          <input
+            id="op-data-emissao"
+            type="date"
+            {...register("dataEmissao")}
+            aria-invalid={!!errors?.dataEmissao}
+            aria-describedby={errors?.dataEmissao ? "op-data-emissao-error" : undefined}
+            className={`w-full px-4 py-3 rounded-xl border bg-slate-50 focus:border-blue-800 transition-all duration-300 ${errors?.dataEmissao ? "border-red-400 bg-red-50" : "border-slate-200"}`}
+          />
+          {errors?.dataEmissao && (
+            <p id="op-data-emissao-error" className="text-red-500 text-xs mt-1 font-semibold">
+              {errors.dataEmissao.message}
+            </p>
+          )}
+        </div>
+
+        <div className="col-span-12 md:col-span-3">
+          <label htmlFor="op-gestao" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+            Gestão
+          </label>
+          <input id="op-gestao" type="text" readOnly {...register("gestao")} className={CAMPO_LEITURA} />
         </div>
 
         <div className="col-span-12 md:col-span-4">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Gestão</label>
-          <input type="text" {...register("gestao")} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" />
+          <label htmlFor="op-unidade" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">
+            Unid. Orçamentária
+          </label>
+          <input id="op-unidade" type="text" readOnly {...register("unidadeOrcamentaria")} className={CAMPO_LEITURA} />
         </div>
 
         <CamposElementoSubelemento control={control} />
 
-        <SeletorCredorOp />
-
-        <div className="col-span-12">
-          <div className="flex items-center mb-4 mt-4 pb-2 border-b border-slate-100">
-            <div className="w-6 h-6 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600 mr-2"><User className="w-3 h-3" /></div>
-            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest">Favorecido</h3>
-          </div>
-        </div>
-
-        <div className="col-span-12 md:col-span-3 relative">
-          <label htmlFor="op-cpf-cnpj" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">CPF/CNPJ</label>
-          <input
-            id="op-cpf-cnpj"
-            type="text"
-            placeholder="Digite para buscar..."
-            {...register("cpfCnpj")}
-            onChange={(e) => handleCpfChange(e.target.value)}
-            onBlur={() => setTimeout(() => setShowCpfSuggestions(false), 200)}
-            onFocus={() => { if (getValues("cpfCnpj")?.replace(/\D/g,'').length >= 4) setShowCpfSuggestions(true); }}
-            onKeyDown={cpfNav.onKeyDown}
-            role="combobox"
-            aria-expanded={showCpfSuggestions && cpfSuggestions.length > 0}
-            aria-controls="cpf-suggestions-listbox"
-            aria-activedescendant={cpfNav.highlightedIndex >= 0 ? `cpf-option-${cpfNav.highlightedIndex}` : undefined}
-            aria-invalid={!!errors?.cpfCnpj}
-            aria-describedby={errors?.cpfCnpj ? "op-cpf-cnpj-error" : undefined}
-            className={`w-full px-4 py-3 rounded-xl border bg-slate-50 focus:border-blue-800 transition-all duration-300 ${errors?.cpfCnpj ? 'border-red-400 bg-red-50' : 'border-slate-200'}`}
-          />
-          {errors?.cpfCnpj && <p id="op-cpf-cnpj-error" className="text-red-500 text-xs mt-1 font-semibold">{errors.cpfCnpj.message}</p>}
-          {showCpfSuggestions && cpfSuggestions.length > 0 && (
-            <div id="cpf-suggestions-listbox" role="listbox" className="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 max-h-52 overflow-y-auto">
-              {cpfSuggestions.map((c: any, i: number) => (
-                <div
-                  key={c.id}
-                  id={`cpf-option-${i}`}
-                  role="option"
-                  aria-selected={cpfNav.highlightedIndex === i}
-                  onMouseDown={() => { selectCredor(c); setCpfSuggestions([]); setShowCpfSuggestions(false); }}
-                  onMouseEnter={() => cpfNav.setHighlightedIndex(i)}
-                  className={`p-3 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${cpfNav.highlightedIndex === i ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
-                >
-                  <div className="font-bold text-slate-800 text-sm">{c.nome} {Number(c.isMei ?? c.is_mei) ? <span className="text-emerald-600 ml-1 font-black text-xs uppercase bg-emerald-100 px-1 rounded">MEI</span> : ""}</div>
-                  <div className="text-xs text-slate-500">
-                    {c.cpf_cnpj || c.cpfCnpj}
-                    {rotuloMunicipio(c.cidade, c.uf) && ` · ${rotuloMunicipio(c.cidade, c.uf)}`}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="col-span-12 md:col-span-5 relative">
-          <label htmlFor="op-nome-credor" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nome do Credor</label>
-          <input
-            id="op-nome-credor"
-            type="text"
-            placeholder="Digite o nome para buscar..."
-            {...register("nomeCredor")}
-            onChange={(e) => handleCredorNameChange(e.target.value)}
-            onBlur={() => setTimeout(() => setShowCredorSuggestions(false), 200)}
-            onFocus={() => { if (getValues("nomeCredor")?.length >= 2) setShowCredorSuggestions(true); }}
-            onKeyDown={credorNav.onKeyDown}
-            role="combobox"
-            aria-expanded={showCredorSuggestions && credorSuggestions.length > 0}
-            aria-controls="credor-suggestions-listbox"
-            aria-activedescendant={credorNav.highlightedIndex >= 0 ? `credor-option-${credorNav.highlightedIndex}` : undefined}
-            aria-invalid={!!errors?.nomeCredor}
-            aria-describedby={errors?.nomeCredor ? "op-nome-credor-error" : undefined}
-            className={`w-full px-4 py-3 rounded-xl border bg-blue-50 text-blue-900 font-bold focus:border-blue-800 transition-all duration-300 ${errors?.nomeCredor ? 'border-red-400 bg-red-50 text-slate-900' : 'border-blue-100'}`}
-          />
-          {errors?.nomeCredor && <p id="op-nome-credor-error" className="text-red-500 text-xs mt-1 font-semibold">{errors.nomeCredor.message}</p>}
-          {showCredorSuggestions && credorSuggestions.length > 0 && (
-            <div id="credor-suggestions-listbox" role="listbox" className="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-xl border border-slate-100 max-h-52 overflow-y-auto">
-              {credorSuggestions.map((c: any, i: number) => (
-                <div
-                  key={c.id}
-                  id={`credor-option-${i}`}
-                  role="option"
-                  aria-selected={credorNav.highlightedIndex === i}
-                  onMouseDown={() => selectCredor(c)}
-                  onMouseEnter={() => credorNav.setHighlightedIndex(i)}
-                  className={`p-3 cursor-pointer border-b border-slate-50 last:border-0 transition-colors ${credorNav.highlightedIndex === i ? 'bg-blue-50' : 'hover:bg-blue-50'}`}
-                >
-                  <div className="font-bold text-slate-800 text-sm">{c.nome} {Number(c.isMei ?? c.is_mei) ? <span className="text-emerald-600 ml-1 font-black text-xs uppercase bg-emerald-100 px-1 rounded">MEI</span> : ""}</div>
-                  <div className="text-xs text-slate-500">
-                    {c.cpf_cnpj || c.cpfCnpj}
-                    {rotuloMunicipio(c.cidade, c.uf) && ` · ${rotuloMunicipio(c.cidade, c.uf)}`}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="col-span-12 md:col-span-2">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">RG</label>
-          <input type="text" {...register("rgCredor")} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" />
-        </div>
-
-        <div className="col-span-12 md:col-span-2">
-          <label className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Endereço</label>
-          <input type="text" {...register("enderecoCredor")} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all duration-300" />
-        </div>
-
-          <InputValorPagamento register={register} control={control} errors={errors} setValue={setValue} />
-
+        <FaixaSaldoEmissao saldo={saldo} erro={erroSaldo} />
       </div>
+
+      <AlertDialog open={!!nePendente} onOpenChange={(aberto) => !aberto && cancelarTroca()}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Trocar de NE?</AlertDialogTitle>
+          <AlertDialogDescription>
+            A lista de credores será limpa: cada emissão é de uma NE só. Carregar a NE {nePendente?.numero}?
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={cancelarTroca}>Manter a NE atual</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmarTroca}>Trocar e limpar a lista</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-    </>
   );
 }
