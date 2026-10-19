@@ -136,3 +136,40 @@ export function nomeNaLinha(basePath: string, nome: string): string {
 export function idNaLinha(basePath: string, id: string): string {
   return basePath ? `${id}-${basePath.replace(/[^A-Za-z0-9_-]/g, "-")}` : id;
 }
+
+/**
+ * Campos que o operador digitou e que CONTINUAM editáveis. Um campo digitado
+ * que deixou de ser editável (ex.: trocou a NE e o imposto não se aplica mais)
+ * volta para o cálculo automático. Mesma regra no cálculo local e na prévia.
+ */
+export function informadosValidosDaLinha(
+  camposInformados: string[],
+  config: { campos: ConfigRetencaoCampoMapeado[] | Array<Partial<ConfigRetencaoCampoMapeado>>; regras: Record<string, string[]> },
+  elementoCodigo: string | null,
+  perfil: Perfil,
+  mei: { credorMei: boolean; sobrescreverMei: boolean }
+): string[] {
+  const configPorCampo = new Map((config.campos as ConfigRetencaoCampoMapeado[]).map((c) => [c.campo, c]));
+  return camposInformados.filter((campo) => {
+    const cfg = configPorCampo.get(campo);
+    return !!cfg && cfg.ativo && estadoCampoOp(cfg, elementoCodigo, config.regras, perfil, mei).editavel;
+  });
+}
+
+/**
+ * Valores mascarados que o cálculo devolve para os campos NÃO digitados
+ * (nome do campo no formulário → "15,00" ou "" se zero). Os digitados ficam
+ * de fora: o valor do operador nunca é sobrescrito.
+ */
+export function valoresCalculadosDoForm(
+  itensCents: Partial<Record<CampoRetencao, number>>,
+  informadosValidos: string[]
+): Record<string, string> {
+  const novos: Record<string, string> = {};
+  for (const campo of CAMPOS_RETENCAO) {
+    if (informadosValidos.includes(campo)) continue;
+    const cents = itensCents[campo] ?? 0;
+    novos[CAMPO_FORM[campo]] = cents > 0 ? maskCurrency(cents / 100) : "";
+  }
+  return novos;
+}
