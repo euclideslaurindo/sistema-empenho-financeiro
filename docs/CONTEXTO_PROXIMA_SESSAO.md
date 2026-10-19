@@ -22,6 +22,16 @@
 
 ---
 
+## 🆕 ATUALIZAÇÃO 19/10/2026 — ESTADO ATUAL (ler antes do histórico abaixo)
+- **Stack hoje:** Next.js 16 (há mudanças em relação ao 15; ver `node_modules/next/dist/docs/`), React Hook Form, Zod, Vitest/jsdom, MySQL 8 (`mysql2`).
+- **Projeto Retenções v2:** rodada 1 (T01–T28) e **rodada 2 (T28–T36, PRs #39 a #52)** na `main`. A rodada 2 tirou os credores da NE (NE sem credor e sem datas, com saldo valor/gasto/restante) e passou a emitir **uma OP por credor em lote** (`POST /api/ordens-pagamento/lote`), com o Município (Expediente) do credor definindo a taxa de expediente no 3.3.90.33.
+- **Fechamento (T37):** `docs/projeto-retencoes-v2/HOMOLOGACAO-RODADA-2.md` (rastreabilidade, checklist, roteiro de teste, entrega e rollback) e `database/consultas/conferencia_rodada2.sql` (só leitura).
+- **Atenção:** o `.env.local` de desenvolvimento aponta para o banco compartilhado de produção. Testar só com dados identificáveis e limpar pela aplicação, até existir um banco de teste (recomendação do documento de homologação).
+- **Próximos passos:** checklist aprovado pelo supervisor → entrega da rodada 2 → **T22** (regressão) e **T23** (deploy/docs) da rodada 1.
+- **Decisões novas:** D48 (edição de OP fora da tela) e D49 (sem homologação separada), em `docs/projeto-retencoes-v2/README.md`, seção 4.
+
+---
+
 ## 🎯 RESUMO DO QUE FOI REALIZADO HOJE
 
 ### 1. Separação de Elemento e Subelemento no Banco e Aplicação
