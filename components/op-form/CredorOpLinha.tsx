@@ -88,7 +88,8 @@ export function CredorOpLinha({
       role="group"
       aria-label={`Credor ${indice + 1} de ${total}: ${linha.nomeCredor || ""}`}
       data-testid={`linha-credor-${indice}`}
-      className={`rounded-2xl border bg-white p-5 shadow-sm ${temErro ? "border-red-400 ring-2 ring-red-100" : "border-slate-200"}`}
+      tabIndex={-1}
+      className={`rounded-2xl border bg-white p-4 md:p-5 shadow-sm outline-none focus-visible:ring-4 focus-visible:ring-blue-200 ${temErro ? "border-red-400 ring-2 ring-red-100" : "border-slate-200"}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
@@ -151,7 +152,7 @@ export function CredorOpLinha({
             className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:border-blue-800 transition-all"
           />
         </div>
-        <div className="col-span-12 md:col-span-2 text-right">
+        <div className="col-span-12 md:col-span-2 md:text-right">
           <p className="text-xs font-black text-emerald-600 uppercase tracking-widest">Líquido</p>
           <p className="text-lg font-black text-emerald-700" data-testid={`liquido-linha-${indice}`}>
             R$ {formatarBRL(liquidoCents)}
