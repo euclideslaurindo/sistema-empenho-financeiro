@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS ne_credores (
   INDEX idx_nec_credor (credor_cpf_cnpj)
 );
 
--- BACKFILL OPCIONAL (NEs antigas com 1 credor): o código também funciona sem isto (fallback na T15)
+-- BACKFILL OPCIONAL (NEs antigas com 1 credor): o código também funciona sem isto (fallback na T15).
+-- Hoje NÃO há credores cadastrados no sistema, então o backfill é dispensável; só rode se o banco já tiver NEs com credor.
 -- INSERT IGNORE INTO ne_credores (id, numero_ne, credor_cpf_cnpj, credor_nome, valor_bruto, ordem)
 -- SELECT UUID(), ne.numero, ne.cpf_cnpj, COALESCE(ne.credor_nome,''), ne.valor, 0
 --   FROM notas_empenho ne
@@ -72,3 +73,6 @@ Sem FK: integridade (credor existente, NE existente) fica na camada de serviço 
 
 ## Decisões em aberto relacionadas
 D7.
+
+## Atualização de escopo (rodada 2, 13/10/2026)
+**Substituída em parte (D36).** A tabela `ne_credores` **fica no banco** (nunca `DROP`), mas deixa de ser lida e escrita pelo fluxo novo: os credores passam a ser escolhidos **na Ordem de Pagamento**, não na NE. O backfill continua dispensável. Nada a desfazer no banco.

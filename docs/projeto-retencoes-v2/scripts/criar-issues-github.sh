@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# ATENÇÃO: este script JÁ FOI USADO (criou as issues TASK-01..23). Rodá-lo de novo DUPLICA as issues.
+# Para atualizar as existentes e criar as novas (TASK-24..28), use: atualizar-issues-github.sh
+#
 # Cria labels, milestones e uma issue por TASK em docs/projeto-retencoes-v2/tasks.
 # Requer o GitHub CLI (gh) autenticado:  gh auth login
 #
@@ -13,6 +16,11 @@ set -euo pipefail
 REPO="${REPO:-euclideslaurindo/sistema-empenho-financeiro}"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../tasks" && pwd)"
 DRY_RUN="${DRY_RUN:-1}"
+
+if [ "$DRY_RUN" != "1" ] && [ "${FORCE:-0}" != "1" ]; then
+  echo "Bloqueado: este script já foi usado e duplicaria as issues. Use atualizar-issues-github.sh (ou FORCE=1 se tiver certeza)." >&2
+  exit 1
+fi
 
 run() {
   if [ "$DRY_RUN" = "1" ]; then

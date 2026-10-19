@@ -68,3 +68,6 @@ Telas (T16), OP (T17).
 
 ## Decisões em aberto relacionadas
 D7.
+
+## Atualização de escopo (rodada 2, 13/10/2026)
+**Substituída pela T30.** O serviço da NE passa a **ignorar** `credores`, `credorNome` e `cpfCnpj`; `validarCredoresPayload`, `resolverCredoresCadastrados`, `inserirLinhasCredores`, `anexarCredores` e a regra "soma dos brutos = valor da NE" saem. A NE **pode ser salva sem credor** e sem consumir o valor todo (saldo na T31). `validarSaldoCredor` deixa de ser chamada na OP.

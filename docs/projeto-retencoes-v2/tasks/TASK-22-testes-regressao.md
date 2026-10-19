@@ -51,3 +51,10 @@ Testes e2e exigem banco isolado; usar o `docker-compose.yml` existente ou um sch
 
 ## Decisões em aberto relacionadas
 Todas as D que ainda estiverem abertas devem estar resolvidas ou registradas antes de fechar.
+
+## Atualização de escopo (decisões de 07/10/2026)
+- Incluir o **teste de conformidade com a planilha EJA Campo** (TASK-28) como parte obrigatória do fechamento.
+- Cenários manuais novos: OP de credor **MEI** (tudo zerado), OP do 3.3.90.33 em município **com** e **sem** taxa de expediente, elemento **.36/.39/.30/.47** com os percentuais padrão, e impressão com a **patronal informativa**.
+
+## Atualização de escopo (rodada 2, 13/10/2026)
+Os testes e a homologação da rodada 2 estão na **T37**. Os testes de `ne_credores` (T15/T16/T17) precisam ser **reescritos** para o fluxo novo (NE sem credor + emissão em lote), não apagados.
