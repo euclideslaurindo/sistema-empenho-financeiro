@@ -8,7 +8,7 @@ import {
   FileText,
   Edit,
 } from "lucide-react";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { numeroPorExtenso, formatDateOnlyBR } from "@/lib/utils";
 import { toast } from "sonner";
@@ -53,6 +53,23 @@ function formatarItensParaImpressao(itensJson: string | any[] | null | undefined
   } catch {
     return vazio;
   }
+}
+
+/**
+ * Lê `?ne=` (link "Imprimir" da emissão de OP, T35-B) e avisa a página uma
+ * vez. Isolado num <Suspense>: useSearchParams não pode travar a página toda
+ * no prerender (Next 16).
+ */
+function LerNeDaUrl({ onNe }: { onNe: (numero: string) => void }) {
+  const searchParams = useSearchParams();
+  const ne = searchParams.get("ne")?.trim() || "";
+  const jaLeu = useRef(false);
+  useEffect(() => {
+    if (!ne || jaLeu.current) return;
+    jaLeu.current = true;
+    onNe(ne);
+  }, [ne, onNe]);
+  return null;
 }
 
 export default function ConsultaImpressao() {
@@ -272,6 +289,37 @@ export default function ConsultaImpressao() {
     );
   };
 
+  // Consulta individual: OPs da NE, todas marcadas. Também chamada ao abrir com ?ne= (T35-B).
+  const buscarOpsDaNe = useCallback(async (numero: string) => {
+    if (!numero.trim()) { toast.error("Informe o número do Empenho."); return; }
+    setIsBuscandoSingle(true);
+    try {
+      const formattedNe = numero.trim().toUpperCase();
+      const data = await apiClient.get(`/api/ordens-pagamento?numeroNe=${encodeURIComponent(formattedNe)}`);
+      if (data && data.ordens && data.ordens.length > 0) {
+        setOpListSingle(data.ordens);
+        const newSel: Record<string, boolean> = {};
+        data.ordens.forEach((op: any) => newSel[op.id] = true);
+        setSelectedOpsSingle(newSel);
+        toast.success(`${data.ordens.length} OP(s) encontrada(s). Selecione e clique em Gerar.`);
+      } else {
+        setOpListSingle([]);
+        setSelectedOpsSingle({});
+        toast.info("Nenhuma OP encontrada para esta NE. Você pode gerar um documento em branco.");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao buscar OPs.");
+    } finally {
+      setIsBuscandoSingle(false);
+    }
+  }, []);
+
+  const abrirNeDaUrl = useCallback((numero: string) => {
+    setSearchMode("single");
+    setBatchInput(numero.toUpperCase());
+    buscarOpsDaNe(numero);
+  }, [buscarOpsDaNe]);
+
   const buscarOrdensParaLote = async () => {
     if (!batchInput.trim()) {
       toast.error("Informe o número do Empenho base.");
@@ -487,6 +535,9 @@ export default function ConsultaImpressao() {
 
   return (
     <div className="flex flex-col h-full bg-slate-50/50 print:bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 overflow-y-auto overflow-x-hidden min-h-screen relative">
+      <Suspense fallback={null}>
+        <LerNeDaUrl onNe={abrirNeDaUrl} />
+      </Suspense>
       <div className="print:hidden sticky top-0 z-50 w-full shadow-sm bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 border-b border-gray-200">
         
       </div>
@@ -549,29 +600,7 @@ export default function ConsultaImpressao() {
                       </div>
                     </div>
                     <button
-                      onClick={async () => {
-                        if (!batchInput.trim()) { toast.error("Informe o número do Empenho."); return; }
-                        setIsBuscandoSingle(true);
-                        try {
-                          const formattedNe = batchInput.trim().toUpperCase();
-                          const data = await apiClient.get(`/api/ordens-pagamento?numeroNe=${encodeURIComponent(formattedNe)}`);
-                          if (data && data.ordens && data.ordens.length > 0) {
-                            setOpListSingle(data.ordens);
-                            const newSel: Record<string, boolean> = {};
-                            data.ordens.forEach((op: any) => newSel[op.id] = true);
-                            setSelectedOpsSingle(newSel);
-                            toast.success(`${data.ordens.length} OP(s) encontrada(s). Selecione e clique em Gerar.`);
-                          } else {
-                            setOpListSingle([]);
-                            setSelectedOpsSingle({});
-                            toast.info("Nenhuma OP encontrada para esta NE. Você pode gerar um documento em branco.");
-                          }
-                        } catch (e: any) {
-                          toast.error(e.message || "Erro ao buscar OPs.");
-                        } finally {
-                          setIsBuscandoSingle(false);
-                        }
-                      }}
+                      onClick={() => buscarOpsDaNe(batchInput)}
                       className="bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 text-white font-bold py-4 px-8 rounded-lg text-sm hover:opacity-90 transition-all flex justify-center items-center h-[54px] shadow-sm hover:shadow-md active:scale-[0.98]"
                     >
                       {isBuscandoSingle ? <span className="animate-pulse">Buscando...</span> : <><Search className="w-4 h-4 mr-2" /> CONSULTAR</>}
