@@ -2,7 +2,7 @@ import { query } from '@/lib/db';
 
 // Atenção ao nome das colunas: em ordens_pagamento, `numero_empenho` guarda o
 // número da OP (ex.: 2026.OP.0004) e `numero_ne` guarda a NE.
-type ExecRows = (sql: string, params: any[]) => Promise<any[]>;
+export type ExecRows = (sql: string, params: any[]) => Promise<any[]>;
 
 export interface NumeroOp {
   numeroOp: string;
