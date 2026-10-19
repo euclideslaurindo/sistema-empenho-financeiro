@@ -296,4 +296,43 @@ describe('Emissão de OP com lista de credores (T35-B)', () => {
     fireEvent.click(within(confirmar).getByRole('button', { name: 'Remover' }));
     await waitFor(() => expect(screen.queryByTestId('linha-credor-0')).toBeNull());
   });
+test('aplicar a data do 1º credor a todos (D40)', async () => {
+    render(<OrdemPagamento />);
+    await carregarNe();
+    await adicionar('Ana');
+    expect(screen.queryByRole('button', { name: /Aplicar data do 1º a todos/ })).toBeNull(); // só com 2 ou mais
+    await adicionar('Bruno');
+    await adicionar('Carla');
+    fireEvent.click(screen.getByRole('button', { name: /Aplicar data do 1º a todos/ }));
+    expect(toast.info).toHaveBeenCalledWith('Informe a data do pagamento do 1º credor para copiar para os demais.');
+    fireEvent.change(linha(0).getByLabelText('Data do pagamento'), { target: { value: '2026-10-30' } });
+    fireEvent.click(screen.getByRole('button', { name: /Aplicar data do 1º a todos/ }));
+    expect((linha(1).getByLabelText('Data do pagamento') as HTMLInputElement).value).toBe('2026-10-30');
+    expect((linha(2).getByLabelText('Data do pagamento') as HTMLInputElement).value).toBe('2026-10-30');
+  });
+
+  test('acessibilidade: o foco vai para o 1º campo com erro; campo ligado à mensagem', async () => {
+    render(<OrdemPagamento />);
+    await carregarNe();
+    await adicionar('Ana');
+    await adicionar('Bruno');
+    valor(0, '1000');
+    fireEvent.click(botaoEmitir()); // linha 2 sem valor
+    const campo = linha(1).getByLabelText('Valor a Pagar R$');
+    await waitFor(() => expect(document.activeElement).toBe(campo));
+    expect(campo).toHaveAttribute('aria-invalid', 'true');
+    const idErro = campo.getAttribute('aria-describedby')!;
+    expect(document.getElementById(idErro)).toHaveTextContent('Informe o valor a pagar.');
+  });
+
+  test('erro do servidor sem campo: o foco vai para a linha, que tem o alerta', async () => {
+    (apiClient.post as any).mockRejectedValue(new Error('credores[0]: o cheque nº "9" já foi utilizado.'));
+    render(<OrdemPagamento />);
+    await carregarNe();
+    await adicionar('Ana');
+    valor(0, '1000');
+    fireEvent.click(botaoEmitir());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('linha-credor-0')));
+  });
+
 });

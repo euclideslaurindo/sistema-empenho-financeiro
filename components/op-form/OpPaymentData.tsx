@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useFormContext, useWatch } from "react-hook-form";
+import { useFormContext } from "react-hook-form";
 import { Search, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -32,15 +32,17 @@ export default function OpPaymentData({
   errors,
   saldo,
   erroSaldo,
+  quantidadeCredores,
   onTrocarNe,
 }: {
   errors: any;
   saldo: SaldoNe | null;
   erroSaldo?: string | null;
+  /** Por prop (e não useWatch da lista): o topo não redesenha a cada tecla nas linhas. */
+  quantidadeCredores: number;
   onTrocarNe: () => void;
 }) {
   const { register, setValue, getValues, control } = useFormContext<any>();
-  const credores: unknown[] = useWatch({ control, name: "credores" }) || [];
   const [neSuggestions, setNeSuggestions] = useState<any[]>([]);
   const [showNeSuggestions, setShowNeSuggestions] = useState(false);
   const [nePendente, setNePendente] = useState<any | null>(null);
@@ -72,7 +74,7 @@ export default function OpPaymentData({
         return;
       }
       const atual = getValues("neCarregada");
-      if (credores.length > 0 && atual && atual !== ne.numero) {
+      if (quantidadeCredores > 0 && atual && atual !== ne.numero) {
         setNePendente(ne); // confirma antes de descartar a lista
         return;
       }
@@ -108,7 +110,7 @@ export default function OpPaymentData({
     setValue("empenho", val);
     // Sem credores na lista, digitar outra NE já descarrega a anterior.
     // Com credores, a NE carregada só muda ao confirmar a troca.
-    if (credores.length === 0) setValue("neCarregada", "");
+    if (quantidadeCredores === 0) setValue("neCarregada", "");
     if (val.length >= 2) {
       buscarNeSugestoes(val);
     } else {
@@ -127,7 +129,7 @@ export default function OpPaymentData({
   const neNav = useListboxKeyboardNav(neSuggestions, selectNe);
 
   return (
-    <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
+    <div className="bg-white border border-slate-200 p-5 md:p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
       <div className="flex items-center mb-8 pb-4 border-b border-slate-100">
         <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-900 mr-3">
           <Wallet className="w-4 h-4" />

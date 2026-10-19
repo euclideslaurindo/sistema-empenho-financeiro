@@ -14,6 +14,7 @@ export function NumeroPrevistoSelo({ numero }: { numero: NumeroPrevisto | null }
       title="Número previsto: o definitivo sai ao emitir"
     >
       <Hash className="w-3 h-3" aria-hidden="true" />
+      <span className="sr-only">Número da OP previsto:</span>
       {numero.rotulo} · {numero.numeroOp}
       <span className="font-semibold text-blue-700">(previsto)</span>
     </span>

@@ -1,5 +1,7 @@
 "use client";
-import { Users } from "lucide-react";
+import { useFormContext } from "react-hook-form";
+import { CalendarCheck, Users } from "lucide-react";
+import { toast } from "sonner";
 import type { Perfil } from "@/lib/retencoes-form";
 import { numeroPrevistoDaLinha, type CredorApi, type NumeroPrevisto } from "@/lib/op-emissao";
 import { CredorBusca } from "@/components/op-form/CredorBusca";
@@ -37,18 +39,42 @@ export function CredoresOpLista({
   onAlternar: (chave: string) => void;
   onLimparErros: (chave: string) => void;
 }) {
+  const { getValues, setValue } = useFormContext<any>();
+
+  // D40: copia a data do pagamento do 1º credor para os demais.
+  const aplicarDataATodos = () => {
+    const data = getValues("credores.0.dataPagamento");
+    if (!data) {
+      toast.info("Informe a data do pagamento do 1º credor para copiar para os demais.");
+      return;
+    }
+    for (let i = 1; i < chaves.length; i++) setValue(`credores.${i}.dataPagamento`, data, { shouldDirty: true });
+    toast.success(`Data do pagamento aplicada aos ${chaves.length} credores.`);
+  };
+
   return (
-    <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+    <div className="bg-white border border-slate-200 p-5 md:p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-100">
         <div className="flex items-center">
           <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-orange-600 mr-3">
             <Users className="w-4 h-4" />
           </div>
           <h2 className="text-lg font-bold text-slate-800">Credores desta emissão</h2>
         </div>
-        <span className="text-sm font-bold text-slate-500">
-          {chaves.length === 1 ? "1 credor" : `${chaves.length} credores`}
-        </span>
+        <div className="flex flex-wrap items-center gap-4">
+          {chaves.length >= 2 && (
+            <button
+              type="button"
+              onClick={aplicarDataATodos}
+              className="flex items-center gap-1 text-sm font-bold text-blue-900 hover:underline"
+            >
+              <CalendarCheck className="w-4 h-4" /> Aplicar data do 1º a todos
+            </button>
+          )}
+          <span className="text-sm font-bold text-slate-500">
+            {chaves.length === 1 ? "1 credor" : `${chaves.length} credores`}
+          </span>
+        </div>
       </div>
 
       <div className="mb-6">
