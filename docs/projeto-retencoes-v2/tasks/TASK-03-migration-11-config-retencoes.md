@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS config_retencoes (
   calculo_automatico TINYINT(1)   NOT NULL DEFAULT 1,   -- 1 = sistema calcula; 0 = operador digita
   editavel_operador  TINYINT(1)   NOT NULL DEFAULT 0,   -- 1 = GESTOR pode alterar o valor na OP (caso específico)
   entra_darf         TINYINT(1)   NOT NULL DEFAULT 0,   -- 1 = soma na DARF
+  desconta_credor    TINYINT(1)   NOT NULL DEFAULT 1,   -- 0 = informativo: aparece na OP, mas NÃO reduz o líquido do credor (ex.: patronal)
   ativo              TINYINT(1)   NOT NULL DEFAULT 1,
   ordem              INT          NOT NULL DEFAULT 0,
   updated_by         CHAR(36)     NULL,
@@ -47,15 +48,15 @@ CREATE TABLE IF NOT EXISTS elemento_retencoes (
 );
 
 INSERT IGNORE INTO config_retencoes
- (campo, rotulo, tipo, aliquota, calculo_automatico, editavel_operador, entra_darf, ativo, ordem) VALUES
- ('irrf',          'IRRF',                       'PERCENTUAL',     1.5000, 1, 0, 0, 1, 10),
- ('iss',           'ISS',                        'PERCENTUAL',     5.0000, 1, 0, 0, 1, 20),
- ('inss',          'INSS',                       'PERCENTUAL',    11.0000, 1, 0, 1, 1, 30),
- ('patronal',      'Patronal',                   'PERCENTUAL',    20.0000, 1, 0, 1, 1, 40),
- ('sest_senat',    'SEST/SENAT',                 'PERCENTUAL',     2.5000, 1, 0, 1, 1, 50),
- ('outros',        'Outros / IBS-CBS',           'VALOR_DIGITADO', NULL,   0, 0, 0, 1, 60),
- ('taxa_bancaria', 'Taxa bancária (expediente)', 'VALOR_DIGITADO', NULL,   0, 1, 0, 1, 70),
- ('taxa_pix',      'Taxa PIX',                   'VALOR_DIGITADO', NULL,   0, 1, 0, 1, 80);
+ (campo, rotulo, tipo, aliquota, calculo_automatico, editavel_operador, entra_darf, desconta_credor, ativo, ordem) VALUES
+ ('irrf',          'IRRF',                       'PERCENTUAL',     1.5000, 1, 0, 0, 1, 1, 10),   -- IR vai para a Secretaria da Fazenda, não para a DARF
+ ('iss',           'ISS',                        'PERCENTUAL',     5.0000, 1, 0, 0, 1, 1, 20),
+ ('inss',          'INSS',                       'PERCENTUAL',    11.0000, 1, 0, 1, 1, 1, 30),
+ ('patronal',      'Patronal',                   'PERCENTUAL',    20.0000, 1, 0, 1, 0, 1, 40),   -- encargo do órgão: não desconta do credor
+ ('sest_senat',    'SEST/SENAT',                 'PERCENTUAL',     2.5000, 1, 0, 1, 1, 1, 50),
+ ('outros',        'Outros / IBS-CBS',           'VALOR_DIGITADO', NULL,   0, 0, 0, 1, 1, 60),
+ ('taxa_bancaria', 'Taxa bancária (expediente)', 'VALOR_DIGITADO', NULL,   0, 1, 0, 1, 1, 70),
+ ('taxa_pix',      'Taxa PIX',                   'VALOR_DIGITADO', NULL,   0, 1, 0, 1, 1, 80);
 
 -- Matriz: presença = se aplica.  3.3.90.14 NÃO recebe linhas (sem imposto).
 INSERT IGNORE INTO elemento_retencoes (elemento_codigo, campo) VALUES
@@ -78,6 +79,7 @@ INSERT IGNORE INTO schema_migrations (version) VALUES ('11');
 ```
 
 Regras de modelagem:
+- `desconta_credor = 0` marca um campo **informativo**: é calculado, aparece na OP e na impressão, pode entrar na DARF (`entra_darf`), mas **não entra** em `total_descontos` nem reduz o `valor_liquido`. Hoje só a **patronal** é assim (decisão do usuário, vale para todos os elementos).
 - `tipo` + `calculo_automatico` cobrem o caso do ISS digitado (D1): basta o admin desmarcar "cálculo automático".
 - Subelementos **herdam** a regra do elemento-pai (o código do elemento é o prefixo).
 - `taxa_bancaria` e `taxa_pix` já nascem `editavel_operador = 1`, pois são digitadas na hora.
@@ -90,12 +92,15 @@ Regras de modelagem:
 - [ ] Script idempotente (duas execuções sem erro e sem duplicar).
 - [ ] 8 linhas em `config_retencoes`; matriz com 5 impostos nos elementos `.33/.36/.39` e 4 em `.30/.47`; `3.3.90.14` sem linhas.
 - [ ] Alíquotas iguais às hoje em produção (conferir antes de rodar).
+- [ ] Patronal com `desconta_credor = 0` e `entra_darf = 1`; demais campos com `desconta_credor = 1`.
 - [ ] Versão `11` em `schema_migrations`.
 - [ ] Nenhuma tabela existente alterada.
 
 ## Riscos e observações
-- **O seed define comportamento financeiro.** O usuário deve revisar a matriz e as alíquotas antes de produção (D1, D3, D4, D8).
-- `entra_darf` do IRRF está `0` por suposição (D4).
+- **O seed define comportamento financeiro.** O usuário deve revisar a matriz e as alíquotas antes de produção (D1, D3, D8).
+- **IRRF fora da DARF:** confirmado pela planilha EJA Campo (o IR vai para a Secretaria da Fazenda). **Patronal na DARF:** `entra_darf = 1` conforme a anotação do usuário; falta confirmar com quem monta a guia (o admin pode desligar sem mexer em código).
+- Os percentuais desta tabela são os **padrões do sistema**, usados pelos elementos `.36`, `.39`, `.30` e `.47` (e legados). O 3.3.90.33 usa os parâmetros próprios da T24/T25.
+- Hoje o sistema **desconta** a patronal do líquido; com `desconta_credor = 0` o líquido das OPs novas **sobe**. Avisar o supervisor antes de ir para produção.
 
 ## Decisões em aberto relacionadas
-D1, D2, D3, D4, D8.
+D1, D2, D3, D8. **Fechadas:** D4 (IRRF fora da DARF), D15 (patronal informativa).

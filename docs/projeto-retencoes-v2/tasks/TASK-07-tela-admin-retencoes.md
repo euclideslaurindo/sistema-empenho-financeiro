@@ -65,3 +65,8 @@ CRUD de elementos (T08). Novos campos além dos 8.
 
 ## Decisões em aberto relacionadas
 D1, D2, D4.
+
+## Atualização de escopo (decisões de 07/10/2026)
+- Esta tela cobre os **percentuais padrão** (usados por .36, .39, .30, .47 e legados), a matriz por elemento e a nova opção **"desconta do credor"** (a patronal fica desmarcada).
+- Os parâmetros do **3.3.90.33** (percentuais do transporte, **tabela do IRRF com vigência** e **ISS por município com taxa de expediente**) ficam na aba "Transporte (3.3.90.33)", criada na **T27**.
+- O campo "Entra na DARF" continua aqui; o IRRF fica desmarcado (o IR vai para a Secretaria da Fazenda).

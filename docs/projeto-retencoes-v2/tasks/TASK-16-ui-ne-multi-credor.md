@@ -54,3 +54,10 @@ Formulário passa a ser mais pesado; testar com 30+ credores (performance dos `u
 
 ## Decisões em aberto relacionadas
 D7.
+
+## Atualização de escopo (decisões de 07/10/2026)
+- Cada linha de credor mostra o selo **MEI** (a retenção depende dele; MEI não sofre nenhuma retenção) e o **município** (usado no ISS do 3.3.90.33).
+- Como ainda **não há credores cadastrados**, o cadastro deve ser feito com atenção: o campo MEI e o município passam a influenciar diretamente o cálculo da OP.
+
+## Atualização de escopo (rodada 2, 13/10/2026)
+**Substituída pela T35.** A seleção de vários credores e do valor bruto **sai da tela da NE** (`NeCredoresField` removido na T30) e passa para a **Ordem de Pagamento**, como uma lista com CPF/CNPJ, nome, município (expediente), valor a pagar, nº do cheque e data do pagamento por credor.
