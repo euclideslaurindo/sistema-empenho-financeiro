@@ -282,9 +282,9 @@ describe('OpTaxesSection — transporte autônomo (3.3.90.33, T25)', () => {
   });
 
   test('avisos e erros da prévia aparecem na seção', async () => {
-    (apiClient.post as any).mockResolvedValueOnce({ ...PREVIA_G, avisos: ['Município sem cadastro de ISS: usada a alíquota padrão (5%) sem taxa de expediente.'] });
+    (apiClient.post as any).mockResolvedValueOnce({ ...PREVIA_G, avisos: ['Município de expediente sem cadastro de ISS: usada a alíquota padrão (5%) sem taxa de expediente.'] });
     renderTransporte();
-    expect(await screen.findByText(/Município sem cadastro de ISS/)).toBeInTheDocument();
+    expect(await screen.findByText(/Município de expediente sem cadastro de ISS/)).toBeInTheDocument();
   });
 
   test('erro 422 de vigência aparece como aviso e limpa os campos', async () => {

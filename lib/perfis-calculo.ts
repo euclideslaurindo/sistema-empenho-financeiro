@@ -20,3 +20,29 @@ export function normalizarMunicipio(nome: string | null | undefined): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/**
+ * Acha o município em iss_municipios pela chave ou por um dos apelidos
+ * (separados por ";"), comparando sempre normalizado. Usado no cálculo
+ * (obterIssMunicipio) e na tela de credores (aviso de município sem cadastro).
+ * A comparação é aqui, no código, e não em JOIN no SQL: a coluna
+ * credores.municipioExpediente tem collation diferente das tabelas antigas.
+ */
+export function encontrarIssMunicipio<T extends { chave: string; apelidos?: string | null }>(
+  lista: T[],
+  nome: string | null | undefined
+): T | null {
+  const alvo = normalizarMunicipio(nome);
+  if (!alvo) return null;
+  return (
+    lista.find(
+      (m) =>
+        normalizarMunicipio(m.chave) === alvo ||
+        (m.apelidos || "")
+          .split(";")
+          .map((a) => normalizarMunicipio(a))
+          .filter(Boolean)
+          .includes(alvo)
+    ) ?? null
+  );
+}

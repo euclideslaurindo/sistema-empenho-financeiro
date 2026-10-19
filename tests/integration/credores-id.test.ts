@@ -97,6 +97,34 @@ describe('Integração API Credores [id]', () => {
       expect(gravado()).toMatchObject({ nome: 'Novo Nome', cidade: 'Garanhuns', uf: 'PE' });
     });
 
+    describe('Município (Expediente) — T33', () => {
+      const editar = async (extra: Record<string, unknown>) => {
+        (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
+        const gravado = conexaoUpdate();
+        const res: any = await PUT(
+          new NextRequest('http://localhost:3000/api/credores/credor-1', {
+            method: 'PUT',
+            body: JSON.stringify({ nome: 'Empresa X', cpfCnpj: '11.222.333/0001-81', cidade: 'Garanhuns', uf: 'PE', ...extra }),
+          }),
+          { params: Promise.resolve({ id: 'credor-1' }) }
+        );
+        expect(res.status).toBe(200);
+        return gravado();
+      };
+
+      test('grava o município de expediente', async () => {
+        expect(await editar({ municipioExpediente: 'Canhotinho' })).toMatchObject({ municipioExpediente: 'Canhotinho' });
+      });
+
+      test('limpar o campo grava NULL', async () => {
+        expect(await editar({ municipioExpediente: '' })).toMatchObject({ municipioExpediente: null });
+      });
+
+      test('sem o campo no payload, a coluna não é tocada (não apaga o valor gravado)', async () => {
+        expect(await editar({})).not.toHaveProperty('municipioExpediente');
+      });
+    });
+
     test('CPF/CNPJ duplicado retorna 409', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
