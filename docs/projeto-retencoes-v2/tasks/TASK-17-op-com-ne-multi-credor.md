@@ -57,3 +57,10 @@ Task de risco financeiro alto: validar em homologação com cenários reais (NE 
 
 ## Decisões em aberto relacionadas
 D7.
+
+## Atualização de escopo (decisões de 07/10/2026)
+- O seletor "Credor desta OP" exibe o selo **MEI**; para MEI o formulário já mostra "Isento (MEI)" e as retenções zeradas.
+- O município do credor escolhido é enviado ao motor de cálculo (T25) quando o elemento for 3.3.90.33.
+
+## Atualização de escopo (rodada 2, 13/10/2026)
+**Substituída pelas T34 e T35.** O `SeletorCredorOp` sai; o credor da OP é escolhido na **lista de credores** da própria OP, e a emissão acontece em lote (`POST /api/ordens-pagamento/lote`), uma OP por credor, na mesma transação. A conferência "credor pertence à NE" e o limite por credor deixam de existir; vale o **saldo total da NE**.
