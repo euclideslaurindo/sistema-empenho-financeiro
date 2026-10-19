@@ -66,6 +66,16 @@ describe('Integração API Notas de Empenho', () => {
       expect(chamadas.some(([sql]) => sql.includes('INSERT INTO ne_credores'))).toBe(false);
     });
 
+    test('status do payload é ignorado: NE nova é sempre EMITIDO', async () => {
+      const chamadas = conexaoCriar();
+      const res = await postar({ numero: 'NE-2026-002', valor: '100.00', elemento: '3.3.90.36', status: 'LIQUIDADO' });
+      expect(res.status).toBe(201);
+      const insert = chamadas.find(([sql]) => sql.includes('INSERT INTO notas_empenho'))!;
+      expect(insert[1][11]).toBe('EMITIDO');
+      const audit = chamadas.find(([sql]) => sql.includes('INSERT INTO auditoria_financeira'))!;
+      expect(JSON.parse(audit[1][5]).status).toBe('EMITIDO');
+    });
+
     test('Payload antigo com credor: grava 1 linha em ne_credores com bruto = valor da NE', async () => {
       const chamadas = conexaoCriar();
       const res = await postar({ numero: 'NE-1', valor: 1000, credorNome: 'Fulano (texto livre)', cpfCnpj: '999.999.999-99' });
