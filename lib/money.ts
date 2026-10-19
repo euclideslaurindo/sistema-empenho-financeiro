@@ -99,3 +99,26 @@ export function formatarBRL(c: Centavos): string {
   const centavosStr = String(centavos).padStart(2, "0");
   return `${negativo ? "-" : ""}${reaisStr},${centavosStr}`;
 }
+
+/**
+ * Lê um valor em reais vindo de qualquer lado, sem adivinhar:
+ * - número: ele mesmo;
+ * - com vírgula: formato BR ("1.234,56" → 1234.56);
+ * - sem vírgula, com UM ponto e 1–2 casas: decimal do banco/API ("100.00" → 100);
+ * - sem vírgula, só pontos de milhar ("1.234", "1.234.567"): milhar;
+ * - só dígitos: inteiro.
+ * Qualquer outra coisa → NaN (a validação recusa em vez de adivinhar).
+ * Existe porque o MySQL devolve DECIMAL como "100.00", e ler isso apagando
+ * os pontos gravava a NE ×100 ao editar.
+ */
+export function lerValorMonetario(valor: unknown): number {
+  if (typeof valor === "number") return Number.isFinite(valor) ? valor : NaN;
+  if (valor === null || valor === undefined) return NaN;
+  const s = String(valor).trim().replace(/^R\$\s*/i, "").replace(/\s/g, "");
+  if (!s) return NaN;
+  if (/^-?\d{1,3}(\.\d{3})*,\d+$|^-?\d+,\d+$/.test(s)) return Number(s.replace(/\./g, "").replace(",", "."));
+  if (/^-?\d+\.\d{1,2}$/.test(s)) return Number(s);
+  if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) return Number(s.replace(/\./g, ""));
+  if (/^-?\d+$/.test(s)) return Number(s);
+  return NaN;
+}

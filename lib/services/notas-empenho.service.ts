@@ -3,7 +3,7 @@ import type { PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 import { NotaEmpenhoDB } from '@/lib/types/db';
 import { parseFormNumber } from '@/lib/utils';
-import { toCents } from '@/lib/money';
+import { lerValorMonetario, toCents } from '@/lib/money';
 import { statusPeloSaldo } from '@/lib/status-ne';
 import { montarSaldo, saldoParaResposta } from '@/lib/services/saldo-ne';
 
@@ -42,12 +42,9 @@ async function registrarAuditoriaNe(
 export const criarNotaEmpenhoSchema = z.object({
   codigo: z.string().optional(),
   numero: z.string().min(1, 'Número da NE é obrigatório.'),
-  valor: z.union([z.string(), z.number()]).transform(val => {
-    if (typeof val === 'number') return val;
-    const str = String(val).trim();
-    const clean = str.replace(/[^\d,]/g, '').replace(',', '.');
-    return parseFloat(clean) || 0;
-  }).refine(val => val > 0, { message: 'O valor da NE deve ser maior que zero.' }),
+  // Mesmo leitor da tela: "100.00" é R$ 100,00, não 10.000 (defesa em profundidade).
+  valor: z.union([z.string(), z.number()]).transform(val => lerValorMonetario(val))
+    .refine(val => val > 0, { message: 'O valor da NE deve ser maior que zero.' }),
   dataPagamento: z.string().optional().nullable(),
   unidadeOrcamentaria: z.string().optional(),
   elementoSubelemento: z.string().optional(),

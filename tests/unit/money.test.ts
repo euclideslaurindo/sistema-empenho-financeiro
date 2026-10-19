@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { toCents, fromCents, calcPercentCents, arredondarMoeda, somarCents, formatarBRL } from '@/lib/money';
+import { toCents, fromCents, calcPercentCents, arredondarMoeda, somarCents, formatarBRL, lerValorMonetario } from '@/lib/money';
+import { parseFormNumber } from '@/lib/utils';
 
 describe('calcPercentCents', () => {
   test('665,00 a 1,5% = 9,98 (998 centavos)', () => {
@@ -196,5 +197,35 @@ describe('formatarBRL', () => {
 
   test('lança RangeError para Infinity', () => {
     expect(() => formatarBRL(Infinity)).toThrow(RangeError);
+  });
+});
+
+describe('lerValorMonetario', () => {
+  test.each([
+    ['100.00', 100], // como o MySQL devolve DECIMAL (era lido como 10000)
+    ['1234.50', 1234.5],
+    ['1234.5', 1234.5],
+    ['100,00', 100],
+    ['1.234,56', 1234.56],
+    ['12.345.678,90', 12345678.9],
+    ['1,5', 1.5],
+    ['1.234', 1234], // só milhar
+    ['1.234.567', 1234567],
+    ['250', 250],
+    ['R$ 1.234,56', 1234.56],
+    [' 100,00 ', 100],
+    [100, 100],
+    [1234.5, 1234.5],
+  ])('%s -> %s', (entrada: string | number, esperado: number) => {
+    expect(lerValorMonetario(entrada)).toBe(esperado);
+  });
+
+  test.each(['', 'abc', '1.2.3', '1,2,3', '10.5.3,1', null, undefined, NaN, Infinity])('inválido: %s -> NaN', (entrada: unknown) => {
+    expect(lerValorMonetario(entrada)).toBeNaN();
+  });
+
+  test('o caso que o parseFormNumber erra (milhar sem vírgula) sai certo aqui', () => {
+    expect(parseFormNumber('1.234')).toBe(1.234);
+    expect(lerValorMonetario('1.234')).toBe(1234);
   });
 });
