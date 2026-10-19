@@ -49,7 +49,7 @@ export function DialogoEmissao({ resultado, onFechar }: { resultado: ResultadoEm
               </p>
             )}
 
-            <div className="max-h-80 overflow-y-auto">
+            <div className="max-h-80 overflow-auto">
               <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="border-b border-slate-100 text-xs font-black text-slate-500 uppercase tracking-widest">

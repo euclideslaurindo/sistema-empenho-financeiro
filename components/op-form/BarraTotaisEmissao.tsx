@@ -35,7 +35,7 @@ export function BarraTotaisEmissao({
   return (
     <div className="sticky bottom-4 z-40">
       <div
-        className={`backdrop-blur-md rounded-2xl shadow-2xl border px-6 py-4 flex flex-wrap items-center justify-between gap-4 ${
+        className={`backdrop-blur-md rounded-2xl shadow-2xl border px-4 md:px-6 py-4 flex flex-wrap items-center justify-between gap-4 ${
           excedeu ? "bg-red-900/95 border-red-300/30" : "bg-slate-900/95 border-white/10"
         }`}
         data-testid="barra-totais-emissao"
@@ -56,7 +56,7 @@ export function BarraTotaisEmissao({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full md:w-auto items-center justify-end gap-3">
           <button
             type="button"
             onClick={onLimpar}
