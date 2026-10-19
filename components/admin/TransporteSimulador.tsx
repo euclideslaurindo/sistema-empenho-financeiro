@@ -81,7 +81,7 @@ export default function TransporteSimulador({ parametros, irrf, municipios, conf
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div>
           <label htmlFor="simt-municipio" className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
-            Município do credor
+            Município (Expediente)
           </label>
           <select
             id="simt-municipio"
@@ -95,7 +95,7 @@ export default function TransporteSimulador({ parametros, irrf, municipios, conf
                 {m.nome}/{m.uf}
               </option>
             ))}
-            <option value={SEM_CADASTRO}>Outro (sem cadastro)</option>
+            <option value={SEM_CADASTRO}>Sem município de expediente</option>
           </select>
         </div>
         <div>

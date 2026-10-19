@@ -12,6 +12,7 @@ import { query, withTransaction } from '@/lib/db';
 import { getAuthUser } from '@/lib/auth';
 import { OrdemPagamentoService } from '@/lib/services/ordem-pagamento.service';
 import { POST as postPrevia } from '@/app/api/ordens-pagamento/previa/route';
+import { calcularRetencoesDaOp } from '@/lib/services/calculo-op.service';
 
 const CONFIG_ROWS = [
   ['irrf', 'IRRF', 'PERCENTUAL', '1.5000', 0], ['iss', 'ISS', 'PERCENTUAL', '5.0000', 0],
@@ -32,16 +33,26 @@ const FAIXAS = [
 const MUNICIPIOS = [
   { chave: 'canhotinho', nome: 'Canhotinho', aliquota: '5', taxa_expediente: '15.20', apelidos: null },
   { chave: 'aguas belas', nome: 'Águas Belas', aliquota: '5', taxa_expediente: '0', apelidos: null },
+  { chave: 'sao bento do una', nome: 'São Bento do Una', aliquota: '5', taxa_expediente: '0', apelidos: 'sbu;sao bento' },
 ];
 
 /** Responde as consultas do cálculo (mesmo formato para query() e conn.execute). */
-function responder(sql: string, { cidade = 'Canhotinho', mei = 0, elemento = '3.3.90.33 - Serviços de transporte', semParametros = false } = {}): any[] {
+function responder(
+  sql: string,
+  {
+    expediente = 'Canhotinho' as string | null,
+    mei = 0,
+    elemento = '3.3.90.33 - Serviços de transporte',
+    semParametros = false,
+  } = {}
+): any[] {
   if (sql.includes('SELECT id, valor, status, elemento, subelemento FROM notas_empenho')) {
     return [{ id: 'ne-1', valor: '100000.00', status: 'EMITIDO', elemento, subelemento: '' }];
   }
   if (sql.includes('SELECT elemento, status FROM notas_empenho')) return [{ elemento, status: 'EMITIDO' }];
   if (sql.includes('SELECT COALESCE(SUM(valor_pagamento), 0) as total_pago')) return [{ total_pago: 0 }];
-  if (sql.includes('FROM credores')) return [{ cidade, uf: 'PE', is_mei: mei }];
+  // T33: o cálculo lê só o Município (Expediente); a `cidade` do endereço não é consultada.
+  if (sql.includes('FROM credores')) return [{ municipioExpediente: expediente, is_mei: mei }];
   if (sql.includes('SELECT * FROM config_retencoes ORDER BY ordem')) return CONFIG_ROWS;
   if (sql.includes('SELECT codigo FROM elementos_despesa')) return [{ codigo: '3.3.90.33' }];
   if (sql.includes('FROM elemento_retencoes')) return ['irrf', 'iss', 'inss', 'patronal', 'sest_senat'].map((campo) => ({ elemento_codigo: '3.3.90.33', campo }));
@@ -157,7 +168,7 @@ describe('POST /api/ordens-pagamento/previa', () => {
   };
 
   test('Caso G pela prévia: mesmo cálculo do salvar, sem gravar', async () => {
-    (query as any).mockImplementation(async (sql: string) => responder(sql, { cidade: 'Águas Belas' }));
+    (query as any).mockImplementation(async (sql: string) => responder(sql, { expediente: 'Águas Belas' }));
     const { status, body } = await chamar({ numeroEmpenho: 'NE-1', credorCpfCnpj: '111', valorPagamento: 11970, dataPagamento: '2026-10-15' });
     expect(status).toBe(200);
     expect(body.perfil).toBe('TRANSPORTE_AUTONOMO');
@@ -168,10 +179,10 @@ describe('POST /api/ordens-pagamento/previa', () => {
     expect((query as any).mock.calls.some((c: any[]) => /^\s*(INSERT|UPDATE|DELETE)/.test(c[0]))).toBe(false);
   });
 
-  test('município sem cadastro devolve aviso', async () => {
-    (query as any).mockImplementation(async (sql: string) => responder(sql, { cidade: 'Recife' }));
+  test('município de expediente sem cadastro devolve aviso', async () => {
+    (query as any).mockImplementation(async (sql: string) => responder(sql, { expediente: 'Recife' }));
     const { body } = await chamar({ numeroEmpenho: 'NE-1', credorCpfCnpj: '111', valorPagamento: 1000 });
-    expect(body.avisos.join(' ')).toContain('Município sem cadastro de ISS');
+    expect(body.avisos.join(' ')).toContain('Município de expediente sem cadastro de ISS');
   });
 
   test('elemento padrão também funciona (perfil PADRAO)', async () => {
@@ -190,5 +201,65 @@ describe('POST /api/ordens-pagamento/previa', () => {
 
     (query as any).mockImplementation(async (sql: string) => (sql.includes('FROM notas_empenho') ? [] : responder(sql)));
     expect((await chamar({ numeroEmpenho: 'NE-X', credorCpfCnpj: '1', valorPagamento: 10 })).status).toBe(404);
+  });
+});
+
+describe('Município (Expediente) define a taxa de expediente do 3.3.90.33 (T33)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  async function calcular(expediente: string | null, elemento = '3.3.90.33', brutoReais = 6317.5) {
+    (query as any).mockImplementation(async (sql: string) => responder(sql, { expediente }));
+    const { resultado } = await calcularRetencoesDaOp(undefined, {
+      brutoCents: Math.round(brutoReais * 100),
+      elementoCodigo: elemento,
+      credorCpfCnpj: '111.111.111-11',
+      dataPagamento: '2026-10-15',
+      informados: {},
+      perfilUsuario: 'GESTOR',
+    });
+    return resultado;
+  }
+
+  test('expediente Canhotinho: ISS 331,08 (315,875 + 15,20)', async () => {
+    const r = await calcular('Canhotinho');
+    expect(r.itens.iss).toBe(33108);
+    expect(r.avisos).toEqual([]);
+    expect((r.snapshot as any).taxa_expediente).toBe(15.2);
+  });
+
+  test('sem Município (Expediente): ISS 315,88, taxa 0 e sem aviso (D45)', async () => {
+    const r = await calcular(null);
+    expect(r.itens.iss).toBe(31588);
+    expect(r.avisos).toEqual([]);
+    expect((r.snapshot as any).taxa_expediente).toBe(0);
+    expect((r.snapshot as any).municipio).toBeNull();
+  });
+
+  test('apelido (SBU) resolve São Bento do Una', async () => {
+    const r = await calcular('SBU');
+    expect((r.snapshot as any).municipio).toBe('São Bento do Una');
+    expect((r.snapshot as any).municipio_cadastrado).toBe(true);
+    expect(r.avisos).toEqual([]);
+  });
+
+  test('expediente sem cadastro: 5%, taxa 0 e aviso (não bloqueia)', async () => {
+    const r = await calcular('Recife');
+    expect(r.itens.iss).toBe(31588);
+    expect(r.avisos.join(' ')).toContain('Município de expediente sem cadastro de ISS');
+  });
+
+  test('em outro elemento (.36) o expediente não muda nada', async () => {
+    const com = await calcular('Canhotinho', '3.3.90.36');
+    const sem = await calcular(null, '3.3.90.36');
+    expect(com.itens).toEqual(sem.itens);
+    expect(com.totalDescontosCents).toBe(sem.totalDescontosCents);
+  });
+
+  test('o credor é lido só se estiver ativo e sem a cidade do endereço', async () => {
+    await calcular('Canhotinho');
+    const sql = (query as any).mock.calls.map((c: any[]) => c[0]).find((s: string) => s.includes('FROM credores'));
+    expect(sql).toContain('ativo = 1');
+    expect(sql).toContain('municipioExpediente');
+    expect(sql).not.toMatch(/\bcidade\b/);
   });
 });

@@ -1,7 +1,7 @@
 import { query, withTransaction } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
 import { CHAVES_TRANSPORTE, type FaixaIrrf, type IssMunicipio, type ParametrosTransporte } from '@/lib/retencoes-transporte';
-import { normalizarMunicipio, type PerfilCalculo } from '@/lib/perfis-calculo';
+import { encontrarIssMunicipio, normalizarMunicipio, type PerfilCalculo } from '@/lib/perfis-calculo';
 import { numero, validarFaixasIrrf, validarMunicipio, validarParametrosTransporte, type FaixaEdicao } from '@/lib/transporte-admin';
 
 async function executar<T>(conn: PoolConnection | undefined, sql: string, values: any[]): Promise<T> {
@@ -86,25 +86,16 @@ export async function obterFaixasIrrfVigentes(
   };
 }
 
-/** Casa o município do credor (normalizado) com a chave ou um dos apelidos. */
+/** Casa o município de expediente do credor (normalizado) com a chave ou um dos apelidos. */
 export async function obterIssMunicipio(
   conn: PoolConnection | undefined,
-  cidade: string | null | undefined
+  municipio: string | null | undefined
 ): Promise<IssMunicipio | null> {
-  const alvo = normalizarMunicipio(cidade);
-  if (!alvo) return null;
+  if (!normalizarMunicipio(municipio)) return null;
   const rows = await executar<
     Array<{ chave: string; nome: string; aliquota: string; taxa_expediente: string; apelidos: string | null }>
   >(conn, 'SELECT chave, nome, aliquota, taxa_expediente, apelidos FROM iss_municipios WHERE ativo = 1', []);
-  const achado = rows.find(
-    (m) =>
-      normalizarMunicipio(m.chave) === alvo ||
-      (m.apelidos || '')
-        .split(';')
-        .map((a) => normalizarMunicipio(a))
-        .filter(Boolean)
-        .includes(alvo)
-  );
+  const achado = encontrarIssMunicipio(rows, municipio);
   return achado ? { nome: achado.nome, aliquota: achado.aliquota, taxaExpediente: achado.taxa_expediente } : null;
 }
 

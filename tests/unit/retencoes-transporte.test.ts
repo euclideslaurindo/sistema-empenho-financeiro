@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest';
 import { calcularTransporteAutonomo, dec, type EntradaTransporte, type FaixaIrrf, type ParametrosTransporte } from '@/lib/retencoes-transporte';
-import { normalizarMunicipio, perfilDoElemento } from '@/lib/perfis-calculo';
+import { encontrarIssMunicipio, normalizarMunicipio, perfilDoElemento } from '@/lib/perfis-calculo';
 import type { ConfigRetencaoCampoMapeado } from '@/lib/services/config-retencoes.service';
 
 // Seed da T24 (migration_16), como o MySQL devolve DECIMAL: texto.
@@ -62,6 +62,18 @@ describe('perfil e município', () => {
     expect(normalizarMunicipio('Águas Belas - PE')).toBe('aguas belas');
     expect(normalizarMunicipio('Brejão')).toBe('brejao');
   });
+  test('encontrarIssMunicipio: chave ou apelido, sem acento nem caixa (T33)', () => {
+    const lista = [
+      { chave: 'canhotinho', nome: 'Canhotinho', apelidos: null },
+      { chave: 'sao bento do una', nome: 'São Bento do Una', apelidos: 'sbu;sao bento' },
+    ];
+    expect(encontrarIssMunicipio(lista, 'CANHOTINHO')?.nome).toBe('Canhotinho');
+    expect(encontrarIssMunicipio(lista, 'São Bento do Una/PE')?.nome).toBe('São Bento do Una');
+    expect(encontrarIssMunicipio(lista, 'SBU')?.nome).toBe('São Bento do Una');
+    expect(encontrarIssMunicipio(lista, 'Recife')).toBeNull();
+    expect(encontrarIssMunicipio(lista, '  ')).toBeNull();
+    expect(encontrarIssMunicipio(lista, null)).toBeNull();
+  });
   test('dec lê DECIMAL como texto, sem float', () => {
     expect(dec('0.133145')).toBe(133145000000n);
     expect(dec('978.620000')).toBe(978620000000000n);
@@ -108,12 +120,20 @@ describe('regras complementares', () => {
     expect(reais(semTaxa, 'iss')).toBe(50);
   });
 
-  test('município sem cadastro: 5%, sem taxa, com aviso (não bloqueia)', () => {
+  test('município de expediente sem cadastro: 5%, sem taxa, com aviso (não bloqueia)', () => {
     const r = calcularTransporteAutonomo(entrada(1000, null, { municipioCredor: 'Recife' }));
     expect(reais(r, 'iss')).toBe(50);
-    expect(r.avisos.join(' ')).toContain('Município sem cadastro de ISS');
+    expect(r.avisos.join(' ')).toContain('Município de expediente sem cadastro de ISS');
     expect(r.snapshot.municipio).toBe('Recife');
     expect(r.snapshot.municipio_cadastrado).toBe(false);
+  });
+
+  test('sem Município (Expediente): 5%, sem taxa e SEM aviso (D45)', () => {
+    for (const vazio of [null, '', '   ']) {
+      const r = calcularTransporteAutonomo(entrada(1000, null, { municipioCredor: vazio }));
+      expect(reais(r, 'iss')).toBe(50);
+      expect(r.avisos).toEqual([]);
+    }
   });
 
   test('MEI: todas as retenções zeradas, líquido = bruto', () => {

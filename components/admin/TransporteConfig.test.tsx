@@ -73,7 +73,7 @@ describe("TransporteSimulador — mesmo cálculo da OP", () => {
     const { container } = render(
       <TransporteSimulador parametros={LISTA_PARAMETROS} irrf={LISTA_IRRF} municipios={MUNICIPIOS} config={CONFIG} />
     );
-    fireEvent.change(screen.getByLabelText("Município do credor"), { target: { value: municipio } });
+    fireEvent.change(screen.getByLabelText("Município (Expediente)"), { target: { value: municipio } });
     fireEvent.change(screen.getByLabelText("Valor bruto"), { target: { value: bruto } });
     // Rótulo exato; o do ISS traz a alíquota no texto, então cai no prefixo.
     const linha = (rotulo: string) =>
