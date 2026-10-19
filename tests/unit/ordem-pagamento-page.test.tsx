@@ -243,7 +243,8 @@ describe('Emissão de OP com lista de credores (T35-B)', () => {
     const dialogo = within(await screen.findByRole('dialog'));
     expect(dialogo.getByText('3 ordens de pagamento emitidas')).toBeInTheDocument();
     expect(dialogo.getByText('2026.OP.0013')).toBeInTheDocument();
-    expect(dialogo.getByRole('link', { name: /Imprimir/ })).toHaveAttribute('href', '/consulta-impressao?ne=2026NE000001');
+    // só as OPs desta emissão (T36)
+    expect(dialogo.getByRole('link', { name: /Imprimir esta emissão/ })).toHaveAttribute('href', '/consulta-impressao?ne=2026NE000001&ops=op-0,op-1,op-2');
     expect(screen.queryByTestId('linha-credor-0')).toBeNull();
     expect((screen.getByLabelText('Nota de Empenho (NE)') as HTMLInputElement).value).toBe('2026NE000001');
     // saldo recarregado depois de emitir

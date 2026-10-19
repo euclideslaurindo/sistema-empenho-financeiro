@@ -15,11 +15,11 @@ import { toast } from "sonner";
 import jsPDF from "jspdf";
 import * as htmlToImage from "html-to-image";
 import { apiClient } from "@/lib/api-client";
+import { selecaoInicialDasOps } from "@/lib/selecao-ops-impressao";
 
 import { EmpenhoVia } from "@/components/consulta-impressao/EmpenhoVia";
 import { ReciboVia } from "@/components/consulta-impressao/ReciboVia";
 import { LINHAS_DOCUMENTO_EM_BRANCO, formatarValorOp, linhasDescontoDaOp, notaDescontosDaOp } from "@/lib/impressao-op";
-import type { NeCredorResposta } from "@/lib/types/db";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -56,21 +56,23 @@ function formatarItensParaImpressao(itensJson: string | any[] | null | undefined
 }
 
 /**
- * Lê `?ne=` (link "Imprimir" da emissão de OP, T35-B) e avisa a página uma
- * vez. Isolado num <Suspense>: useSearchParams não pode travar a página toda
- * no prerender (Next 16).
+ * Lê `?ne=` e, opcionalmente, `?ops=id1,id2` (link "Imprimir esta emissão" da
+ * OP, T35-B/T36) e avisa a página uma vez. Isolado num <Suspense>:
+ * useSearchParams não pode travar a página toda no prerender (Next 16).
  */
-function LerNeDaUrl({ onNe }: { onNe: (numero: string) => void }) {
+function LerNeDaUrl({ onNe }: { onNe: (numero: string, opsDaEmissao: string[]) => void }) {
   const searchParams = useSearchParams();
   const ne = searchParams.get("ne")?.trim() || "";
+  const ops = searchParams.get("ops") || "";
   const jaLeu = useRef(false);
   useEffect(() => {
     if (!ne || jaLeu.current) return;
     jaLeu.current = true;
-    onNe(ne);
-  }, [ne, onNe]);
+    onNe(ne, ops.split(",").map((id) => id.trim()).filter(Boolean));
+  }, [ne, ops, onNe]);
   return null;
 }
+
 
 export default function ConsultaImpressao() {
   const [view, setView] = useState<"search" | "document">("search");
@@ -289,8 +291,9 @@ export default function ConsultaImpressao() {
     );
   };
 
-  // Consulta individual: OPs da NE, todas marcadas. Também chamada ao abrir com ?ne= (T35-B).
-  const buscarOpsDaNe = useCallback(async (numero: string) => {
+  // Consulta individual: OPs da NE, todas marcadas — ou só as da emissão, quando
+  // aberta pelo "Imprimir esta emissão" (?ne=…&ops=…, T36).
+  const buscarOpsDaNe = useCallback(async (numero: string, opsDaEmissao: string[] = []) => {
     if (!numero.trim()) { toast.error("Informe o número do Empenho."); return; }
     setIsBuscandoSingle(true);
     try {
@@ -298,10 +301,14 @@ export default function ConsultaImpressao() {
       const data = await apiClient.get(`/api/ordens-pagamento?numeroNe=${encodeURIComponent(formattedNe)}`);
       if (data && data.ordens && data.ordens.length > 0) {
         setOpListSingle(data.ordens);
-        const newSel: Record<string, boolean> = {};
-        data.ordens.forEach((op: any) => newSel[op.id] = true);
-        setSelectedOpsSingle(newSel);
-        toast.success(`${data.ordens.length} OP(s) encontrada(s). Selecione e clique em Gerar.`);
+        const selecao = selecaoInicialDasOps(data.ordens, opsDaEmissao);
+        setSelectedOpsSingle(selecao);
+        const marcadas = Object.values(selecao).filter(Boolean).length;
+        toast.success(
+          marcadas < data.ordens.length
+            ? `${data.ordens.length} OP(s) encontrada(s); ${marcadas} desta emissão já marcada(s). Clique em Gerar.`
+            : `${data.ordens.length} OP(s) encontrada(s). Selecione e clique em Gerar.`
+        );
       } else {
         setOpListSingle([]);
         setSelectedOpsSingle({});
@@ -314,10 +321,10 @@ export default function ConsultaImpressao() {
     }
   }, []);
 
-  const abrirNeDaUrl = useCallback((numero: string) => {
+  const abrirNeDaUrl = useCallback((numero: string, opsDaEmissao: string[]) => {
     setSearchMode("single");
     setBatchInput(numero.toUpperCase());
-    buscarOpsDaNe(numero);
+    buscarOpsDaNe(numero, opsDaEmissao);
   }, [buscarOpsDaNe]);
 
   const buscarOrdensParaLote = async () => {
@@ -345,18 +352,7 @@ export default function ConsultaImpressao() {
     }
   };
 
-  // Credores da NE (T17) para a linha "Credores da NE" da via; NE antiga
-  // (credor só sintetizado do legado) não tem relação a imprimir.
-  const buscarCredoresNe = async (numeroNe: string): Promise<NeCredorResposta[]> => {
-    try {
-      const data = await apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(numeroNe)}`);
-      return (data?.ne?.credores || []).filter((c: NeCredorResposta) => !c.legado);
-    } catch {
-      return [];
-    }
-  };
-
-  const gerarDocFormatado = (op: any, formattedNe: string, ano: string, i: number, credoresNe: NeCredorResposta[] = []) => {
+  const gerarDocFormatado = (op: any, formattedNe: string, ano: string, i: number) => {
     const valorF = Number(op.valorPagamento || op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     const liquidoF = Number(op.valorLiquido || op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
     const itensFormatados = formatarItensParaImpressao(op.itensJson);
@@ -386,7 +382,6 @@ export default function ConsultaImpressao() {
         deduzidoData: formatDateOnlyBR(op.dataPagamento),
         provisaoData: formatDateOnlyBR(op.dataEmissao),
         pagamentoData: formatDateOnlyBR(op.dataPagamento),
-        credoresNe,
       },
       verso: {
         ...versoData,
@@ -430,9 +425,8 @@ export default function ConsultaImpressao() {
 
       if (opsParaGerar.length > 0) {
         // tem OPs salvas selecionadas: gera documentos com os dados delas
-        const credoresNe = await buscarCredoresNe(formattedNe);
         opsParaGerar.forEach((op, opIndex) => {
-          allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex, credoresNe));
+          allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex));
         });
       } else {
         // nenhuma OP salva selecionada: gera documento em branco baseado na NE
@@ -473,7 +467,6 @@ export default function ConsultaImpressao() {
             elementoSubelemento: finalElemento,
             saldoAnterior: valorFormatado,
             especificacao: finalHistorico,
-            credoresNe: (neDB?.credores || []).filter((c: NeCredorResposta) => !c.legado),
           },
           verso: {
             ...versoData,
@@ -501,9 +494,8 @@ export default function ConsultaImpressao() {
       const match = formattedNe.match(/^(\d{4})NE/i);
       const ano = match ? match[1] : frenteData.emissaoAno;
 
-      const credoresNe = await buscarCredoresNe(formattedNe);
       selectedOpData.forEach((op, opIndex) => {
-        allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex, credoresNe));
+        allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex));
       });
     }
 
