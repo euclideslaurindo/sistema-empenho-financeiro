@@ -161,17 +161,6 @@ export interface NeCredorDB {
   updated_at: Date;
 }
 
-/** Credor de uma NE como devolvido pela API (valores em reais). */
-export interface NeCredorResposta {
-  cpfCnpj: string;
-  nome: string;
-  valorBruto: number;
-  valorPago: number;
-  saldo: number;
-  legado?: true; // sintetizado das colunas legadas (NE sem linhas em ne_credores)
-  isMei?: true; // credor MEI no cadastro (T26)
-}
-
 export interface DarfAcompanhamentoDB {
   id: string;
   ordem_pagamento_id: string;
