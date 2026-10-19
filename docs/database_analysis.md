@@ -13,7 +13,7 @@ Abaixo, listo os pontos fortes atuais e algumas recomendações de otimização 
 
 ### A. Limite de Conexões (Pool)
 * **Status Atual:** No arquivo `lib/db.ts`, o limite do Pool de Conexões está configurado como `connectionLimit: 3`. Isso foi feito provavelmente para evitar sobrecarga em testes locais (XAMPP).
-* **O Risco:** Em um servidor real (como o `DAGMCGPA100`) com vários usuários acessando o sistema ao mesmo tempo, 3 conexões podem se esgotar rapidamente, causando lentidão (as requisições ficam em fila esperando uma conexão liberar).
+* **O Risco:** Em um servidor real (como o de produção) com vários usuários acessando o sistema ao mesmo tempo, 3 conexões podem se esgotar rapidamente, causando lentidão (as requisições ficam em fila esperando uma conexão liberar).
 * **Solução:** Aumentar o `connectionLimit` para `20` ou `50` (dependendo da configuração do servidor MySQL da sua rede).
 
 ### B. Índices para Ordenação Rápida
