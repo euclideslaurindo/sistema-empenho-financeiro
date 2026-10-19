@@ -53,6 +53,8 @@ Conteúdo do `retencoes_snapshot` (gravado pela T10):
 
 Observação de compatibilidade: `total_descontos` passa a **incluir** as taxas bancária/PIX nas OPs novas. Outros sistemas que leiam esse total verão o valor já com elas (comportamento desejado, D11).
 
+**Atenção — novo significado de `total_descontos`:** a **patronal não entra mais** no total (ela é informativa, `desconta_credor = 0`). A coluna `patronal` continua sendo gravada com o valor calculado. OPs antigas não são tocadas. O `retencoes_snapshot` passa a guardar também `perfil` (`SIMPLES`/`TRANSPORTE_AUTONOMO`), `isento` (`"MEI"` ou `null`), o município e a taxa de expediente usados no ISS, e a lista de campos informativos.
+
 ## Arquivos
 - **Novo:** `database/migration_12.sql`
 - **Tipos:** `lib/types/db.ts` (interface de `ordens_pagamento`)

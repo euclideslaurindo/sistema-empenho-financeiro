@@ -16,7 +16,7 @@ Criar a tabela que acompanha, **por OP**, o valor da DARF, o mês de competênci
 ## Escopo
 ### Entra
 - Tabela `darf_acompanhamento` e índices.
-- Backfill das OPs existentes com DARF > 0, com um **mês de corte** configurável: OPs anteriores ao corte entram como `PAGA` (para o usuário não ter que baixar o histórico antigo).
+- Backfill das OPs existentes com DARF > 0, com um **mês de corte** configurável: OPs anteriores ao corte entram como `PAGA` (para o usuário não ter que baixar o histórico antigo). **Como ainda não há credores (e portanto OPs) cadastrados, o backfill é dispensável**; manter o script apenas por segurança.
 
 ### Não entra
 Lógica de sincronização (T20) e tela (T21).

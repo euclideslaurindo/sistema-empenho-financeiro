@@ -53,3 +53,6 @@ GET /api/ordens-pagamento/proximo-numero?numeroNe=2026NE000982
 
 ## Decisões em aberto relacionadas
 Nenhuma.
+
+## Atualização de escopo (rodada 2, 13/10/2026)
+Com a emissão em lote (T34/T35), o número previsto aparece **por credor**, em sequência. `GET /api/ordens-pagamento/proximo-numero` passa a aceitar `quantidade` (1 a 100) e devolve também `numeros[]`; sem `quantidade` o formato antigo continua igual. O campo "Número da OP" do topo da tela sai e o `FaixaNumeroPrevisto` vira um selo por linha de credor.
