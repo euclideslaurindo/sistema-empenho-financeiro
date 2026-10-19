@@ -125,3 +125,14 @@ export function rotuloCampoDoElemento(cfg: ConfigRetencaoCampoMapeado, elementoC
   if (perfilDoElemento(elementoCodigo) !== "TRANSPORTE_AUTONOMO") return rotuloCampo(cfg);
   return cfg.campo === "patronal" ? `${cfg.rotulo} (informativa)` : cfg.rotulo;
 }
+
+// T35-A: um mesmo componente do formulário da OP pode servir a várias linhas
+// (`credores.0`, `credores.1`…). Sem prefixo, tudo continua na raiz, como antes.
+export function nomeNaLinha(basePath: string, nome: string): string {
+  return basePath ? `${basePath}.${nome}` : nome;
+}
+
+/** Id de elemento único por linha; sem prefixo, o id de sempre. */
+export function idNaLinha(basePath: string, id: string): string {
+  return basePath ? `${id}-${basePath.replace(/[^A-Za-z0-9_-]/g, "-")}` : id;
+}
