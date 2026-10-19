@@ -187,3 +187,46 @@ describe('Tela da Nota de Empenho — saldo (T31)', () => {
     expect(within(faixa).getByText('R$ 10,00')).toBeInTheDocument();
   });
 });
+
+describe('Tela da Nota de Empenho — valor vindo do banco (correção do ×100)', () => {
+  // O MySQL devolve DECIMAL como texto "100.00"; antes o campo recebia esse
+  // texto e o formulário apagava o ponto: a NE era salva com valor ×100.
+  const doBanco = (valor: string) => ({ ...NE_ANTIGA, valor: valor as any });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.scrollTo = vi.fn() as any;
+    global.fetch = vi.fn(async () => ({ json: async () => ({ duplicado: false }) })) as any;
+  });
+
+  test.each([
+    ['100.00', '100,00', 100],
+    ['1234.50', '1.234,50', 1234.5],
+    ['85000.00', '85.000,00', 85000],
+  ])('editar NE com valor %s: campo mostra %s e salva %s', async (banco: string, campo: string, salvo: number) => {
+    (apiClient.get as any).mockResolvedValue({ notas: [doBanco(banco)], pagination: { totalPages: 1 } });
+    (apiClient.put as any).mockResolvedValue({ success: true });
+    render(<NotasEmpenho />);
+    const linha = (await screen.findByText('2026NE000001')).closest('tr')!;
+    fireEvent.click(within(linha).getByTitle('Editar'));
+    expect((screen.getByLabelText('Valor R$') as HTMLInputElement).value).toBe(campo);
+    fireEvent.click(screen.getByRole('button', { name: /salvar/i }));
+    await waitFor(() => expect(apiClient.put).toHaveBeenCalled());
+    expect((apiClient.put as any).mock.calls[0][1].valor).toBe(salvo);
+  });
+
+  test('"Carregar dados da NE" (duplicidade) também mostra e salva o valor certo', async () => {
+    (apiClient.get as any).mockResolvedValue({ notas: [], pagination: { totalPages: 1 } });
+    (apiClient.put as any).mockResolvedValue({ success: true });
+    const parecida = { id: 'ne-9', numero: '2026NE000009', valor: '100.00', elemento: '3.3.90.36 - Outros serviços PF', subelemento: 'Locação', historico: 'Obs' };
+    global.fetch = vi.fn(async () => ({ json: async () => ({ duplicado: true, nota: parecida }) })) as any;
+    render(<NotasEmpenho />);
+    await screen.findByRole('heading', { name: 'Cadastro de Nota de Empenho' });
+    fireEvent.change(screen.getByLabelText('Valor R$'), { target: { value: '10000' } });
+    fireEvent.click(await screen.findByText(/Carregar dados da NE 2026NE000009/, {}, { timeout: 2000 }));
+    await waitFor(() => expect((screen.getByLabelText('Valor R$') as HTMLInputElement).value).toBe('100,00'));
+    fireEvent.click(screen.getByRole('button', { name: /salvar/i }));
+    await waitFor(() => expect(apiClient.put).toHaveBeenCalled());
+    expect((apiClient.put as any).mock.calls[0][1].valor).toBe(100);
+  });
+});

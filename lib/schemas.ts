@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { lerValorMonetario } from "@/lib/money";
 
 /**
  * Schema Zod para validação de Notas de Empenho.
@@ -7,10 +8,10 @@ import { z } from "zod";
  */
 export const notaEmpenhoSchema = z.object({
   numeroNE: z.string().min(1, "Número da NE é obrigatório"),
-  valorNE: z.union([z.string(), z.number()]).transform(val => {
-    const clean = String(val).replace(/[^\d,-]/g, '').replace(',', '.');
-    return parseFloat(clean) || 0;
-  }).refine(val => val > 0, { message: "O valor da NE deve ser maior que zero." }),
+  // lerValorMonetario entende "100,00" (tela) e "100.00" (como o banco devolve):
+  // apagar os pontos gravava a NE ×100 ao editar.
+  valorNE: z.union([z.string(), z.number()]).transform(val => lerValorMonetario(val))
+    .refine(val => val > 0, { message: "O valor da NE deve ser maior que zero." }),
   // T29: a NE não tem mais Data de Pagamento nem Data de Emissão na tela.
   unidadeOrcamentaria: z.string().optional(),
   elemento: z.string().optional(),

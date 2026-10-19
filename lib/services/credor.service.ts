@@ -60,8 +60,10 @@ export class CredorService {
       countSql += clause;
       sqlParams.push(`%${buscaFormatada}%`, `%${buscaFormatada}%`);
       countParams.push(`%${buscaFormatada}%`, `%${buscaFormatada}%`);
-      // Só aplica REPLACE (sem índice) quando a busca tem dígitos parciais
-      if (digits && digits !== buscaFormatada) {
+      // Com 4+ dígitos, também compara só os dígitos do documento: assim
+      // "11111111111" acha "111.111.111-11" (antes só entrava com pontuação
+      // na busca, e o CPF digitado sem máscara não achava ninguém).
+      if (digits.length >= 4) {
         const replaceClause = ` OR REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') LIKE ?`;
         sql += replaceClause;
         countSql += replaceClause;
