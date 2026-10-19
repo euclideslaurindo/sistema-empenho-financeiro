@@ -25,10 +25,12 @@ import {
   estadoCampoOp,
   idNaLinha,
   informadosEmCentavos,
+  informadosValidosDaLinha,
   mascararValorDigitado,
   nomeNaLinha,
   rotuloCampoDoElemento,
   somarDescontosCents,
+  valoresCalculadosDoForm,
   type CampoRetencao,
   type Perfil,
 } from "@/lib/retencoes-form";
@@ -52,6 +54,22 @@ function mesmaLista(a: string[], b: string[]) {
   return a.length === b.length && a.every((x) => b.includes(x));
 }
 
+type SetValue = (nome: string, valor: unknown) => void;
+type GetValues = (nome?: string) => any;
+
+/** Grava os valores calculados na linha, sem tocar no que já está igual. */
+export function aplicarCalculadosNaLinha(
+  getValues: GetValues,
+  setValue: SetValue,
+  basePath: string,
+  novos: Record<string, string>
+) {
+  for (const [nome, valor] of Object.entries(novos)) {
+    const caminho = nomeNaLinha(basePath, nome);
+    if (getValues(caminho) !== valor) setValue(caminho, valor);
+  }
+}
+
 // Isolado do resto do formulário (só ele re-renderiza com os watches) e sem
 // DOM. Usa o MESMO motor do servidor (lib/retencoes.ts), então o valor
 // mostrado é o valor que vai ser gravado.
@@ -72,14 +90,7 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
     if (perfilDoElemento(extrairCodigoElemento(elemento)) !== "PADRAO") return;
     const timer = setTimeout(() => {
       const elementoCodigo = extrairCodigoElemento(elemento);
-      const configPorCampo = new Map(config.campos.map((c) => [c.campo, c]));
-
-      // Um campo digitado que deixou de ser editável (ex.: trocou a NE e o
-      // imposto não se aplica mais) volta a ser do cálculo automático.
-      const informadosValidos = camposInformados.filter((campo) => {
-        const cfg = configPorCampo.get(campo);
-        return !!cfg && cfg.ativo && estadoCampoOp(cfg, elementoCodigo, config.regras, perfil, { credorMei, sobrescreverMei }).editavel;
-      });
+      const informadosValidos = informadosValidosDaLinha(camposInformados, config, elementoCodigo, perfil, { credorMei, sobrescreverMei });
 
       let resultado;
       try {
@@ -97,12 +108,7 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
         return; // valor digitado inválido (ex.: maior que o bruto): o resumo mostra o alerta
       }
 
-      for (const campo of CAMPOS_RETENCAO) {
-        if (informadosValidos.includes(campo)) continue;
-        const cents = resultado.itens[campo] ?? 0;
-        const novo = cents > 0 ? maskCurrency(cents / 100) : "";
-        if (getValues(n(CAMPO_FORM[campo])) !== novo) setValue(n(CAMPO_FORM[campo]), novo);
-      }
+      aplicarCalculadosNaLinha(getValues, setValue, basePath, valoresCalculadosDoForm(resultado.itens, informadosValidos));
       if (!mesmaLista(informadosValidos, camposInformados)) {
         setValue(n("camposInformados"), informadosValidos);
       }
@@ -141,18 +147,11 @@ function PreviaTransporteEffect({ config, perfil, basePath }: { config: ConfigRe
     if (perfilDoElemento(elementoCodigo) !== "TRANSPORTE_AUTONOMO") return;
     let cancelado = false;
 
-    const limparCalculados = (informadosValidos: string[]) => {
-      for (const campo of CAMPOS_RETENCAO) {
-        if (!informadosValidos.includes(campo) && getValues(n(CAMPO_FORM[campo])) !== "") setValue(n(CAMPO_FORM[campo]), "");
-      }
-    };
+    const limparCalculados = (informadosValidos: string[]) =>
+      aplicarCalculadosNaLinha(getValues, setValue, basePath, valoresCalculadosDoForm({}, informadosValidos));
 
     const timer = setTimeout(async () => {
-      const configPorCampo = new Map(config.campos.map((c) => [c.campo, c]));
-      const informadosValidos = camposInformados.filter((campo) => {
-        const cfg = configPorCampo.get(campo);
-        return !!cfg && cfg.ativo && estadoCampoOp(cfg, elementoCodigo, config.regras, perfil, { credorMei, sobrescreverMei }).editavel;
-      });
+      const informadosValidos = informadosValidosDaLinha(camposInformados, config, elementoCodigo, perfil, { credorMei, sobrescreverMei });
       if (!mesmaLista(informadosValidos, camposInformados)) setValue(n("camposInformados"), informadosValidos);
 
       const bruto = toCents(valorPagamento);
@@ -184,12 +183,7 @@ function PreviaTransporteEffect({ config, perfil, basePath }: { config: ConfigRe
           }
         );
         if (cancelado) return;
-        for (const campo of CAMPOS_RETENCAO) {
-          if (informadosValidos.includes(campo)) continue;
-          const cents = toCents(previa.itens?.[campo] ?? 0);
-          const novo = cents > 0 ? maskCurrency(cents / 100) : "";
-          if (getValues(n(CAMPO_FORM[campo])) !== novo) setValue(n(CAMPO_FORM[campo]), novo);
-        }
+        aplicarCalculadosNaLinha(getValues, setValue, basePath, valoresCalculadosDoForm(itensDaPreviaEmCentavos(previa.itens), informadosValidos));
         setValue(n("previaAvisos"), previa.avisos || []);
       } catch (e: any) {
         if (cancelado) return;
@@ -207,6 +201,35 @@ function PreviaTransporteEffect({ config, perfil, basePath }: { config: ConfigRe
   }, [elemento, empenho, cpfCnpj, valorPagamento, dataPagamento, dataEmissao, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues, n, basePath]);
 
   return null;
+}
+
+/** Itens da prévia (em reais) → centavos, para o mesmo caminho do cálculo local. */
+export function itensDaPreviaEmCentavos(itens: Record<string, number> | undefined): Partial<Record<CampoRetencao, number>> {
+  return Object.fromEntries(CAMPOS_RETENCAO.map((campo) => [campo, toCents(itens?.[campo] ?? 0)]));
+}
+
+/**
+ * Efeitos de uma linha (sem DOM): cálculo local e, no modo "individual", a
+ * prévia do .33. Na lista (T35-B) ficam SEMPRE montados por linha, mesmo com
+ * o painel fechado, e a prévia do .33 vem do PreviaLoteEffect ("externa").
+ */
+export function EfeitosRetencaoLinha({
+  config,
+  perfil,
+  basePath = "",
+  previa = "individual",
+}: {
+  config: ConfigRetencoes;
+  perfil: Perfil;
+  basePath?: string;
+  previa?: "individual" | "externa";
+}) {
+  return (
+    <>
+      <AutoCalcEffect config={config} perfil={perfil} basePath={basePath} />
+      {previa === "individual" && <PreviaTransporteEffect config={config} perfil={perfil} basePath={basePath} />}
+    </>
+  );
 }
 
 function TaxesTotalSummary({ basePath }: { basePath: string }) {
@@ -363,7 +386,7 @@ function BannerMei({ perfil, sobrescreverMei, basePath }: { perfil: Perfil; sobr
   );
 }
 
-function CamposRetencao({ config, perfil, basePath }: { config: ConfigRetencoes; perfil: Perfil; basePath: string }) {
+function CamposRetencao({ config, perfil, basePath, efeitos }: { config: ConfigRetencoes; perfil: Perfil; basePath: string; efeitos: boolean }) {
   const { control } = useFormContext<any>();
   const { n } = useNomesDaLinha(basePath);
   const elemento = useWatch({ control, name: "elemento" });
@@ -421,8 +444,7 @@ function CamposRetencao({ config, perfil, basePath }: { config: ConfigRetencoes;
         })}
       </div>
 
-      <AutoCalcEffect config={config} perfil={perfil} basePath={basePath} />
-      <PreviaTransporteEffect config={config} perfil={perfil} basePath={basePath} />
+      {efeitos && <EfeitosRetencaoLinha config={config} perfil={perfil} basePath={basePath} />}
     </>
   );
 }
@@ -432,12 +454,15 @@ export default function OpTaxesSection({
   config,
   erroConfig,
   basePath = "",
+  efeitos = true,
 }: {
   userRole: string;
   config: ConfigRetencoes | null;
   erroConfig: string | null;
   /** Prefixo da linha do credor (ex.: `credores.2`); vazio = campos na raiz. */
   basePath?: string;
+  /** false quando quem monta a seção já mantém os efeitos da linha (lista da T35-B). */
+  efeitos?: boolean;
 }) {
   const perfil = userRole as Perfil;
 
@@ -451,7 +476,7 @@ export default function OpTaxesSection({
       </div>
 
       {config ? (
-        <CamposRetencao config={config} perfil={perfil} basePath={basePath} />
+        <CamposRetencao config={config} perfil={perfil} basePath={basePath} efeitos={efeitos} />
       ) : erroConfig ? (
         <p role="alert" className="text-sm font-semibold text-red-600">
           Não foi possível carregar a configuração de retenções ({erroConfig}). O servidor calculará as retenções ao salvar.
