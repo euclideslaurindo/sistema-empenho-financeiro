@@ -19,7 +19,10 @@ Fazer a via impressa da OP mostrar os rótulos/alíquotas **que foram usados naq
 - Rótulos lidos do **snapshot** da OP; para OPs antigas (sem snapshot), usar o rótulo do campo **sem percentual** (ou os percentuais históricos fixos de hoje, se o usuário preferir; **perguntar no PR**).
 - Linhas novas "Taxa bancária (expediente)" e "Taxa PIX" (aparecem quando maiores que zero ou sempre, conforme decisão de layout).
 - Remover impostos que não se aplicam ao elemento da via (ex.: `3.3.90.14` imprime só o líquido).
-- Total de descontos coerente com a soma exibida.
+- Total de descontos coerente com a soma exibida **sem a patronal**.
+- **Patronal em linha separada**, abaixo dos descontos, como informativo: "Contribuição patronal (encargo do órgão — não descontada)". Decisão do usuário: ela deve aparecer na impressão.
+- **Credor MEI:** a via mostra "Isento (MEI)" no bloco de retenções.
+- **ISS com taxa de expediente** (3.3.90.33): mostrar "ISS (5%)" e "Taxa de expediente — Prefeitura de X" como linhas separadas, cuja soma é o valor gravado em `iss`.
 
 ### Não entra
 Layout de NE com vários credores (T16/T17).
@@ -35,7 +38,9 @@ Layout de NE com vários credores (T16/T17).
 - [ ] OP nova com IRRF a 2% imprime "IRRF (2%)".
 - [ ] OP antiga (sem snapshot) imprime sem erro e com os mesmos valores de antes.
 - [ ] Taxa bancária e PIX aparecem na via com os valores corretos.
-- [ ] Soma das linhas = "Total de Descontos"; líquido bate com a tela.
+- [ ] Soma das linhas de desconto (sem a patronal) = "Total de Descontos"; líquido bate com a tela.
+- [ ] A patronal aparece na via, separada e identificada como não descontada.
+- [ ] OP de credor MEI imprime "Isento (MEI)" e líquido = bruto.
 - [ ] Elemento `3.3.90.14` não mostra linhas de imposto.
 
 ## Riscos e observações
