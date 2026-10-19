@@ -3,133 +3,15 @@ import type { PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 import { extrairCodigoElemento } from '@/lib/elementos';
 import { calcularRetencoesDaOp } from '@/lib/services/calculo-op.service';
-import type { CampoTributario, CampoDesconto } from '@/lib/retencoes';
-import { toCents, fromCents, formatarBRL } from '@/lib/money';
-import { somenteDigitos } from '@/lib/ne-credores';
+import { toCents, fromCents } from '@/lib/money';
 import { calcularProximoNumeroOp } from '@/lib/services/numeracao-op';
+import { recalcularStatusNe } from '@/lib/services/saldo-ne';
 import { entraDarfDaConfig, removerDarfDaOp, sincronizarDarfDaOp } from '@/lib/services/darf.service';
+import { criarOpNaTransacao, montarInformados, ordemPagamentoSchema, toDecimal } from '@/lib/services/ordem-pagamento-core';
 
 export type ServiceResult<T = any> = 
   | { success: true; data: T; status?: number }
   | { success: false; error: string; status: number };
-
-// Helper para higienizar números, exatamente como estava na rota antiga
-const safeNumber = z.union([z.string(), z.number()]).transform(val => {
-  if (typeof val === 'number') return val;
-  return parseFloat(String(val)) || 0;
-});
-
-// Schema isolado e protegido
-const ordemPagamentoSchema = z.object({
-  liquidacao_id: z.string().optional().nullable(),
-  numeroCheque: z.string().optional().nullable(),
-  valorPagamento: safeNumber.refine(val => val > 0, { message: 'O valor do pagamento deve ser maior que zero.' }),
-  numeroEmpenho: z.string().min(1, 'O número da Nota de Empenho é obrigatório.'), // Frontend envia como numeroEmpenho, mas é a NE
-  sub: z.string().optional(),
-  credorNome: z.string().optional(),
-  // Obrigatório: ordens_pagamento.credor_cpf_cnpj referencia credores.cpf_cnpj (fk_op_credor).
-  credorCpfCnpj: z.string().min(1, 'O CPF/CNPJ do credor é obrigatório.'),
-  credorRg: z.string().optional(),
-  credorEndereco: z.string().optional(),
-  unidadeOrcamentaria: z.string().optional(),
-  elemento: z.string().optional(),
-  subelemento: z.string().optional(),
-  gestao: z.string().optional(),
-  historico: z.string().optional(),
-  itens: z.array(z.any()).optional(),
-  saldoAnterior: safeNumber.optional(),
-  valorEmpenho: safeNumber.optional(),
-  irrf: safeNumber.optional(),
-  iss: safeNumber.optional(),
-  inss: safeNumber.optional(),
-  sestSenat: safeNumber.optional(),
-  patronal: safeNumber.optional(),
-  outrosDescontos: safeNumber.optional(),
-  taxaBancaria: safeNumber.optional(),
-  taxaPix: safeNumber.optional(),
-  // T26: ADMIN confirmou reter mesmo com credor MEI.
-  sobrescreverMei: z.boolean().optional(),
-  totalDescontos: safeNumber.optional(),
-  valorLiquido: safeNumber.optional(),
-  dataEmissao: z.string().optional().nullable(),
-  dataPagamento: z.string().optional().nullable(),
-});
-
-/**
- * Monta o mapa `informados` pro motor de cálculo (T10) a partir do payload já
- * validado pelo Zod. Só inclui uma chave se o campo realmente veio no
- * payload (`!== undefined`) — é isso que distingue "operador não tocou no
- * campo" de "operador digitou 0", e é o que corrige o bug antigo de
- * "cliente manda 0 e pula um imposto" (ver lib/retencoes.ts).
- */
-function montarInformados(parsedData: any): Partial<Record<CampoTributario | CampoDesconto, number>> {
-  const informados: Partial<Record<CampoTributario | CampoDesconto, number>> = {};
-  const mapa: Array<[string, CampoTributario | CampoDesconto]> = [
-    ['irrf', 'irrf'],
-    ['iss', 'iss'],
-    ['inss', 'inss'],
-    ['sestSenat', 'sest_senat'],
-    ['patronal', 'patronal'],
-    ['outrosDescontos', 'outros'],
-    ['taxaBancaria', 'taxa_bancaria'],
-    ['taxaPix', 'taxa_pix'],
-  ];
-  for (const [campoPayload, campoEngine] of mapa) {
-    const valor = parsedData[campoPayload];
-    if (valor !== undefined) {
-      informados[campoEngine] = toCents(valor);
-    }
-  }
-  return informados;
-}
-
-/**
- * NE com vários credores (T17): o credor da OP tem que estar em ne_credores
- * e o total pago a ele na NE não pode passar do bruto dele. NE sem linhas em
- * ne_credores (anterior à T15) continua livre — só vale o saldo total.
- * Roda dentro da transação, depois da trava da NE (FOR UPDATE), então duas
- * OPs simultâneas da mesma NE enxergam uma à outra.
- */
-async function validarSaldoCredor(
-  conn: PoolConnection,
-  numeroNe: string,
-  credorCpfCnpj: string,
-  valorCents: number,
-  opIdIgnorar?: string
-) {
-  const [linhas]: any = await conn.execute(
-    'SELECT credor_cpf_cnpj, credor_nome, valor_bruto FROM ne_credores WHERE numero_ne = ? FOR UPDATE',
-    [numeroNe]
-  );
-  if (!linhas || linhas.length === 0) return;
-
-  const digitos = somenteDigitos(credorCpfCnpj);
-  const alvo = linhas.find((l: any) => somenteDigitos(l.credor_cpf_cnpj) === digitos);
-  if (!alvo) {
-    throw { status: 422, error: `O credor ${credorCpfCnpj} não pertence à NE "${numeroNe}".` };
-  }
-
-  const [pagos]: any = await conn.execute(
-    `SELECT credor_cpf_cnpj, COALESCE(SUM(valor_pagamento), 0) as total_pago
-       FROM ordens_pagamento
-      WHERE numero_ne = ?${opIdIgnorar ? ' AND id <> ?' : ''}
-      GROUP BY credor_cpf_cnpj`,
-    opIdIgnorar ? [numeroNe, opIdIgnorar] : [numeroNe]
-  );
-  const pagoCents = (pagos || [])
-    .filter((p: any) => somenteDigitos(p.credor_cpf_cnpj) === digitos)
-    .reduce((t: number, p: any) => t + toCents(p.total_pago), 0);
-  const brutoCents = toCents(alvo.valor_bruto);
-
-  if (pagoCents + valorCents > brutoCents) {
-    throw {
-      status: 422,
-      error:
-        `Saldo do credor insuficiente. Bruto R$ ${formatarBRL(brutoCents)}, ` +
-        `já pago R$ ${formatarBRL(pagoCents)}, restante R$ ${formatarBRL(brutoCents - pagoCents)}.`,
-    };
-  }
-}
 
 export class OrdemPagamentoService {
   /**
@@ -250,11 +132,6 @@ export class OrdemPagamentoService {
     try {
       const parsedData = ordemPagamentoSchema.parse(rawData);
 
-      const toDecimal = (v: any): number => {
-        if (typeof v === 'number') return isNaN(v) ? 0 : v;
-        return parseFloat(String(v)) || 0;
-      };
-
       // Retry em caso de colisão no numero_empenho: o SELECT MAX() FOR UPDATE não
       // trava nada quando é a primeira OP do ano (sem linhas pra travar), então duas
       // requisições concorrentes podem calcular o mesmo número. A UNIQUE KEY no banco
@@ -265,12 +142,7 @@ export class OrdemPagamentoService {
       for (let tentativa = 1; tentativa <= MAX_TENTATIVAS_NUMERO_OP; tentativa++) {
       try {
       result = await withTransaction(async (conn: PoolConnection) => {
-        const {
-          liquidacao_id, numeroEmpenho: neReal, sub, credorNome, credorCpfCnpj, credorRg, credorEndereco,
-          unidadeOrcamentaria, gestao, historico, itens,
-          saldoAnterior, valorEmpenho, valorPagamento: vPagamento,
-          numeroCheque, dataEmissao, dataPagamento,
-        } = parsedData;
+        const { numeroEmpenho: neReal, numeroCheque } = parsedData;
 
         const chequeFormatado = numeroCheque ? numeroCheque.trim() : null;
         if (chequeFormatado) {
@@ -293,164 +165,13 @@ export class OrdemPagamentoService {
         if (neRows[0].status === 'CANCELADO') {
           throw { status: 409, error: `Não é possível criar OP para a NE "${neReal}" pois ela está CANCELADA.` };
         }
-        const valorNe = parseFloat(neRows[0].valor) || 0;
-        // Elemento/subelemento SEMPRE vêm da NE no servidor — nunca do
-        // payload do cliente. Vale tanto pro cálculo das retenções (T10)
-        // quanto pro que é gravado/impresso na OP, pra nunca divergir do
-        // que foi de fato usado no cálculo.
-        const elementoGravado = neRows[0].elemento || '';
-        const subelementoGravado = neRows[0].subelemento || '';
-        const elementoCodigo = extrairCodigoElemento(elementoGravado);
-
-        const [paidRows]: any = await conn.execute(
-          'SELECT COALESCE(SUM(valor_pagamento), 0) as total_pago FROM ordens_pagamento WHERE numero_ne = ? FOR UPDATE',
-          [neReal]
-        );
-        const totalJaPago = parseFloat(paidRows[0]?.total_pago) || 0;
-        const saldoDisponivel = Math.round((valorNe - totalJaPago) * 100) / 100;
-        // Mesma conversão de sempre, mas passando por centavos inteiros (T01)
-        // em vez de só Math.round(x*100)/100 — é o valor que entra no motor
-        // de retenções, bom já higienizar aqui.
-        const brutoCents = toCents(vPagamento);
-        const vPagamentoArredondado = fromCents(brutoCents);
-
-        if (vPagamentoArredondado > saldoDisponivel) {
-          throw {
-            status: 422,
-            error: `Saldo insuficiente. Saldo disponível da NE: R$ ${saldoDisponivel.toFixed(2).replace('.', ',')}. Valor solicitado: R$ ${vPagamentoArredondado.toFixed(2).replace('.', ',')}`
-          };
-        }
-
-        await validarSaldoCredor(conn, neReal, credorCpfCnpj, brutoCents);
-
-        let totalItensCalc = 0;
-        if (itens && Array.isArray(itens)) {
-          itens.forEach((i: any) => {
-            totalItensCalc += (Number(i.quantidade) || 0) * toDecimal(i.valorUnitario);
-          });
-        }
-        totalItensCalc = Math.round(totalItensCalc * 100) / 100;
-        // Tolerância de 1 centavo para evitar falso positivo por imprecisão IEEE 754.
-        // A diferença também é arredondada antes de comparar, pois mesmo dois valores
-        // já arredondados podem subtrair para algo como 0.010000000000005 em vez de 0.01.
-        const diferencaItens = Math.round(Math.abs(totalItensCalc - vPagamentoArredondado) * 100) / 100;
-        if (totalItensCalc > 0 && diferencaItens > 0.01) {
-          throw { status: 400, error: `A soma dos itens (R$ ${totalItensCalc.toFixed(2)}) não bate com o valor a pagar da OP (R$ ${vPagamentoArredondado.toFixed(2)}). Fraude detectada.` };
-        }
-
-        const { numeroOp: numeroDaOpGerado, sub: subGerado } = await calcularProximoNumeroOp(
-          async (sql, params) => {
-            const [rows]: any = await conn.execute(sql, params);
-            return rows;
-          },
-          neReal,
-          { travar: true }
-        );
-
-        // Motor único (T10/T25): config do banco, perfil pelo elemento (transporte
-        // no .33), MEI do cadastro; nunca confia em total/líquido do cliente.
-        const { resultado, configCampos } = await calcularRetencoesDaOp(conn, {
-          brutoCents,
-          elementoCodigo,
-          credorCpfCnpj,
-          dataPagamento,
-          dataEmissao,
-          informados: montarInformados(parsedData),
-          perfilUsuario: perfil as 'ADMIN' | 'GESTOR' | 'CONSULTA',
-          sobrescreverMei: parsedData.sobrescreverMei,
+        // Passos 3–9 (saldo, itens, numeração, retenções, INSERT, MEI, DARF): T34-A.
+        const { numeroNe, ...data } = await criarOpNaTransacao(conn, parsedData, {
+          usuarioId, perfil, neRow: neRows[0], chequeFormatado,
         });
+        await recalcularStatusNe(conn, numeroNe);
 
-        const finalIrrf = fromCents(resultado.itens.irrf ?? 0);
-        const finalIss = fromCents(resultado.itens.iss ?? 0);
-        const finalInss = fromCents(resultado.itens.inss ?? 0);
-        const finalSestSenat = fromCents(resultado.itens.sest_senat ?? 0);
-        const finalPatronal = fromCents(resultado.itens.patronal ?? 0);
-        const finalOutros = fromCents(resultado.itens.outros ?? 0);
-        const finalTaxaBancaria = fromCents(resultado.itens.taxa_bancaria ?? 0);
-        const finalTaxaPix = fromCents(resultado.itens.taxa_pix ?? 0);
-        const finalTotalDescontos = fromCents(resultado.totalDescontosCents);
-        const finalLiquido = fromCents(resultado.liquidoCents);
-        const snapshotJson = JSON.stringify(resultado.snapshot);
-
-        // Guarda de tamanho: evita estouro do max_allowed_packet do MySQL (~16MB padrão)
-        const itensJson = itens ? JSON.stringify(itens) : null;
-        if (itensJson && itensJson.length > 65535) {
-          throw { status: 400, error: 'A lista de itens é muito grande. Reduza a quantidade de itens ou o tamanho das descrições.' };
-        }
-        const id = crypto.randomUUID();
-        await conn.execute(
-          `INSERT INTO ordens_pagamento (
-            id, liquidacao_id, numero_ne, numero_empenho, sub, credor_nome, credor_cpf_cnpj, credor_rg, credor_endereco,
-            unidade_orcamentaria, elemento, subelemento, gestao, historico,
-            itens_json,
-            saldo_anterior, valor_empenho, valor_pagamento,
-            irrf, iss, inss, sest_senat, patronal, outros_descontos, taxa_bancaria, taxa_pix,
-            total_descontos, valor_liquido, retencoes_snapshot,
-            numero_cheque, data_emissao, data_pagamento, usuario_id
-          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          [
-            id, liquidacao_id || null, neReal, numeroDaOpGerado, subGerado,
-            credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
-            unidadeOrcamentaria || '', elementoGravado, subelementoGravado, gestao || '', historico || '',
-            itensJson,
-            toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamento,
-            finalIrrf, finalIss, finalInss, finalSestSenat, finalPatronal, finalOutros, finalTaxaBancaria, finalTaxaPix,
-            finalTotalDescontos, finalLiquido, snapshotJson,
-            chequeFormatado, dataEmissao || null, dataPagamento || null, usuarioId
-          ]
-        );
-
-        // T26: retenção em credor MEI só com confirmação do ADMIN — fica na auditoria.
-        if (resultado.snapshot.mei_sobrescrito) {
-          await conn.execute(
-            `INSERT INTO auditoria_financeira (id, entidade, entidade_id, acao, dados_anteriores, dados_novos, usuario_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [
-              crypto.randomUUID(), 'ordens_pagamento', id, 'CREATE', null,
-              JSON.stringify({
-                aviso: 'Retenção aplicada manualmente pelo ADMIN em credor MEI.',
-                credorCpfCnpj, irrf: finalIrrf, iss: finalIss, inss: finalInss, patronal: finalPatronal, sestSenat: finalSestSenat,
-              }),
-              usuarioId,
-            ]
-          );
-        }
-
-        // Mesma transação: erro na DARF desfaz a OP.
-        await sincronizarDarfDaOp(
-          conn,
-          {
-            id, numeroNe: neReal, numeroOp: numeroDaOpGerado, sub: subGerado,
-            credorCpfCnpj, credorNome: credorNome || null, dataPagamento, dataEmissao,
-            valores: { irrf: finalIrrf, iss: finalIss, inss: finalInss, patronal: finalPatronal, sest_senat: finalSestSenat },
-          },
-          { entraDarf: entraDarfDaConfig(configCampos) }
-        );
-
-        const saldoRestante = Math.round((saldoDisponivel - vPagamentoArredondado) * 100) / 100;
-        const novoStatus = saldoRestante <= 0 ? 'LIQUIDADO' : saldoRestante < valorNe ? 'PARCIALMENTE PAGO' : 'EMITIDO';
-        await conn.execute('UPDATE notas_empenho SET status = ? WHERE numero = ?', [novoStatus, neReal]);
-
-        return {
-          success: true as const,
-          data: {
-            id,
-            numeroOp: numeroDaOpGerado,
-            sub: subGerado,
-            saldoRestante,
-            irrf: finalIrrf,
-            iss: finalIss,
-            inss: finalInss,
-            sestSenat: finalSestSenat,
-            patronal: finalPatronal,
-            outrosDescontos: finalOutros,
-            taxaBancaria: finalTaxaBancaria,
-            taxaPix: finalTaxaPix,
-            totalDescontos: finalTotalDescontos,
-            valorLiquido: finalLiquido,
-          },
-          status: 201,
-        };
+        return { success: true as const, data, status: 201 };
       });
       break;
       } catch (err: any) {
@@ -484,11 +205,6 @@ export class OrdemPagamentoService {
     try {
       // Correção 1: Forçamos a validação Zod no PUT também! Bypass resolvido.
       const parsedData = ordemPagamentoSchema.parse(rawData);
-
-      const toDecimal = (v: any): number => {
-        if (typeof v === 'number') return isNaN(v) ? 0 : v;
-        return parseFloat(String(v)) || 0;
-      };
 
       const result = await withTransaction(async (conn: PoolConnection) => {
         const {
@@ -532,8 +248,10 @@ export class OrdemPagamentoService {
           if (neObj.status === 'CANCELADO') {
             throw { status: 409, error: `Não é possível atualizar OP da NE "${neSegura}" pois ela foi CANCELADA.` };
           }
-          saldoDisp = Math.round(parseFloat(neObj.saldoDisponivel) * 100) / 100;
-          if (vPagamentoArredondado > saldoDisp) {
+          // Em centavos (T31). O SQL já soma em DECIMAL; aqui só se compara.
+          const saldoCents = toCents(neObj.saldoDisponivel ?? 0);
+          saldoDisp = fromCents(saldoCents);
+          if (brutoCents > saldoCents) {
             throw { status: 409, error: `Valor do pagamento excede o saldo disponível da NE (R$ ${saldoDisp.toFixed(2)}).` };
           }
           elementoGravado = neObj.elemento || '';
@@ -541,7 +259,6 @@ export class OrdemPagamentoService {
           elementoCodigo = extrairCodigoElemento(elementoGravado);
         }
 
-        await validarSaldoCredor(conn, neSegura, credorCpfCnpj, brutoCents, id);
 
         let totalItensCalc = 0;
         if (itens && Array.isArray(itens)) {
@@ -661,25 +378,8 @@ export class OrdemPagamentoService {
           );
         }
 
-        // atualiza status da NE conforme saldo restante
-        const [neData] = await conn.execute<any[]>(
-          `SELECT ne.valor,
-                  (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel
-           FROM notas_empenho ne
-           LEFT JOIN (SELECT numero_ne, SUM(valor_pagamento) as total_pago FROM ordens_pagamento GROUP BY numero_ne) op_sum
-             ON op_sum.numero_ne = ne.numero
-           WHERE ne.numero = ? FOR UPDATE`,
-          [neSegura]
-        );
-
-        if (neData && (neData as any[]).length > 0) {
-          const saldo = Math.round(parseFloat((neData as any[])[0].saldoDisponivel) * 100) / 100;
-          const valorTotal = Math.round(parseFloat((neData as any[])[0].valor) * 100) / 100;
-          let novoStatus = 'EMITIDO';
-          if (saldo <= 0) novoStatus = 'LIQUIDADO';
-          else if (saldo < valorTotal) novoStatus = 'PARCIALMENTE PAGO';
-          await conn.execute('UPDATE notas_empenho SET status = ? WHERE numero = ?', [novoStatus, neSegura]);
-        }
+        // atualiza o status da NE conforme o saldo (regra única, T31)
+        await recalcularStatusNe(conn, neSegura);
 
         return { success: true as const, data: null, status: 200 };
       });
@@ -727,26 +427,8 @@ export class OrdemPagamentoService {
           [crypto.randomUUID(), 'ordens_pagamento', id, 'DELETE', JSON.stringify(oldOp), null, usuarioId]
         );
 
-        const [neData] = await conn.execute<any[]>(
-          `SELECT ne.valor,
-                  (ne.valor - COALESCE(op_sum.total_pago, 0)) as saldoDisponivel
-           FROM notas_empenho ne
-           LEFT JOIN (SELECT numero_ne, SUM(valor_pagamento) as total_pago FROM ordens_pagamento GROUP BY numero_ne) op_sum
-             ON op_sum.numero_ne = ne.numero
-           WHERE ne.numero = ? FOR UPDATE`,
-          [numeroNe]
-        );
-
-        if (neData && (neData as any[]).length > 0) {
-          const saldo = Math.round(parseFloat((neData as any[])[0].saldoDisponivel) * 100) / 100;
-          const valorTotal = Math.round(parseFloat((neData as any[])[0].valor) * 100) / 100;
-
-          let novoStatus = 'EMITIDO';
-          if (saldo <= 0) novoStatus = 'LIQUIDADO';
-          else if (saldo < valorTotal) novoStatus = 'PARCIALMENTE PAGO';
-
-          await conn.execute('UPDATE notas_empenho SET status = ? WHERE numero = ?', [novoStatus, numeroNe]);
-        }
+        // devolve o saldo à NE e recalcula o status (regra única, T31)
+        await recalcularStatusNe(conn, numeroNe);
         return { success: true as const, data: null, status: 200 };
       });
 

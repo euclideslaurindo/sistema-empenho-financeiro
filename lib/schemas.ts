@@ -11,10 +11,7 @@ export const notaEmpenhoSchema = z.object({
     const clean = String(val).replace(/[^\d,-]/g, '').replace(',', '.');
     return parseFloat(clean) || 0;
   }).refine(val => val > 0, { message: "O valor da NE deve ser maior que zero." }),
-  dataPagamento: z.string().min(1, "Data é obrigatória").refine(val => {
-    const y = parseInt(val.split('-')[0], 10);
-    return y >= 2000 && y <= 2100;
-  }, "Ano inválido"),
+  // T29: a NE não tem mais Data de Pagamento nem Data de Emissão na tela.
   unidadeOrcamentaria: z.string().optional(),
   elemento: z.string().optional(),
   subelemento: z.string().optional(),
@@ -25,27 +22,7 @@ export const notaEmpenhoSchema = z.object({
     const y = parseInt(val.split('-')[0], 10);
     return y >= 2000 && y <= 2100;
   }, "Ano inválido"),
-  dataEmissao: z.string().optional().refine(val => {
-    if (!val) return true;
-    const y = parseInt(val.split('-')[0], 10);
-    return y >= 2000 && y <= 2100;
-  }, "Ano inválido"),
-  credorNome: z.string().optional(),
-  cpfCnpj: z.string().optional(),
-  credores: z
-    .array(
-      z.object({
-        cpfCnpj: z.string(),
-        nome: z.string(),
-        valorBruto: z.string(),
-        valorPago: z.number().optional(),
-        doCadastro: z.boolean(),
-        isMei: z.boolean().optional(),
-        municipio: z.string().optional(),
-        legado: z.boolean().optional(),
-      })
-    )
-    .optional(),
+  // T30: a NE não tem credor; os credores são escolhidos na Ordem de Pagamento.
 });
 
 export type NotaEmpenhoFormValues = z.input<typeof notaEmpenhoSchema>;

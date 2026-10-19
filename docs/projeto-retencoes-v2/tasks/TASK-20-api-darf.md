@@ -14,7 +14,7 @@ Manter `darf_acompanhamento` **sempre coerente com as OPs** e expor a consulta e
 ## Escopo
 ### Entra
 **1. Sincronização (`lib/services/darf.service.ts`)** — `sincronizarDarfDaOp(conn, op)` chamada **dentro da transação** de OP:
-- `criar`: calcula `valor_darf = Σ campos com entra_darf` (em centavos); se `> 0`, insere com `PENDENTE`; competência = `data_pagamento` (fallback `data_emissao`) em `YYYY-MM`.
+- `criar`: calcula `valor_darf = Σ campos com entra_darf` (em centavos; **inclui a patronal**, mesmo ela sendo informativa) e grava em `detalhe_json` o `retido` (INSS 11% + SEST + SENAT, descontado do credor, equivalente ao "INSS TOTAL" da planilha EJA Campo) separado do `patronal` (encargo do órgão). OP de **credor MEI** não tem retenção e, portanto, não gera DARF; se `> 0`, insere com `PENDENTE`; competência = `data_pagamento` (fallback `data_emissao`) em `YYYY-MM`.
 - `atualizar`: recalcula; se a DARF estiver `PENDENTE`, atualiza valor/competência/credor; se **zerou**, remove a linha; se estiver `PAGA` e o valor/competência mudariam → **409** "DARF já paga: reabra o status antes de alterar a OP" (D13).
 - `excluir`: remove a linha `PENDENTE`; se `PAGA` → **409** (D13).
 

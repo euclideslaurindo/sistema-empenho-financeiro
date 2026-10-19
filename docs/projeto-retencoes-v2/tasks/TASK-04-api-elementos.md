@@ -79,3 +79,7 @@ Regex sugerida: `^\s*(\d(?:\.\d+)+)`.
 
 ## Decisões em aberto relacionadas
 D3, D9.
+
+## Atualização de escopo (decisões de 07/10/2026)
+- `GET /api/elementos` passa a devolver também `perfilCalculo` (`SIMPLES` ou `TRANSPORTE_AUTONOMO`), lido de `elementos_despesa.perfil_calculo` (T02).
+- A escrita (ADMIN) permite alterar `perfilCalculo` apenas entre os valores conhecidos; valor inválido → 400.
