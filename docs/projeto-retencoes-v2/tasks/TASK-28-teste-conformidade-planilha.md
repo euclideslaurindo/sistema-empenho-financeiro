@@ -39,3 +39,12 @@ Importar a planilha pela interface (adiado).
 
 ## Decisões em aberto relacionadas
 D17, D22.
+
+## Atualização de escopo (rodada 2, 13/10/2026)
+No fixture, a coluna `municipio` passa a alimentar **`municipioExpediente`** do credor (T33), em vez do município do endereço. Os resultados esperados **não mudam**.
+
+## Implementação (14/10/2026)
+- `tests/unit/conformidade-eja-campo.test.ts`: passa pelo serviço (`calcularRetencoesDaOp`) com o banco simulado e o **seed da `migration_16`** (`tests/fixtures/seed-transporte.ts`; um teste confere que o seed é o mesmo do arquivo SQL). Uma linha = um caso de teste.
+- Resultado: **63 exatas, 5 com 1 centavo** (motoristas 16, 25, 30, 81 e 83, exatamente as marcadas com `divergenciaConhecida`), **23 isentas**. Diferença nos totais: IRRF −1, SEST −2, SENAT −2 e **líquido +5 centavos** — no limite da tolerância de 5 centavos.
+- `tests/fixtures/eja-campo-5a-parcela.json` é cópia do fixture desta pasta; um teste exige que as duas sejam idênticas.
+- **Para a T33:** trocar a origem do município só no helper `credorDaLinha` do teste (de `cidade` para `municipioExpediente`).

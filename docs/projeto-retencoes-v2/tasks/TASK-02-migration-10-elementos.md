@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS elementos_despesa (
   legado      TINYINT(1)   NOT NULL DEFAULT 0,            -- 1 = veio da lista antiga
   ativo       TINYINT(1)   NOT NULL DEFAULT 1,
   ordem       INT          NOT NULL DEFAULT 0,
+  perfil_calculo VARCHAR(30) NOT NULL DEFAULT 'SIMPLES',  -- 'SIMPLES' (percentuais da tela do admin) | 'TRANSPORTE_AUTONOMO' (T25)
   created_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -67,6 +68,9 @@ INSERT IGNORE INTO elementos_despesa (codigo, descricao, legado, ordem) VALUES
  ('4.4.90.51','Obras e Instalações',1,100),
  ('4.4.90.52','Equipamentos e Material Permanente',1,110);
 
+-- Só o 3.3.90.33 usa o cálculo da planilha EJA Campo; os demais usam os percentuais padrão (decisão do usuário)
+UPDATE elementos_despesa SET perfil_calculo = 'TRANSPORTE_AUTONOMO' WHERE codigo = '3.3.90.33';
+
 INSERT IGNORE INTO subelementos_despesa (codigo, elemento_codigo, descricao, ordem) VALUES
  ('3.3.90.14.01','3.3.90.14','Diárias Pessoal Civil Dentro do Estado',1),
  ('3.3.90.14.03','3.3.90.14','Bolsas de Capacitação - Secretaria de Educação Lei nº 11.461/97',2);
@@ -83,6 +87,7 @@ INSERT IGNORE INTO schema_migrations (version) VALUES ('10');
 ```
 
 Notas:
+- `perfil_calculo` escolhe a **estratégia de cálculo** do elemento. `SIMPLES` = percentuais de `config_retencoes` sobre o bruto (T10). `TRANSPORTE_AUTONOMO` = cálculo da planilha EJA Campo (T25), **somente** para o 3.3.90.33.
 - A **descrição** dos elementos antigos usa a mesma grafia de `lib/constants.ts`, para que o texto `"codigo - descricao"` bata com o que já está gravado nas NEs.
 - Descrições dos novos itens vêm do documento oficial das anotações (o usuário abreviou 14.03 como "Bolsas de Capacitação"; mantive o texto oficial completo).
 - Os 27 subelementos soltos antigos **não são migrados** como tabela (não têm elemento). Ficam só nos registros já gravados (D9).
@@ -104,4 +109,4 @@ Notas:
 - Usuário `admin` do app não tem `ALTER`/`REFERENCES`: executar com conta privilegiada. **Sem FKs** nas tabelas novas, como na `migration_06`.
 
 ## Decisões em aberto relacionadas
-D3 (elementos legados), D9 (subelementos dos demais elementos).
+D3 (elementos legados), D9 (subelementos dos demais elementos). **Fechada:** D14 (perfil de cálculo só no 3.3.90.33).
