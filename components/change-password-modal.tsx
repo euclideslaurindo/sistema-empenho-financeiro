@@ -15,12 +15,23 @@ interface ChangePasswordModalProps {
 export function ChangePasswordModal({ onClose }: ChangePasswordModalProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  // Confirmação: um erro de digitação na senha nova deixava o usuário sem acesso.
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const senhasDiferentes = confirmPassword.length > 0 && confirmPassword !== newPassword;
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentPassword || !newPassword) {
-      toast.error("Por favor, preencha ambas as senhas.");
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error("Por favor, preencha todas as senhas.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("A confirmação não é igual à nova senha.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error("A nova senha deve ter no mínimo 8 caracteres.");
       return;
     }
 
@@ -79,9 +90,33 @@ export function ChangePasswordModal({ onClose }: ChangePasswordModalProps) {
               required
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-3 mb-2 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0f2942]"
+              className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0f2942]"
+              disabled={isSubmitting}
+              minLength={8}
+              aria-describedby="new-password-ajuda"
+            />
+            <p id="new-password-ajuda" className="text-xs text-slate-500 mt-1">Mínimo de 8 caracteres.</p>
+          </div>
+          <div>
+            <label htmlFor="confirm-password" className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
+              Confirmar Nova Senha
+            </label>
+            <input
+              id="confirm-password"
+              type="password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              aria-invalid={senhasDiferentes}
+              aria-describedby={senhasDiferentes ? "confirm-password-erro" : undefined}
+              className={`w-full px-4 py-3 mb-2 bg-zinc-50 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0f2942] ${senhasDiferentes ? "border-red-400" : "border-zinc-200"}`}
               disabled={isSubmitting}
             />
+            {senhasDiferentes && (
+              <p id="confirm-password-erro" role="alert" className="text-xs font-semibold text-red-600">
+                A confirmação não é igual à nova senha.
+              </p>
+            )}
           </div>
           <div className="flex gap-3 pt-2">
             <button
@@ -94,7 +129,7 @@ export function ChangePasswordModal({ onClose }: ChangePasswordModalProps) {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || senhasDiferentes}
               className="flex-1 bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-md shadow-slate-900/20 ring-1 ring-white/10 hover:bg-slate-700 text-white font-semibold py-2.5 rounded-lg transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Salvando...' : 'Confirmar'}
