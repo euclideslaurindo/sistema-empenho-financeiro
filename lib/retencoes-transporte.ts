@@ -8,6 +8,7 @@
 import {
   avisosMei,
   CAMPOS_DESCONTO,
+  CAMPOS_INFORMATIVOS,
   CAMPOS_TRIBUTARIOS,
   validarInformado,
   valorTributarioMei,
@@ -188,7 +189,7 @@ export function calcularTransporteAutonomo(e: EntradaTransporte): ResultadoCalcu
   }
 
   // 11-12: patronal é informativa — fora do total e do líquido.
-  const informativos = ["patronal"];
+  const informativos: string[] = [...CAMPOS_INFORMATIVOS];
   const totalDescontosCents = Object.entries(itens)
     .filter(([campo]) => !informativos.includes(campo))
     .reduce((t, [, v]) => t + v, 0);

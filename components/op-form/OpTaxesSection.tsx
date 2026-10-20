@@ -424,7 +424,9 @@ function CamposRetencao({ config, perfil, basePath, efeitos }: { config: ConfigR
           calculada automaticamente.
         </p>
       ) : (
-        <p className="mb-6 text-sm font-semibold text-slate-500">Retenções conforme a configuração do elemento {elementoCodigo}.</p>
+        <p className="mb-6 text-sm font-semibold text-slate-500">
+          Retenções conforme a configuração do elemento {elementoCodigo}. A patronal é informativa e não entra no total.
+        </p>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

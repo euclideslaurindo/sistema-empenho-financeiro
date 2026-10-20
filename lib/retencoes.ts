@@ -11,6 +11,14 @@ export type CampoDesconto = "outros" | "taxa_bancaria" | "taxa_pix";
 export const CAMPOS_TRIBUTARIOS: CampoTributario[] = ["irrf", "iss", "inss", "patronal", "sest_senat"];
 export const CAMPOS_DESCONTO: CampoDesconto[] = ["outros", "taxa_bancaria", "taxa_pix"];
 
+/**
+ * Campos só informativos (R15/D15): calculados, gravados e impressos, mas FORA
+ * do total de descontos e do líquido — em todos os elementos. A patronal é o
+ * INSS que o órgão paga; não sai do valor que o credor recebe.
+ */
+export const CAMPOS_INFORMATIVOS: CampoTributario[] = ["patronal"];
+const ehInformativo = (campo: string) => (CAMPOS_INFORMATIVOS as string[]).includes(campo);
+
 export interface EntradaCalculo {
   brutoCents: number;
   elementoCodigo: string | null;
@@ -154,7 +162,9 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
     itens[campo] = permitido && informado !== undefined ? validarInformado(campo, informado, brutoCents) : 0;
   }
 
-  const totalDescontosCents = Object.values(itens).reduce((a, b) => a + b, 0);
+  const totalDescontosCents = Object.entries(itens)
+    .filter(([campo]) => !ehInformativo(campo))
+    .reduce((a, [, b]) => a + b, 0);
   if (totalDescontosCents > brutoCents) {
     throw { status: 422, error: "Total de descontos maior que o valor a pagar." };
   }
@@ -177,6 +187,7 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
           aplica:
             !tributarios.includes(cfg.campo) || elementoDesconhecido || (camposAplicaveis as string[]).includes(cfg.campo),
           valor: (itens[cfg.campo] ?? 0) / 100,
+          ...(ehInformativo(cfg.campo) ? { informativo: true } : {}),
         },
       ])
     ),
@@ -190,5 +201,6 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
     liquidoCents: brutoCents - totalDescontosCents,
     avisos,
     snapshot,
+    informativos: [...CAMPOS_INFORMATIVOS],
   };
 }
