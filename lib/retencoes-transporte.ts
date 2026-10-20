@@ -165,7 +165,8 @@ export function calcularTransporteAutonomo(e: EntradaTransporte): ResultadoCalcu
       itens[campo] = valorTributarioMei(campo, !!cfg?.ativo, e.informados[campo], sobrescreverMei, e.brutoCents);
       continue;
     }
-    if (cfg && !cfg.ativo) {
+    // Campo fora da configuração ou inativo: 0, como no motor padrão.
+    if (!cfg || !cfg.ativo) {
       itens[campo] = 0;
       continue;
     }

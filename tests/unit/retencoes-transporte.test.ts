@@ -182,3 +182,13 @@ describe('sobrescrita do ADMIN em credor MEI no transporte (T26)', () => {
     expect(gestor.snapshot.mei_sobrescrito).toBeUndefined();
   });
 });
+
+describe('campo fora da configuração (revisão de 20/10)', () => {
+  test('tributo ausente da config vale 0, como no motor padrão', () => {
+    const semIrrf = CONFIG.filter((c) => c.campo !== 'irrf');
+    const r = calcularTransporteAutonomo(entrada(11970, 'Águas Belas', { config: semIrrf }));
+    expect(r.itens.irrf).toBe(0);
+    // os demais continuam calculados
+    expect(r.itens.inss).toBeGreaterThan(0);
+  });
+});

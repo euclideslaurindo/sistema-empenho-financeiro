@@ -122,3 +122,22 @@ export function lerValorMonetario(valor: unknown): number {
   if (/^-?\d+$/.test(s)) return Number(s);
   return NaN;
 }
+
+/**
+ * Total de um item (quantidade × valor unitário) em centavos, arredondado
+ * no item. É a MESMA conta na tela e no servidor: cada item arredondado,
+ * depois somado — nunca soma em ponto flutuante (10,10 + 20,20 dava
+ * 30,299999… e a tela acusava diferença que não existe).
+ */
+export function totalItemCents(quantidade: unknown, valorUnitario: unknown): Centavos {
+  const qtd = Number(quantidade);
+  if (!Number.isFinite(qtd)) return 0;
+  return Math.round(qtd * toCents(valorUnitario as string | number | null | undefined));
+}
+
+export function somaItensCents(itens: Array<{ quantidade?: unknown; valorUnitario?: unknown }> | null | undefined): Centavos {
+  return (itens || []).reduce((t, i) => t + totalItemCents(i?.quantidade, i?.valorUnitario), 0);
+}
+
+/** A soma dos itens "bate" com o valor quando a diferença é de até 1 centavo. */
+export const itensBatemComValor = (somaCents: Centavos, valorCents: Centavos) => Math.abs(somaCents - valorCents) <= 1;
