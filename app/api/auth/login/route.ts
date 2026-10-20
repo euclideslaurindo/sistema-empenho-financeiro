@@ -6,6 +6,7 @@ import { checkRateLimit, resetRateLimit } from '@/lib/rate-limiter';
 import { UsuarioDB } from '@/lib/types/db';
 import { JWT_SECRET } from '@/lib/jwt-secret';
 import { AUTH_COOKIE_NAME, AUTH_COOKIE_SECURE } from '@/lib/constants';
+import { candidatosDoLogin, normalizarNomeUsuario } from '@/lib/login-usuario';
 
 export async function POST(request: NextRequest) {
   // Prioriza headers padrão de proxy reverso, fallback para request.ip
@@ -54,30 +55,35 @@ export async function POST(request: NextRequest) {
     }
 
     // Converter o "nome" do login no mesmo formato de email fake gerado no registro
-    const normalizedUsername = email.trim().toLowerCase().replace(/\s+/g, '.');
+    const normalizedUsername = normalizarNomeUsuario(email);
     const fakeEmailOld = `${normalizedUsername}@empenho.local`;
     const fakeEmailPattern = `${normalizedUsername}.%@empenho.local`;
 
-    // Busca o usuário pelo nome (email fake antigo, novo com sufixo UUID, ou email exato)
+    // O LIKE só traz candidatos; quem decide é correspondeAoLogin (nome EXATO).
+    // Antes: LIKE + LIMIT 1 deixava "joao" pegar "joao.silva" e recusar a senha certa.
     const dbUsers = await query<UsuarioDB[]>(
-      'SELECT id, nome, email, senha_hash, perfil, ativo FROM usuarios WHERE email = ? OR email = ? OR email LIKE ? LIMIT 1',
+      'SELECT id, nome, email, senha_hash, perfil, ativo FROM usuarios WHERE email = ? OR email = ? OR email LIKE ? LIMIT 20',
       [fakeEmailOld, email, fakeEmailPattern]
     );
+    const candidatos = candidatosDoLogin(dbUsers || [], email);
 
-    const user = dbUsers && dbUsers.length > 0 ? dbUsers[0] : null;
-
-    if (!user) {
-      return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 401 });
+    // Homônimos (mesmo nome, sufixos diferentes): vale o que tiver esta senha.
+    let user: UsuarioDB | null = null;
+    for (const candidato of candidatos) {
+      if (await bcrypt.compare(senha, candidato.senha_hash)) {
+        user = candidato;
+        break;
+      }
     }
 
+    // Uma mensagem só para usuário inexistente e senha errada: não revela quem existe.
+    if (!user) {
+      return NextResponse.json({ error: 'Usuário ou senha inválidos' }, { status: 401 });
+    }
+
+    // Conta desativada só é informada a quem acertou a senha.
     if (!user.ativo) {
       return NextResponse.json({ error: 'Sua conta está desativada' }, { status: 403 });
-    }
-
-    const isPasswordValid = await bcrypt.compare(senha, user.senha_hash);
-
-    if (!isPasswordValid) {
-      return NextResponse.json({ error: 'Credenciais inválidas' }, { status: 401 });
     }
 
     // Gera JWT

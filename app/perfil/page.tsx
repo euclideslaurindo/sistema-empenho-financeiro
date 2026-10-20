@@ -1,9 +1,16 @@
 "use client";
 import { useState, useEffect } from "react";
-import { UserCircle, Settings, Mail, Shield, Bell, Key } from "lucide-react";
+import { UserCircle, Settings, Shield, Key } from "lucide-react";
 import { ActionToolbar, ActionButton } from "@/components/action-toolbar";
 import { toast } from "sonner";
 import { ChangePasswordModal } from "@/components/change-password-modal";
+
+// Perfil real do usuário (antes a tela mostrava "Nível 1" para todos).
+const ROTULO_PERFIL: Record<string, string> = {
+  ADMIN: "Administrador",
+  GESTOR: "Gestor",
+  CONSULTA: "Consulta (somente leitura)",
+};
 
 export default function PerfilGestor() {
   const [isEditing, setIsEditing] = useState(false);
@@ -12,9 +19,8 @@ export default function PerfilGestor() {
   const [perfil, setPerfil] = useState({
     id: "",
     nome: "",
-    matricula: "",
     email: "",
-    nivel_acesso: 1,
+    perfil: "",
     ativo: 1,
     ultimoAcesso: null as string | null
   });
@@ -94,7 +100,7 @@ export default function PerfilGestor() {
       <div className="p-8 max-w-[1280px] mx-auto w-full flex-1">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#1e293b] mb-1">
-            Perfil do Gestor Financeiro
+            Meu Perfil
           </h1>
           <p className="text-zinc-600 text-sm">
             Gerencie suas informações pessoais e credenciais de acesso.
@@ -108,22 +114,15 @@ export default function PerfilGestor() {
                 <UserCircle className="w-20 h-20" />
               </div>
               <h2 className="text-xl font-bold text-white">
-                {isLoading ? "Carregando..." : perfil.nome || "Gestor Financeiro"}
+                {isLoading ? "Carregando..." : perfil.nome || "-"}
               </h2>
-              <p className="text-[#a1a1aa] font-medium text-sm mb-4">
-                Matrícula: {perfil.matricula || "-"}
-              </p>
 
               <div className="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-indigo-400/10 text-indigo-600 rounded-lg text-sm font-semibold mb-6">
                 <Shield className="w-4 h-4" />
-                <span>Acesso Total: Nível {perfil.nivel_acesso}</span>
+                <span>Perfil: {ROTULO_PERFIL[perfil.perfil] || perfil.perfil || "-"}</span>
               </div>
 
               <div className="w-full border-t border-[#334155] pt-6 space-y-4 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-[#a1a1aa]">Departamento</span>
-                  <span className="font-semibold text-white">Tesouraria</span>
-                </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[#a1a1aa]">Último Acesso</span>
                   <span className="font-semibold text-white">{perfil.ultimoAcesso || "Nunca acessado"}</span>
@@ -212,46 +211,6 @@ export default function PerfilGestor() {
                   </button>
                 </div>
               )}
-            </div>
-
-            <div className="bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 p-6 rounded-lg border border-slate-200/80 shadow-sm">
-              <h3 className="text-lg font-bold text-[#1e293b] mb-6 flex items-center">
-                <Bell className="w-5 h-5 mr-2 text-indigo-600" />
-                Preferências de Notificação
-              </h3>
-
-              <div className="space-y-4">
-                <label className="flex items-center justify-between p-4 bg-slate-50/50 rounded-lg cursor-pointer hover:bg-[#e4e4e7] transition-colors">
-                  <div>
-                    <p className="font-semibold text-[#1e293b]">
-                      Novas Ordens de Pagamento
-                    </p>
-                    <p className="text-sm text-[#1e293b]/60">
-                      Receber e-mail quando uma OP for atribuída a você
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    className="w-5 h-5 text-[#1e293b] rounded focus:ring-indigo-500 accent-indigo-600"
-                  />
-                </label>
-                <label className="flex items-center justify-between p-4 bg-slate-50/50 rounded-lg cursor-pointer hover:bg-[#e4e4e7] transition-colors">
-                  <div>
-                    <p className="font-semibold text-[#1e293b]">
-                      Atrasos de Execução
-                    </p>
-                    <p className="text-sm text-[#1e293b]/60">
-                      Avisos sobre empenhos próximos do vencimento
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    defaultChecked
-                    className="w-5 h-5 text-[#1e293b] rounded focus:ring-indigo-500 accent-indigo-600"
-                  />
-                </label>
-              </div>
             </div>
           </div>
         </div>
