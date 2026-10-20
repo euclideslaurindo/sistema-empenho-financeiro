@@ -30,7 +30,7 @@ const rotulos = (op: any) => linhasDescontoDaOp(op).map((l) => l.rotulo);
 describe('linhasDescontoDaOp', () => {
   test('OP nova no .36: 8 linhas, rótulos do snapshot com a alíquota usada', () => {
     expect(rotulos({ retencoesSnapshot: snapshot('3.3.90.36') })).toEqual([
-      'IRRF (1,5%)', 'ISS (5%)', 'INSS (11%)', 'Patronal (20%)', 'SEST/SENAT (2,5%)',
+      'IRRF (1,5%)', 'ISS (5%)', 'INSS (11%)', 'Patronal (20%, informativa)', 'SEST/SENAT (2,5%)',
       'Outros / IBS-CBS', 'Taxa bancária (expediente)', 'Taxa PIX',
     ]);
   });
