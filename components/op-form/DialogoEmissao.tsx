@@ -24,7 +24,10 @@ export interface ResultadoEmissao {
 
 /** Sucesso da emissão (T35-B): as OPs criadas, com o caminho para imprimir. */
 export function DialogoEmissao({ resultado, onFechar }: { resultado: ResultadoEmissao | null; onFechar: () => void }) {
-  const urlImpressao = resultado ? `/consulta-impressao?ne=${encodeURIComponent(resultado.numeroNe)}` : "#";
+  // Só as OPs desta emissão já marcadas na consulta (T36); as anteriores da NE ficam desmarcadas.
+  const urlImpressao = resultado
+    ? `/consulta-impressao?ne=${encodeURIComponent(resultado.numeroNe)}&ops=${resultado.ops.map((op) => encodeURIComponent(op.id)).join(",")}`
+    : "#";
 
   return (
     <Dialog open={!!resultado} onOpenChange={(aberto) => !aberto && onFechar()}>
@@ -81,7 +84,7 @@ export function DialogoEmissao({ resultado, onFechar }: { resultado: ResultadoEm
                 rel="noopener noreferrer"
                 className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2"
               >
-                <Printer className="w-4 h-4" /> Imprimir
+                <Printer className="w-4 h-4" /> Imprimir esta emissão
               </a>
               <button
                 type="button"

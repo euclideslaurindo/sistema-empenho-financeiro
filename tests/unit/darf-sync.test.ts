@@ -255,3 +255,24 @@ describe('OP x DARF', () => {
     expect(chamadas.some(([s]) => s.includes('DELETE FROM ordens_pagamento'))).toBe(false);
   });
 });
+
+describe('emissão em lote (T36): competência por OP', () => {
+  test('duas OPs da mesma NE com pagamento em meses diferentes caem em competências diferentes', async () => {
+    const inserts: any[][] = [];
+    const conn: any = {
+      execute: vi.fn(async (sql: string, params: any[] = []) => {
+        if (sql.includes('INSERT INTO darf_acompanhamento')) inserts.push(params);
+        return [[]]; // nenhuma DARF anterior para estas OPs
+      }),
+    };
+    const op = (id: string, sub: string, dataPagamento: string) => ({
+      id, numeroNe: '2026NE000001', numeroOp: `2026.OP.00${sub}`, sub, credorCpfCnpj: '111.111.111-11', credorNome: 'Ana',
+      dataPagamento, dataEmissao: '2026-10-19', valores: { inss: 110, patronal: 200, sest_senat: 25 },
+    });
+    const entraDarf = ['inss', 'patronal', 'sest_senat'] as any;
+    await sincronizarDarfDaOp(conn, op('op-1', '01', '2026-10-20'), { entraDarf });
+    await sincronizarDarfDaOp(conn, op('op-2', '02', '2026-11-05'), { entraDarf });
+    const competencias = inserts.map((p) => p.find((v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}$/.test(v)));
+    expect(competencias).toEqual(['2026-10', '2026-11']);
+  });
+});
