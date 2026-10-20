@@ -256,7 +256,8 @@ O usuário cadastra a NE **sem credor** e sem consumir o valor todo → os credo
 
 ## 9. Estratégia de banco e deploy
 
-1. Migrations `11` a `17` (numeração real do repositório; a rodada 2 é a `17`) rodam no Workbench, em **homologação primeiro**, sempre antes do deploy do código.
+1. Migrations `11` a `17` (numeração real do repositório; a rodada 2 é a `17`) rodam no Workbench, sempre antes do deploy do código. **Não há homologação separada** (D49): a conferência é o roteiro e as consultas só de leitura de [`HOMOLOGACAO-RODADA-2.md`](./HOMOLOGACAO-RODADA-2.md) e `database/consultas/conferencia_rodada2.sql`. A `migration_17` já foi conferida em produção (14/10/2026).
+5. Entrega: build `standalone` (`node server.js`, como no `Dockerfile` e no CI), guardando a versão anterior no servidor para o rollback. Roteiro na seção 5 do documento de homologação.
 2. Cada script é idempotente e termina com `INSERT IGNORE INTO schema_migrations`.
 3. Seeds são conferidos pelo usuário antes de ir para produção (matriz de retenções e alíquotas).
 4. Rollback: blocos comentados; qualquer `DROP` só com aprovação explícita.

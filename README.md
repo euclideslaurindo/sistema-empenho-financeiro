@@ -19,6 +19,10 @@ mysql -u admin -p < database/database.sql
 ```
 Ou abra o arquivo `database/database.sql` no MySQL Workbench/HeidiSQL e execute.
 
+> O `database.sql` está desatualizado: o schema atual vem das migrations `database/migration_*.sql` (numeração real em `docs/projeto-retencoes-v2/README.md`, seção 15), que rodam **manualmente** no Workbench.
+>
+> **Desenvolvimento e testes usam um banco de teste**, nunca o banco compartilhado de produção: o mesmo banco é lido por outros sistemas, e tudo o que se testa nele (NE, OP, DARF) fica gravado de verdade. Ver `docs/projeto-retencoes-v2/HOMOLOGACAO-RODADA-2.md`, seção 7.
+
 
 ### 2. Instalar dependências
 ```bash
@@ -32,10 +36,21 @@ npm run dev
 Acesse: http://localhost:3000
 
 ### 4. Rodar em produção
+O projeto usa `output: 'standalone'` (`next.config.ts`): o `npm start` (`next start`) **não** serve esse build. O jeito certo é o mesmo do `Dockerfile` e do CI:
 ```bash
+npm ci
 npm run build
-npm start
+cp -r public .next/standalone/public
+cp -r .next/static .next/standalone/.next/static
+node .next/standalone/server.js   # com as variáveis do .env de produção no ambiente
 ```
+Ou pelo Docker: `docker compose up -d --build`. Roteiro completo de entrega e rollback: `docs/projeto-retencoes-v2/HOMOLOGACAO-RODADA-2.md`.
+
+### 5. Fluxo principal (a partir da rodada 2)
+1. **Nota de Empenho** (`/notas-empenho`): cadastro **sem credor e sem datas**; a lista mostra valor, gasto e restante.
+2. **Ordem de Pagamento** (`/ordem-pagamento`): carregar a NE, adicionar **um ou vários credores** (cada um com valor, cheque, data do pagamento e itens) e **emitir**: uma OP por credor, numa transação só (`POST /api/ordens-pagamento/lote`).
+3. **Impressão** (`/consulta-impressao`): "Imprimir esta emissão" abre a consulta só com as OPs emitidas.
+4. **DARF** (`/darf`): uma por OP, na competência do mês do pagamento da OP.
 
 ---
 
