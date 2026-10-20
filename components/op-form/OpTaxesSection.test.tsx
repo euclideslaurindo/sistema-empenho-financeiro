@@ -73,28 +73,28 @@ const liquido = () => screen.getByTestId('resumo-liquido').textContent;
 const descontos = () => screen.getByTestId('resumo-descontos').textContent;
 
 describe('OpTaxesSection — casos do README (paridade com o servidor)', () => {
-  test('Caso A: 1.000,00 no .36 -> líquido 600,00', async () => {
+  test('Caso A: 1.000,00 no .36 -> líquido 800,00 (patronal informativa)', async () => {
     renderSecao();
-    await waitFor(() => expect(liquido()).toBe('R$ 600,00'));
+    await waitFor(() => expect(liquido()).toBe('R$ 800,00'));
     expect(input('IRRF (1,5%)').value).toBe('15,00');
     expect(input('ISS (5%)').value).toBe('50,00');
     expect(input('INSS (11%)').value).toBe('110,00');
     expect(input('Patronal (20%)').value).toBe('200,00');
     expect(input('SEST/SENAT (2,5%)').value).toBe('25,00');
-    expect(descontos()).toBe('- R$ 400,00');
+    expect(descontos()).toBe('- R$ 200,00');
   });
 
-  test('Caso B: 665,00 no .36 -> arredondamento do 3º decimal, líquido 398,99', async () => {
+  test('Caso B: 665,00 no .36 -> arredondamento do 3º decimal, líquido 531,99', async () => {
     renderSecao({ valorPagamento: '665,00' });
-    await waitFor(() => expect(liquido()).toBe('R$ 398,99'));
+    await waitFor(() => expect(liquido()).toBe('R$ 531,99'));
     expect(input('IRRF (1,5%)').value).toBe('9,98');
     expect(input('SEST/SENAT (2,5%)').value).toBe('16,63');
-    expect(descontos()).toBe('- R$ 266,01');
+    expect(descontos()).toBe('- R$ 133,01');
   });
 
-  test('Caso C: 1.000,00 no .30 -> ISS desabilitado e zerado, líquido 650,00', async () => {
+  test('Caso C: 1.000,00 no .30 -> ISS desabilitado e zerado, líquido 850,00', async () => {
     renderSecao({ elemento: '3.3.90.30 - Material de consumo' });
-    await waitFor(() => expect(liquido()).toBe('R$ 650,00'));
+    await waitFor(() => expect(liquido()).toBe('R$ 850,00'));
     const iss = input('ISS (5%)');
     expect(iss.disabled).toBe(true);
     expect(iss.value).toBe('');
@@ -113,13 +113,13 @@ describe('OpTaxesSection — casos do README (paridade com o servidor)', () => {
     expect(screen.getAllByText('Não se aplica a 3.3.90.14')).toHaveLength(5);
   });
 
-  test('Caso E: Taxa bancária 8,50 entra no total e reduz o líquido (390,49)', async () => {
+  test('Caso E: Taxa bancária 8,50 entra no total e reduz o líquido (523,49)', async () => {
     renderSecao({ valorPagamento: '665,00' });
-    await waitFor(() => expect(liquido()).toBe('R$ 398,99'));
+    await waitFor(() => expect(liquido()).toBe('R$ 531,99'));
     fireEvent.change(input('Taxa bancária (expediente)'), { target: { value: '850' } });
     expect(input('Taxa bancária (expediente)').value).toBe('8,50');
-    await waitFor(() => expect(liquido()).toBe('R$ 390,49'));
-    expect(descontos()).toBe('- R$ 274,51');
+    await waitFor(() => expect(liquido()).toBe('R$ 523,49'));
+    expect(descontos()).toBe('- R$ 141,51');
   });
 
   test('Caso F: 11,00 no .36 -> IRRF 0,17', async () => {
@@ -149,11 +149,11 @@ describe('OpTaxesSection — config e permissões', () => {
 
   test('GESTOR edita IRRF quando o admin marca editavelOperador, e o valor digitado não é sobrescrito', async () => {
     const methods = renderSecao({ config: comCampo('irrf', { editavelOperador: true }) });
-    await waitFor(() => expect(liquido()).toBe('R$ 600,00'));
+    await waitFor(() => expect(liquido()).toBe('R$ 800,00'));
     const irrf = input('IRRF (1,5%)');
     expect(irrf.disabled).toBe(false);
     fireEvent.change(irrf, { target: { value: '1000' } });
-    await waitFor(() => expect(liquido()).toBe('R$ 605,00'));
+    await waitFor(() => expect(liquido()).toBe('R$ 805,00'));
     expect(irrf.value).toBe('10,00');
     expect(methods().getValues('camposInformados')).toEqual(['irrf']);
   });
@@ -198,15 +198,15 @@ describe('OpTaxesSection — camposInformados (contrato com o servidor da T10)',
 
   test('valores do cálculo automático NÃO entram em camposInformados', async () => {
     const methods = renderSecao();
-    await waitFor(() => expect(liquido()).toBe('R$ 600,00'));
+    await waitFor(() => expect(liquido()).toBe('R$ 800,00'));
     expect(methods().getValues('camposInformados')).toEqual([]);
   });
 
   test('valor digitado que deixa de ser editável (trocou a NE) volta para o cálculo', async () => {
     const methods = renderSecao({ perfil: 'ADMIN' });
-    await waitFor(() => expect(liquido()).toBe('R$ 600,00'));
+    await waitFor(() => expect(liquido()).toBe('R$ 800,00'));
     fireEvent.change(input('IRRF (1,5%)'), { target: { value: '1000' } });
-    await waitFor(() => expect(liquido()).toBe('R$ 605,00'));
+    await waitFor(() => expect(liquido()).toBe('R$ 805,00'));
 
     act(() => methods().setValue('elemento', '3.3.90.14 - Diárias'));
     await waitFor(() => expect(liquido()).toBe('R$ 1.000,00'));
@@ -296,7 +296,7 @@ describe('OpTaxesSection — transporte autônomo (3.3.90.33, T25)', () => {
 
   test('elemento padrão não chama a prévia (continua calculando no navegador)', async () => {
     renderTransporte({ elemento: '3.3.90.36 - Outros', valorPagamento: '1.000,00' });
-    await waitFor(() => expect(liquido()).toBe('R$ 600,00'));
+    await waitFor(() => expect(liquido()).toBe('R$ 800,00'));
     expect(apiClient.post).not.toHaveBeenCalled();
   });
 });

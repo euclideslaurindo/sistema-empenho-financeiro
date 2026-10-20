@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest';
-import { toCents, fromCents, calcPercentCents, arredondarMoeda, somarCents, formatarBRL } from '@/lib/money';
+import { toCents, fromCents, calcPercentCents, arredondarMoeda, somarCents, formatarBRL, lerValorMonetario, itensBatemComValor, somaItensCents, totalItemCents } from '@/lib/money';
+import { parseFormNumber } from '@/lib/utils';
 
 describe('calcPercentCents', () => {
   test('665,00 a 1,5% = 9,98 (998 centavos)', () => {
@@ -196,5 +197,54 @@ describe('formatarBRL', () => {
 
   test('lança RangeError para Infinity', () => {
     expect(() => formatarBRL(Infinity)).toThrow(RangeError);
+  });
+});
+
+describe('lerValorMonetario', () => {
+  test.each([
+    ['100.00', 100], // como o MySQL devolve DECIMAL (era lido como 10000)
+    ['1234.50', 1234.5],
+    ['1234.5', 1234.5],
+    ['100,00', 100],
+    ['1.234,56', 1234.56],
+    ['12.345.678,90', 12345678.9],
+    ['1,5', 1.5],
+    ['1.234', 1234], // só milhar
+    ['1.234.567', 1234567],
+    ['250', 250],
+    ['R$ 1.234,56', 1234.56],
+    [' 100,00 ', 100],
+    [100, 100],
+    [1234.5, 1234.5],
+  ])('%s -> %s', (entrada: string | number, esperado: number) => {
+    expect(lerValorMonetario(entrada)).toBe(esperado);
+  });
+
+  test.each(['', 'abc', '1.2.3', '1,2,3', '10.5.3,1', null, undefined, NaN, Infinity])('inválido: %s -> NaN', (entrada: unknown) => {
+    expect(lerValorMonetario(entrada)).toBeNaN();
+  });
+
+  test('o caso que o parseFormNumber erra (milhar sem vírgula) sai certo aqui', () => {
+    expect(parseFormNumber('1.234')).toBe(1.234);
+    expect(lerValorMonetario('1.234')).toBe(1234);
+  });
+});
+
+describe('itens em centavos (mesma conta na tela e no servidor)', () => {
+  test('10,10 + 20,20 bate com 30,30 (em ponto flutuante dava 30,2999…)', () => {
+    const soma = somaItensCents([{ quantidade: 1, valorUnitario: '10,10' }, { quantidade: 1, valorUnitario: '20,20' }]);
+    expect(soma).toBe(3030);
+    expect(itensBatemComValor(soma, toCents('30,30'))).toBe(true);
+    expect(0.1 + 0.2 === 0.3).toBe(false); // o motivo da correção
+  });
+  test('cada item arredondado no item; quantidade fracionada', () => {
+    expect(totalItemCents(2.5, '12,34')).toBe(3085); // 30,85
+    expect(totalItemCents(3, 33.33)).toBe(9999);
+    expect(totalItemCents('abc', '10,00')).toBe(0);
+    expect(somaItensCents(undefined)).toBe(0);
+  });
+  test('tolerância de 1 centavo, nem mais nem menos', () => {
+    expect(itensBatemComValor(3030, 3031)).toBe(true);
+    expect(itensBatemComValor(3030, 3032)).toBe(false);
   });
 });

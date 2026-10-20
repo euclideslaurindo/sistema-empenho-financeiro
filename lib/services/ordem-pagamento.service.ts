@@ -3,7 +3,7 @@ import type { PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 import { extrairCodigoElemento } from '@/lib/elementos';
 import { calcularRetencoesDaOp } from '@/lib/services/calculo-op.service';
-import { toCents, fromCents } from '@/lib/money';
+import { toCents, fromCents, itensBatemComValor, somaItensCents } from '@/lib/money';
 import { calcularProximoNumeroOp } from '@/lib/services/numeracao-op';
 import { recalcularStatusNe } from '@/lib/services/saldo-ne';
 import { entraDarfDaConfig, removerDarfDaOp, sincronizarDarfDaOp } from '@/lib/services/darf.service';
@@ -260,18 +260,11 @@ export class OrdemPagamentoService {
         }
 
 
-        let totalItensCalc = 0;
-        if (itens && Array.isArray(itens)) {
-          itens.forEach((i: any) => {
-            totalItensCalc += (Number(i.quantidade) || 0) * toDecimal(i.valorUnitario);
-          });
-        }
-        totalItensCalc = Math.round(totalItensCalc * 100) / 100;
-        // Tolerância de 1 centavo para evitar falso positivo por imprecisão IEEE 754
-        // (mesmo critério usado em criar(), ver comentário lá).
-        const diferencaItens = Math.round(Math.abs(totalItensCalc - vPagamentoArredondado) * 100) / 100;
-        if (totalItensCalc > 0 && diferencaItens > 0.01) {
-          throw { status: 400, error: `A soma dos itens (R$ ${totalItensCalc.toFixed(2)}) não bate com o valor a pagar da OP (R$ ${vPagamentoArredondado.toFixed(2)}). Fraude detectada.` };
+        // Mesma conta da criação e da tela (lib/money.ts): itens em centavos,
+        // tolerância de 1 centavo.
+        const itensCents = somaItensCents(Array.isArray(itens) ? itens : []);
+        if (itensCents > 0 && !itensBatemComValor(itensCents, brutoCents)) {
+          throw { status: 400, error: `A soma dos itens (R$ ${fromCents(itensCents).toFixed(2)}) não bate com o valor a pagar da OP (R$ ${vPagamentoArredondado.toFixed(2)}). Fraude detectada.` };
         }
 
         // D12: só recalcula se valor, credor ou elemento mudaram desde a
@@ -283,7 +276,7 @@ export class OrdemPagamentoService {
         const snapshotAnterior =
           oldOp.retencoes_snapshot && typeof oldOp.retencoes_snapshot === 'object' ? oldOp.retencoes_snapshot : null;
         const elementoAnterior = snapshotAnterior?.elemento ?? null;
-        const valorMudou = Math.abs((parseFloat(oldOp.valor_pagamento) || 0) - vPagamento) > 0.001;
+        const valorMudou = toCents(oldOp.valor_pagamento) !== brutoCents;
         const credorMudou = (oldOp.credor_cpf_cnpj || '') !== (credorCpfCnpj || '');
         const elementoMudou = elementoCodigo !== elementoAnterior;
         const precisaRecalcular = valorMudou || credorMudou || elementoMudou;
@@ -348,7 +341,7 @@ export class OrdemPagamentoService {
             sub || '01', credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
             elementoGravado, subelementoGravado,
             itensJson,
-            toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamento,
+            toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamentoArredondado,
             finalIrrf, finalIss, finalInss, finalSestSenat, finalPatronal, finalOutros, finalTaxaBancaria, finalTaxaPix,
             finalTotalDescontos, finalLiquido, snapshotJson,
             numeroCheque ? numeroCheque.trim() : null, dataEmissao || null, dataPagamento || null, historico || '', usuarioId, id

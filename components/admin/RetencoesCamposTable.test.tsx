@@ -88,3 +88,27 @@ describe("RetencoesCamposTable", () => {
     expect(await screen.findByText("Alíquota não pode passar de 100.")).toBeInTheDocument();
   });
 });
+
+describe('dica do ISS (revisão de 20/10)', () => {
+  test('o ISS avisa que no 3.3.90.33 vale a tabela por município, ligado ao campo', () => {
+    const comIss = {
+      campos: [
+        ...defaultValues.campos,
+        { ...defaultValues.campos[0], campo: "iss", rotulo: "ISS", aliquota: "5", ordem: 20 },
+      ],
+    };
+    function Wrapper() {
+      const methods = useForm({ defaultValues: comIss });
+      return (
+        <FormProvider {...methods}>
+          <RetencoesCamposTable />
+        </FormProvider>
+      );
+    }
+    render(<Wrapper />);
+    const iss = screen.getByLabelText('Alíquota de ISS');
+    const dica = screen.getByText('No 3.3.90.33 vale a tabela de ISS por município.');
+    expect(iss.getAttribute('aria-describedby')).toContain(dica.id);
+    expect(screen.getAllByText(/No 3\.3\.90\.33 vale a tabela/)).toHaveLength(1); // só no ISS
+  });
+});

@@ -162,7 +162,7 @@ describe('Integração OrdemPagamentoService', () => {
     expect(params[23]).toBe(0); // finalOutros (não editável pelo GESTOR; valor enviado ignorado)
     expect(params[24]).toBe(0); // finalTaxaBancaria (não informado)
     expect(params[25]).toBe(0); // finalTaxaPix (não informado)
-    expect(params[26]).toBe(40); // finalTotalDescontos (soma dos descontos calculados pelo motor)
-    expect(params[27]).toBe(60); // finalLiquido (valor a pagar - total de descontos)
+    expect(params[26]).toBe(20); // finalTotalDescontos (sem a patronal, que é informativa — R15/D15)
+    expect(params[27]).toBe(80); // finalLiquido (valor a pagar - total de descontos; a patronal não sai do credor)
   });
 });

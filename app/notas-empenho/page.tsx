@@ -23,7 +23,7 @@ import { maskCurrency } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
 import { SubelementoCampo } from "@/components/ne-form/SubelementoCampo";
 import { FaixaSaldoNe, percentualDaBarra } from "@/components/ne-form/FaixaSaldoNe";
-import { formatarBRL, toCents } from "@/lib/money";
+import { formatarBRL, lerValorMonetario, toCents } from "@/lib/money";
 
 interface NotaEmpenho {
   id: string;
@@ -47,7 +47,9 @@ interface NotaEmpenho {
 /** Valores do formulário a partir de uma NE gravada (editar ou "carregar dados da NE"). */
 const formularioDaNe = (ne: NotaEmpenho) => ({
   numeroNE: ne.numero,
-  valorNE: String(ne.valor),
+  // O banco devolve "100.00": no campo vai "100,00", como quando se digita
+  // (antes ia o texto cru e o formulário lia ×100 ao salvar).
+  valorNE: maskCurrency(lerValorMonetario(ne.valor)),
   unidadeOrcamentaria: ne.unidadeOrcamentaria || "",
   elemento: ne.elemento || "",
   subelemento: ne.subelemento || "",
@@ -139,8 +141,8 @@ export default function NotasEmpenho() {
 
     const timer = setTimeout(async () => {
       try {
-        const num = parseFloat(String(valorNEWatch).replace(/[^\d,]/g, '').replace(',', '.'));
-        if (isNaN(num)) return;
+        const num = lerValorMonetario(valorNEWatch);
+        if (!(num > 0)) return;
         const params = new URLSearchParams({ valor: String(num) });
         if (elementoWatch) params.append('elemento', elementoWatch);
         if (subelementoWatch) params.append('subelemento', subelementoWatch);

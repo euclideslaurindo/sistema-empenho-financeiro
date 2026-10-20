@@ -152,3 +152,30 @@ describe('Integração API Credores', () => {
     expect(data.error).toContain('CPF/CNPJ e Nome são obrigatórios');
   });
 });
+
+describe('busca de credor por CPF/CNPJ (correção: só dígitos não achava)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getAuthUser as any).mockResolvedValue({ id: 'u1', perfil: 'GESTOR' });
+    (query as any).mockImplementation(async (sql: string) => (sql.includes('COUNT(*)') ? [{ total: 0 }] : []));
+  });
+
+  const buscar = async (busca: string) => {
+    const res: any = await GET(new NextRequest(`http://localhost:3000/api/credores?busca=${encodeURIComponent(busca)}&limit=8`));
+    expect(res.status).toBe(200);
+    const [sql, params] = (query as any).mock.calls.find((c: any[]) => String(c[0]).includes('FROM credores') && !String(c[0]).includes('COUNT(*)'));
+    return { sql: String(sql), params: params as any[] };
+  };
+
+  test.each(['11111111111', '11222333000181', '111.111.111-11', '1111'])('"%s": compara também só os dígitos do documento', async (busca: string) => {
+    const { sql, params } = await buscar(busca);
+    expect(sql).toContain("REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj");
+    expect(params).toContain(`%${busca.replace(/\D/g, '')}%`);
+  });
+
+  test.each(['Ana', 'Jo', '123'])('"%s": nome ou poucos dígitos não usam o REPLACE', async (busca: string) => {
+    const { sql } = await buscar(busca);
+    expect(sql).not.toContain('REPLACE(');
+    expect(sql).toContain('nome LIKE ?');
+  });
+});

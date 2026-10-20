@@ -58,13 +58,13 @@ export function linhasDescontoDaOp(op: { retencoesSnapshot?: unknown }): LinhaDe
     if (mei && TRIBUTARIOS.has(c.campo)) continue; // a nota "Isento (MEI)" substitui as linhas de imposto
     const rotulo = s.rotulo || c.rotuloPadrao;
     const aliquota = !s.automatico || s.aliquota === null || s.aliquota === undefined ? null : Number(s.aliquota);
-    linhas.push({
-      chave: c.chave,
-      rotulo:
-        aliquota !== null && Number.isFinite(aliquota)
-          ? `${rotulo} (${aliquota.toLocaleString("pt-BR", { maximumFractionDigits: 4 })}%)`
-          : rotulo,
-    });
+    // Informativa (patronal): aparece na via, mas não entra no total de descontos.
+    const informativa = !!s.informativo && !/informativa/i.test(rotulo);
+    const partes = [
+      aliquota !== null && Number.isFinite(aliquota) ? `${aliquota.toLocaleString("pt-BR", { maximumFractionDigits: 4 })}%` : null,
+      informativa ? "informativa" : null,
+    ].filter(Boolean);
+    linhas.push({ chave: c.chave, rotulo: partes.length > 0 ? `${rotulo} (${partes.join(", ")})` : rotulo });
   }
   return linhas;
 }

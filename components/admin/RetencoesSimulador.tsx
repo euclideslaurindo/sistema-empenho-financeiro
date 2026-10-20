@@ -9,7 +9,7 @@ const ROTULOS: Record<string, string> = {
   irrf: "IRRF",
   iss: "ISS",
   inss: "INSS",
-  patronal: "Patronal",
+  patronal: "Patronal (informativa, fora do total)",
   sest_senat: "SEST/SENAT",
 };
 

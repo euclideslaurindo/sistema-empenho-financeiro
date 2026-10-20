@@ -208,6 +208,25 @@ describe('Integração API Notas de Empenho [id]', () => {
       expect(gravado).not.toHaveProperty('exercicio');
     });
 
+    test.each([
+      ['100.00', 100], // formato em que o banco devolve: antes gravava 10000
+      ['1234.50', 1234.5],
+      ['1.234,50', 1234.5],
+      [100, 100],
+    ])('valor %s no PUT é gravado como %s (nunca ×100)', async (valor: string | number, gravadoEsperado: number) => {
+      const { chamadas, resposta } = editar({ valor });
+      expect((await resposta).status).toBe(200);
+      expect(Number(gravadoNoUpdate(chamadas).valor)).toBe(gravadoEsperado);
+    });
+
+    test('valor inválido no PUT -> 400 e nada gravado', async () => {
+      const { chamadas, resposta } = editar({ valor: 'abc' });
+      expect((await resposta).status).toBe(400);
+      expect(chamadas.some(([sql]) => sql.startsWith('UPDATE notas_empenho'))).toBe(false);
+      // a validação recusa antes da transação: descarta o mock "uma vez" que sobrou
+      (withTransaction as any).mockReset();
+    });
+
     test('com as chaves no payload (compatibilidade), grava as datas', async () => {
       const { chamadas, resposta } = editar({ dataPagamento: '2026-05-05', dataEmissao: null });
       expect((await resposta).status).toBe(200);

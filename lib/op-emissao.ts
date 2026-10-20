@@ -1,7 +1,7 @@
 // Emissão de OPs em lote pela tela (T35-B): regras puras da lista de credores.
 // A tela só monta, valida e mostra; quem decide o valor gravado é o servidor
 // (POST /api/ordens-pagamento/lote, T34-C), com o mesmo motor de retenções.
-import { toCents, formatarBRL } from "@/lib/money";
+import { toCents, formatarBRL, itensBatemComValor, totalItemCents as totalItemCentsDaMoeda } from "@/lib/money";
 import { extrairCodigoElemento } from "@/lib/elementos";
 import {
   CAMPO_FORM,
@@ -114,8 +114,8 @@ export function credorNaLista(credores: Array<Pick<CredorLinha, "cpfCnpj">>, cpf
   return !!alvo && credores.some((c) => somenteDigitos(c.cpfCnpj) === alvo);
 }
 
-export const totalItemCents = (item: Partial<ItemOp>) =>
-  Math.round((Number(item?.quantidade) || 0) * toCents(item?.valorUnitario));
+/** Mesma conta da tela e do servidor (lib/money.ts). */
+export const totalItemCents = (item: Partial<ItemOp>) => totalItemCentsDaMoeda(item?.quantidade, item?.valorUnitario);
 
 /** Itens com valor (total > 0). Itens zerados não vão para a OP. */
 export function itensValorizados(itens: ItemOp[] | undefined): ItemOp[] {
@@ -193,7 +193,7 @@ export function validarEmissao(
     if (cheque) cheques.set(cheque, [...(cheques.get(cheque) || []), i]);
 
     const somaItens = somaItensCents(c.itens);
-    if (somaItens > 0 && Math.abs(somaItens - brutoCents) > 1) {
+    if (somaItens > 0 && !itensBatemComValor(somaItens, brutoCents)) {
       marcar(i, "itens", `A soma dos itens (R$ ${formatarBRL(somaItens)}) deve ser igual ao valor a pagar.`);
     }
 
