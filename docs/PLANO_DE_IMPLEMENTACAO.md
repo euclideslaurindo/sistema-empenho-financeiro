@@ -10,7 +10,7 @@ Baseado na auditoria completa de 21 problemas confirmados no código-fonte.
 > Este plano **modifica arquivos críticos de autenticação e segurança**. Leia com atenção antes de aprovar, especialmente a Fase 1 — qualquer erro de configuração pode bloquear o acesso ao sistema.
 
 > [!CAUTION]
-> **Ação manual necessária ANTES da Fase 1:** Você deve alterar a senha do banco de dados MySQL (`qwe124578`) diretamente no servidor `DAGMCGPA100` e atualizar o arquivo `.env.local` com a nova senha. Isso precisa ser feito por você, não pode ser automatizado.
+> **Ação manual necessária ANTES da Fase 1:** Você deve alterar a senha do banco de dados MySQL diretamente no servidor de banco e atualizar o arquivo `.env.local` com a nova senha. Isso precisa ser feito por você, não pode ser automatizado.
 
 ---
 
