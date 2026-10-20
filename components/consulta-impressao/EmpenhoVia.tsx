@@ -26,10 +26,10 @@ export const EmpenhoVia = ({
             <Image
               src="/brasao_pernambuco.png"
               alt="Brasão do Estado de Pernambuco"
-              width={74}
+              width={67}
               height={74}
               priority
-              className="w-[74px] h-[74px] object-contain mx-auto"
+              className="h-[74px] w-auto object-contain mx-auto"
             />
           </div>
           <div className="flex flex-col text-center flex-1 tracking-wide font-sans mt-2">
