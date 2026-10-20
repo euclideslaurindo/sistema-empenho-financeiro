@@ -22,7 +22,7 @@ const REGRAS_PADRAO: Record<string, string[]> = {
 };
 
 describe("calcularRetencoes — casos A-F do README", () => {
-  test("Caso A: 1.000,00 no .36 -> líquido 600,00", () => {
+  test("Caso A: 1.000,00 no .36 -> líquido 800,00 (patronal informativa, fora do total)", () => {
     const r = calcularRetencoes({
       brutoCents: toCents(1000),
       elementoCodigo: "3.3.90.36",
@@ -36,11 +36,12 @@ describe("calcularRetencoes — casos A-F do README", () => {
     expect(r.itens.inss).toBe(11000);
     expect(r.itens.patronal).toBe(20000);
     expect(r.itens.sest_senat).toBe(2500);
-    expect(r.totalDescontosCents).toBe(40000);
-    expect(r.liquidoCents).toBe(60000);
+    expect(r.totalDescontosCents).toBe(20000);
+    expect(r.liquidoCents).toBe(80000);
+    expect(r.informativos).toEqual(["patronal"]);
   });
 
-  test("Caso B: 665,00 no .36 -> líquido 398,99", () => {
+  test("Caso B: 665,00 no .36 -> líquido 531,99", () => {
     const r = calcularRetencoes({
       brutoCents: toCents(665),
       elementoCodigo: "3.3.90.36",
@@ -51,11 +52,11 @@ describe("calcularRetencoes — casos A-F do README", () => {
     });
     expect(r.itens.irrf).toBe(998);
     expect(r.itens.sest_senat).toBe(1663);
-    expect(r.totalDescontosCents).toBe(26601);
-    expect(r.liquidoCents).toBe(39899);
+    expect(r.totalDescontosCents).toBe(13301);
+    expect(r.liquidoCents).toBe(53199);
   });
 
-  test("Caso C: 1.000,00 no .30 (sem ISS) -> líquido 650,00", () => {
+  test("Caso C: 1.000,00 no .30 (sem ISS) -> líquido 850,00", () => {
     const r = calcularRetencoes({
       brutoCents: toCents(1000),
       elementoCodigo: "3.3.90.30",
@@ -65,8 +66,8 @@ describe("calcularRetencoes — casos A-F do README", () => {
       perfil: "GESTOR",
     });
     expect(r.itens.iss).toBe(0);
-    expect(r.totalDescontosCents).toBe(35000);
-    expect(r.liquidoCents).toBe(65000);
+    expect(r.totalDescontosCents).toBe(15000);
+    expect(r.liquidoCents).toBe(85000);
   });
 
   test("Caso D: 1.000,00 no .14 -> líquido = bruto, mesmo com tentativa de fraude", () => {
@@ -82,7 +83,7 @@ describe("calcularRetencoes — casos A-F do README", () => {
     expect(r.liquidoCents).toBe(100000);
   });
 
-  test("Caso E: 665,00 no .36 + taxa bancária 8,50 -> líquido 390,49", () => {
+  test("Caso E: 665,00 no .36 + taxa bancária 8,50 -> líquido 523,49", () => {
     const r = calcularRetencoes({
       brutoCents: toCents(665),
       elementoCodigo: "3.3.90.36",
@@ -91,8 +92,8 @@ describe("calcularRetencoes — casos A-F do README", () => {
       informados: { taxa_bancaria: toCents(8.5) },
       perfil: "GESTOR",
     });
-    expect(r.totalDescontosCents).toBe(27451);
-    expect(r.liquidoCents).toBe(39049);
+    expect(r.totalDescontosCents).toBe(14151);
+    expect(r.liquidoCents).toBe(52349);
   });
 
   test("Caso F: 11,00 no .36 -> IRRF 0,17 (bug histórico de ponto flutuante já corrigido na T01)", () => {
@@ -366,7 +367,7 @@ describe("calcularRetencoes — credor MEI (regra 0, T25)", () => {
       brutoCents: toCents(1000), elementoCodigo: "3.3.90.36", config: CONFIG_PADRAO, regras: REGRAS_PADRAO,
       informados: {}, perfil: "GESTOR", credorMei: false,
     });
-    expect(r.totalDescontosCents).toBe(40000);
+    expect(r.totalDescontosCents).toBe(20000); // patronal (200,00) informativa
     expect(r.snapshot.mei).toBeUndefined();
   });
 });

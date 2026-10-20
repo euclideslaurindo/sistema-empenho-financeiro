@@ -1,7 +1,7 @@
 // Regras de tela da seção "Retenções e Descontos" da OP (T11). Espelham as
 // regras de lib/retencoes.ts pra tela nunca oferecer edição que o servidor
 // vai ignorar — mas quem decide o valor gravado continua sendo o servidor.
-import { CAMPOS_TRIBUTARIOS, type CampoDesconto, type CampoTributario } from "@/lib/retencoes";
+import { CAMPOS_INFORMATIVOS, CAMPOS_TRIBUTARIOS, type CampoDesconto, type CampoTributario } from "@/lib/retencoes";
 import type { ConfigRetencaoCampoMapeado } from "@/lib/services/config-retencoes.service";
 import { maskCurrency } from "@/lib/utils";
 import { toCents } from "@/lib/money";
@@ -116,9 +116,12 @@ export function somarDescontosCents(valores: Record<string, unknown>, excluir: C
   );
 }
 
-/** No transporte (T25) a patronal é só informativa: fora do total e do líquido. */
-export const camposInformativos = (elementoCodigo: string | null): CampoRetencao[] =>
-  perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO" ? ["patronal"] : [];
+/**
+ * Campos só informativos (a patronal), fora do total e do líquido em TODOS os
+ * elementos (R15/D15) — a mesma lista do motor (lib/retencoes.ts). O parâmetro
+ * fica por compatibilidade com quem já chama passando o elemento.
+ */
+export const camposInformativos = (_elementoCodigo?: string | null): CampoRetencao[] => [...CAMPOS_INFORMATIVOS];
 
 /** No transporte os percentuais incidem sobre bases diferentes: rótulo sem "%". */
 export function rotuloCampoDoElemento(cfg: ConfigRetencaoCampoMapeado, elementoCodigo: string | null): string {

@@ -75,8 +75,8 @@ describe('OpTaxesSection com basePath (T35-A)', () => {
       elemento: '3.3.90.36 - Serviços',
       credores: [linhaVazia({ valorPagamento: '1.000,00' }), linhaVazia({ valorPagamento: '200,00' })],
     });
-    await waitFor(() => expect(liquido(0)).toBe('R$ 600,00'));
-    await waitFor(() => expect(liquido(1)).toBe('R$ 120,00'));
+    await waitFor(() => expect(liquido(0)).toBe('R$ 800,00'));
+    await waitFor(() => expect(liquido(1)).toBe('R$ 160,00'));
     expect(form().getValues('credores.0.irrf')).toBe('15,00');
     expect(form().getValues('credores.1.irrf')).toBe('3,00');
     expect(form().getValues('irrf')).toBeUndefined();
@@ -89,7 +89,7 @@ describe('OpTaxesSection com basePath (T35-A)', () => {
       elemento: '3.3.90.36 - Serviços',
       credores: [linhaVazia({ valorPagamento: '665,00' }), linhaVazia({ valorPagamento: '665,00' })],
     });
-    await waitFor(() => expect(liquido(1)).toBe('R$ 398,99'));
+    await waitFor(() => expect(liquido(1)).toBe('R$ 531,99'));
     const taxa0 = input(0, 'Taxa bancária (expediente)');
     const taxa1 = input(1, 'Taxa bancária (expediente)');
     expect(taxa0.id).not.toBe(taxa1.id);
@@ -97,8 +97,8 @@ describe('OpTaxesSection com basePath (T35-A)', () => {
 
     fireEvent.change(taxa1, { target: { value: '850' } });
     expect(taxa1.value).toBe('8,50');
-    await waitFor(() => expect(liquido(1)).toBe('R$ 390,49'));
-    expect(liquido(0)).toBe('R$ 398,99');
+    await waitFor(() => expect(liquido(1)).toBe('R$ 523,49'));
+    expect(liquido(0)).toBe('R$ 531,99');
     expect(form().getValues('credores.1.camposInformados')).toEqual(['taxa_bancaria']);
     expect(form().getValues('credores.0.camposInformados')).toEqual([]);
     expect(form().getValues('camposInformados')).toBeUndefined();
@@ -136,7 +136,7 @@ describe('OpTaxesSection com basePath (T35-A)', () => {
     });
     expect(linha(0).getByText('Credor MEI — isento de retenções')).toBeInTheDocument();
     expect(linha(1).queryByText('Credor MEI — isento de retenções')).toBeNull();
-    await waitFor(() => expect(liquido(1)).toBe('R$ 600,00'));
+    await waitFor(() => expect(liquido(1)).toBe('R$ 800,00'));
     expect(liquido(0)).toBe('R$ 1.000,00');
   });
 });

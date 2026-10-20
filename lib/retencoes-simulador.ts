@@ -6,6 +6,7 @@
 // efeito da configuração ATUAL DA TELA (ainda não salva) antes de salvar.
 import { calcPercentCents, somarCents, toCents } from "@/lib/money";
 import { parseFormNumber } from "@/lib/utils";
+import { CAMPOS_INFORMATIVOS } from "@/lib/retencoes";
 
 export const CAMPOS_TRIBUTARIOS = ["irrf", "iss", "inss", "patronal", "sest_senat"] as const;
 export type CampoTributario = (typeof CAMPOS_TRIBUTARIOS)[number];
@@ -50,7 +51,10 @@ export function simularRetencoes(entrada: SimuladorEntrada): SimuladorResultado 
         : 0;
 
     itensCents[c.campo] = valor;
-    totalDescontosCents = somarCents(totalDescontosCents, valor);
+    // Patronal é informativa (R15/D15): aparece, mas não entra no total — igual ao motor.
+    if (!(CAMPOS_INFORMATIVOS as string[]).includes(c.campo)) {
+      totalDescontosCents = somarCents(totalDescontosCents, valor);
+    }
   }
 
   const taxaBancariaCents = toCents(entrada.taxaBancariaReais || 0);
