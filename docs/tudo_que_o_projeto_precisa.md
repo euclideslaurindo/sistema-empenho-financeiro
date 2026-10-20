@@ -223,18 +223,18 @@ export async function GET(request: NextRequest) {
 Arquivo [setup_db.js](file:///C:/Users/BOLSONARO2022/.gemini/antigravity/scratch/sistema-empenho-financeiro/setup_db.js#L5-L11):
 ```javascript
 const connection = await mysql.createConnection({
-  host: '***REMOVIDO***',           // ← Nome do servidor interno da SEFAZ
+  host: '<servidor interno>',     // ← Nome do servidor interno da SEFAZ
   port: 3306,
-  user: 'admin',                  // ← Usuário do banco
-  password: '***REMOVIDO***',          // ← SENHA DO BANCO EXPOSTA PUBLICAMENTE
+  user: '<usuário>',              // ← Usuário do banco
+  password: '<senha removida>',  // ← SENHA DO BANCO EXPOSTA PUBLICAMENTE
   database: 'empenho'
 });
 ```
 
 **Impacto**: Qualquer pessoa que visite o GitHub pode ver:
-- O nome do servidor de banco de dados interno (`***REMOVIDO***`)
-- Credenciais de acesso ao MySQL (`admin` / `***REMOVIDO***`)
-- A topologia interna da rede (IPs em `next.config.ts`: `***REMOVIDO***`, `nagmcggr019`)
+- O nome do servidor de banco de dados interno
+- Credenciais de acesso ao MySQL (usuário e senha)
+- A topologia interna da rede (IPs e nomes de máquinas internas)
 
 > [!WARNING]
 > **Mesmo que você delete este arquivo agora, ele continuará acessível no histórico do Git.** Será necessário alterar a senha do banco de dados e rotacionar credenciais.
