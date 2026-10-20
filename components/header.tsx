@@ -58,7 +58,7 @@ export function Header() {
       {/* Left: Logo */}
       <Link href="/" className="flex items-center gap-3 mr-12 group">
         <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-300">
-          <Image src="/brasao_pernambuco.png" alt="Brasão de Pernambuco" width={56} height={56} priority className="w-14 h-14 object-contain" />
+          <Image src="/brasao_pernambuco.png" alt="Brasão de Pernambuco" width={51} height={56} priority className="h-14 w-auto object-contain" />
         </div>
         <span className="font-bold text-lg text-slate-800 tracking-tight">EMPENHO GRE</span>
       </Link>
