@@ -59,9 +59,20 @@ function LinhaCampo({ index }: { index: number }) {
           disabled={aliquotaDesabilitada}
           aria-label={`Alíquota de ${rotulo}`}
           aria-invalid={!!erroAliquota}
-          aria-describedby={erroAliquota ? `campo-${index}-aliquota-erro` : undefined}
+          aria-describedby={
+            [erroAliquota ? `campo-${index}-aliquota-erro` : "", campo === "iss" ? `campo-${index}-aliquota-dica` : ""]
+              .filter(Boolean)
+              .join(" ") || undefined
+          }
           className={`w-full px-3 py-2 rounded-lg border text-sm font-bold text-right disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none ${erroAliquota ? "border-red-400 bg-red-50" : "border-slate-200 bg-slate-50 focus:border-blue-800"}`}
         />
+        {campo === "iss" && (
+          // O transporte (3.3.90.33) não usa esta alíquota: usa a do município
+          // de expediente do credor (tabela de ISS por município), ou 5%.
+          <p id={`campo-${index}-aliquota-dica`} className="text-slate-500 text-[11px] mt-1 font-semibold normal-case tracking-normal">
+            No 3.3.90.33 vale a tabela de ISS por município.
+          </p>
+        )}
         {erroAliquota && (
           <p id={`campo-${index}-aliquota-erro`} className="text-red-500 text-xs mt-1 font-semibold">
             {erroAliquota.message}

@@ -3,18 +3,20 @@ import React, { useState } from "react";
 import { useFormContext, useFieldArray, useWatch } from "react-hook-form";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { maskCurrency, parseFormNumber, formatCurrency } from "@/lib/utils";
+import { maskCurrency, formatCurrency } from "@/lib/utils";
 import { idNaLinha, nomeNaLinha } from "@/lib/retencoes-form";
+import { itensBatemComValor, somaItensCents, toCents, totalItemCents } from "@/lib/money";
 import { AlertDialog, AlertDialogContent, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 // Componente isolado para calcular e exibir o total (evita re-render da tabela inteira)
 function TotalItensInfo({ control, setValue, basePath }: { control: any, setValue: any, basePath: string }) {
   const wItens = useWatch({ control, name: nomeNaLinha(basePath, "itens") }) || [];
-  const totalItens = wItens.reduce((acc: number, item: any) => {
-    return acc + (Number(item?.quantidade) || 0) * parseFormNumber(item?.valorUnitario);
-  }, 0);
-
-  const valorPg = parseFormNumber(useWatch({ control, name: nomeNaLinha(basePath, "valorPagamento") }));
+  // Em centavos, a mesma conta do servidor (lib/money.ts): somar em ponto
+  // flutuante dava 10,10 + 20,20 = 30,2999… e o aviso aparecia sem motivo.
+  const totalCents = somaItensCents(wItens);
+  const totalItens = totalCents / 100;
+  const valorCents = toCents(useWatch({ control, name: nomeNaLinha(basePath, "valorPagamento") }));
+  const diferente = valorCents > 0 && !itensBatemComValor(totalCents, valorCents);
 
   const handleConfirmarItens = () => {
     if (totalItens <= 0) {
@@ -30,12 +32,10 @@ function TotalItensInfo({ control, setValue, basePath }: { control: any, setValu
     <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-4">
       <div className="flex items-center gap-2">
         <span className="text-sm font-black text-slate-500 uppercase tracking-widest">V. Total dos Itens:</span>
-        <span className={`text-lg font-black ${
-          totalItens !== valorPg && valorPg > 0 ? 'text-red-600' : 'text-slate-800'
-        }`}>
+        <span className={`text-lg font-black ${diferente ? 'text-red-600' : 'text-slate-800'}`}>
           {formatCurrency(totalItens)}
         </span>
-        {totalItens !== valorPg && valorPg > 0 && (
+        {diferente && (
           <span className="text-xs text-red-500 font-bold ml-1">⚠ Deve ser exatamente igual ao Valor a Pagar</span>
         )}
       </div>
@@ -56,7 +56,7 @@ function ItemRow({ field, index, remove, control, register, setValue, onRemoveCl
   const idErro = (campo: string) => idNaLinha(basePath, `item-${index}-${campo}-error`);
   const qty = useWatch({ control, name: nomeItem("quantidade") }) || 0;
   const unitVal = useWatch({ control, name: nomeItem("valorUnitario") }) || 0;
-  const total = Number(qty) * parseFormNumber(unitVal);
+  const total = totalItemCents(qty, unitVal) / 100; // mesma conta do total e do servidor
   const especificacaoError = itemErrors?.especificacao;
   const unidadeError = itemErrors?.unidade;
 

@@ -134,6 +134,28 @@ describe('criarOpNaTransacao (T34-A)', () => {
   });
 });
 
+describe('contas em centavos (revisão de 20/10)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    chamadas.length = 0;
+    proximoSub = 1;
+  });
+
+  test('itens 10,10 + 20,20 batem com 30,30 (em ponto flutuante não batiam por 0,0000…1)', async () => {
+    const itens = [
+      { especificacao: 'A', quantidade: 1, unidade: 'UN', valorUnitario: 10.1 },
+      { especificacao: 'B', quantidade: 1, unidade: 'UN', valorUnitario: 20.2 },
+    ];
+    await expect(criarOpNaTransacao(mockConn(), dados({ valorPagamento: 30.3, itens }), ctx())).resolves.toMatchObject({ sub: '01' });
+  });
+
+  test('a OP grava o mesmo valor (em centavos) que entrou no cálculo', async () => {
+    await criarOpNaTransacao(mockConn(), dados({ valorPagamento: 10.005 }), ctx());
+    const valorGravado = inserts()[0][1][17];
+    expect(valorGravado).toBe(10.01);
+  });
+});
+
 describe('OrdemPagamentoService.criar depois da extração', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { extrairCodigoElemento } from '@/lib/elementos';
 import { calcularRetencoesDaOp, type CacheCalculo } from '@/lib/services/calculo-op.service';
 import type { CampoTributario, CampoDesconto } from '@/lib/retencoes';
-import { toCents, fromCents } from '@/lib/money';
+import { toCents, fromCents, itensBatemComValor, somaItensCents } from '@/lib/money';
 import { calcularProximoNumeroOp } from '@/lib/services/numeracao-op';
 import { entraDarfDaConfig, sincronizarDarfDaOp } from '@/lib/services/darf.service';
 
@@ -165,19 +165,11 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
     };
   }
 
-  let totalItensCalc = 0;
-  if (itens && Array.isArray(itens)) {
-    itens.forEach((i: any) => {
-      totalItensCalc += (Number(i.quantidade) || 0) * toDecimal(i.valorUnitario);
-    });
-  }
-  totalItensCalc = Math.round(totalItensCalc * 100) / 100;
-  // Tolerância de 1 centavo para evitar falso positivo por imprecisão IEEE 754.
-  // A diferença também é arredondada antes de comparar, pois mesmo dois valores
-  // já arredondados podem subtrair para algo como 0.010000000000005 em vez de 0.01.
-  const diferencaItens = Math.round(Math.abs(totalItensCalc - vPagamentoArredondado) * 100) / 100;
-  if (totalItensCalc > 0 && diferencaItens > 0.01) {
-    throw { status: 400, error: `A soma dos itens (R$ ${totalItensCalc.toFixed(2)}) não bate com o valor a pagar da OP (R$ ${vPagamentoArredondado.toFixed(2)}). Fraude detectada.` };
+  // Mesma conta da tela (lib/money.ts): cada item arredondado em centavos,
+  // depois somado; tolerância de 1 centavo.
+  const itensCents = somaItensCents(Array.isArray(itens) ? itens : []);
+  if (itensCents > 0 && !itensBatemComValor(itensCents, brutoCents)) {
+    throw { status: 400, error: `A soma dos itens (R$ ${fromCents(itensCents).toFixed(2)}) não bate com o valor a pagar da OP (R$ ${vPagamentoArredondado.toFixed(2)}). Fraude detectada.` };
   }
 
   const { numeroOp: numeroDaOpGerado, sub: subGerado } = await calcularProximoNumeroOp(
@@ -235,7 +227,8 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
       credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
       unidadeOrcamentaria || '', elementoGravado, subelementoGravado, gestao || '', historico || '',
       itensJson,
-      toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamento,
+      // grava o mesmo valor (em centavos) que entrou no cálculo das retenções
+      toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamentoArredondado,
       finalIrrf, finalIss, finalInss, finalSestSenat, finalPatronal, finalOutros, finalTaxaBancaria, finalTaxaPix,
       finalTotalDescontos, finalLiquido, snapshotJson,
       chequeFormatado, dataEmissao || null, dataPagamento || null, usuarioId
