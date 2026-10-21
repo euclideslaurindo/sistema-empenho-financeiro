@@ -118,28 +118,58 @@ export class CredorService {
     const usuarioId = await resolveUsuarioId(usuarioIdSolicitante);
     const dataExpFormatada = formatarDataExpedicao(dataExpedicao);
     const enderecoFinal = montarEnderecoFinal(body);
-    const id = crypto.randomUUID();
+    const campos: Record<string, any> = {
+      cpf_cnpj: cpfCnpj.trim(),
+      nome: nome.trim(),
+      rg: rg?.trim() || 'ISENTO',
+      orgao_emissor: orgaoEmissor?.trim() || null,
+      pis: pis?.trim() || null,
+      data_expedicao: dataExpFormatada,
+      endereco: enderecoFinal,
+      cep: cep?.trim() || null,
+      logradouro: logradouro?.trim() || null,
+      numero: numero?.trim() || null,
+      bairro: bairro?.trim() || null,
+      cidade: cidadeNorm,
+      uf: ufNorm,
+      telefone: telefone?.trim() || null,
+      banco: banco?.trim() || null,
+      agencia: agencia?.trim() || null,
+      conta_corrente: contaCorrente?.trim() || null,
+      pix: pix?.trim() || null,
+      is_mei: isMei ? 1 : 0,
+      usuario_id: usuarioId,
+      municipioExpediente: expediente.valor,
+    };
 
     try {
-      await query(
-        `INSERT INTO credores (id, cpf_cnpj, nome, rg, orgao_emissor, pis, data_expedicao, endereco, cep, logradouro, numero, bairro, cidade, uf, telefone, banco, agencia, conta_corrente, pix, is_mei, usuario_id, municipioExpediente)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id, cpfCnpj.trim(), nome.trim(), rg?.trim() || 'ISENTO', orgaoEmissor?.trim() || null,
-          pis?.trim() || null, dataExpFormatada, enderecoFinal, cep?.trim() || null, logradouro?.trim() || null,
-          numero?.trim() || null, bairro?.trim() || null, cidadeNorm, ufNorm,
-          telefone?.trim() || null, banco?.trim() || null, agencia?.trim() || null, contaCorrente?.trim() || null,
-          pix?.trim() || null, isMei ? 1 : 0, usuarioId, expediente.valor,
-        ]
+      // O credor excluído (ativo = 0) continua com o CPF/CNPJ, que é único na
+      // tabela: cadastrá-lo de novo reativa o mesmo registro com os dados novos
+      // (antes dava "já cadastrado" sem ele aparecer na lista).
+      const excluido = await query<{ id: string }[]>(
+        'SELECT id FROM credores WHERE cpf_cnpj = ? AND ativo = 0 LIMIT 1',
+        [campos.cpf_cnpj]
       );
+      if (excluido?.[0]?.id) {
+        const idExcluido = excluido[0].id;
+        const setClauses = Object.keys(campos).map((col) => `${col} = ?`).join(', ');
+        await query(`UPDATE credores SET ${setClauses}, ativo = 1 WHERE id = ? AND ativo = 0`, [...Object.values(campos), idExcluido]);
+        return { success: true, data: { id: idExcluido, reativado: true }, status: 200 };
+      }
+
+      const id = crypto.randomUUID();
+      const colunas = ['id', ...Object.keys(campos)];
+      await query(
+        `INSERT INTO credores (${colunas.join(', ')}) VALUES (${colunas.map(() => '?').join(', ')})`,
+        [id, ...Object.values(campos)]
+      );
+      return { success: true, data: { id }, status: 201 };
     } catch (err: any) {
       if (err.code === 'ER_DUP_ENTRY') {
         return { success: false, error: 'Este CPF/CNPJ já está cadastrado no sistema.', status: 409 };
       }
       throw err;
     }
-
-    return { success: true, data: { id }, status: 201 };
   }
 
   static async atualizar(id: string, body: any, usuarioIdSolicitante: string, perfilSolicitante: string): Promise<ServiceResult> {
@@ -172,9 +202,23 @@ export class CredorService {
     try {
       await withTransaction(async (conn: PoolConnection) => {
         // Lock pessimista: evita corrida entre edições simultâneas do mesmo credor
-        const [rows]: any = await conn.execute('SELECT id FROM credores WHERE id = ? AND ativo = 1 FOR UPDATE', [id]);
+        const [rows]: any = await conn.execute('SELECT id, cpf_cnpj FROM credores WHERE id = ? AND ativo = 1 FOR UPDATE', [id]);
         if (!rows || rows.length === 0) {
           throw { status: 404, error: 'Credor não encontrado.' };
+        }
+
+        // Trocar o CPF/CNPJ de quem já tem OP: a FK leva a troca para as OPs,
+        // mas o acompanhamento de DARF fica com o documento antigo.
+        const cpfAtual = String(rows[0].cpf_cnpj ?? '').trim();
+        if (cpfAtual && cpfAtual !== cpfCnpj.trim()) {
+          const [opSum]: any = await conn.execute('SELECT COUNT(*) as total FROM ordens_pagamento WHERE credor_cpf_cnpj = ?', [cpfAtual]);
+          const totalOps = parseInt(opSum?.[0]?.total || 0);
+          if (totalOps > 0) {
+            throw {
+              status: 409,
+              error: `Não é possível trocar o CPF/CNPJ: este credor já tem ${totalOps} ordem(ns) de pagamento. Se o documento estiver errado, cadastre um novo credor.`,
+            };
+          }
         }
 
         const [existing]: any = await conn.execute(
