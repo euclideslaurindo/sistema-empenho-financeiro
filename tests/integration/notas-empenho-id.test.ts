@@ -363,3 +363,81 @@ describe('Integração API Notas de Empenho [id]', () => {
     });
   });
 });
+
+describe('revisão da aba 3 (Notas de Empenho)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getAuthUser as any).mockResolvedValue({ id: 'u1', perfil: 'GESTOR' });
+  });
+
+  /** Conexão simulada pelo texto do SQL; guarda todas as chamadas. */
+  const conexao = (resp: { ne?: any; gasto?: number; ops?: number } = {}) => {
+    const chamadas: Array<[string, any[]]> = [];
+    const execute = vi.fn(async (sql: string, params: any[] = []) => {
+      chamadas.push([sql, params]);
+      if (sql.includes('FOR UPDATE')) return [resp.ne ? [resp.ne] : []];
+      if (sql.includes('SUM(op.valor_pagamento)')) return [[{ total_pago: resp.gasto ?? 0 }]];
+      if (sql.includes('COUNT(*)')) return [[{ total: resp.ops ?? 0 }]];
+      if (sql.includes('SELECT id FROM usuarios')) return [[{ id: 'u1' }]];
+      if (sql.includes('SELECT id FROM notas_empenho WHERE numero')) return [[]];
+      return [{ affectedRows: 1 }];
+    });
+    (withTransaction as any).mockImplementationOnce(async (cb: any) => cb({ execute }));
+    return chamadas;
+  };
+  const put = (body: any) =>
+    PUT(new NextRequest('http://localhost:3000/api/notas-empenho/ne-1', { method: 'PUT', body: JSON.stringify(body) }), { params: Promise.resolve({ id: 'ne-1' }) }) as any;
+  const del = () =>
+    DELETE(new NextRequest('http://localhost:3000/api/notas-empenho/ne-1', { method: 'DELETE' }), { params: Promise.resolve({ id: 'ne-1' }) }) as any;
+
+  test('N1: cancelar registra na auditoria quem cancelou e o status antes/depois', async () => {
+    const chamadas = conexao({ ne: { numero: '2026NE000001', valor: '100.00', status: 'EMITIDO' } });
+    expect((await del()).status).toBe(200);
+    const [sql, params] = chamadas.find(([s]) => s.includes('INSERT INTO auditoria_financeira'))!;
+    expect(sql).toContain('auditoria_financeira');
+    expect(params[1]).toBe('notas_empenho');
+    expect(params[2]).toBe('ne-1');
+    expect(params[3]).toBe('UPDATE');
+    expect(JSON.parse(params[4]).status).toBe('EMITIDO');
+    expect(JSON.parse(params[5]).status).toBe('CANCELADO');
+    expect(params[6]).toBe('u1');
+  });
+
+  test('N1: cancelar uma NE já cancelada dá 409 e não grava nada', async () => {
+    const chamadas = conexao({ ne: { numero: '2026NE000001', valor: '100.00', status: 'CANCELADO' } });
+    const res = await del();
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain('já está cancelada');
+    expect(chamadas.some(([s]) => s.startsWith('UPDATE') || s.includes('INSERT'))).toBe(false);
+  });
+
+  test('N6: trocar o número da NE leva a troca para o acompanhamento de DARF', async () => {
+    const chamadas = conexao({ ne: { id: 'ne-1', numero: '2026NE000001', valor: '100.00', status: 'PARCIALMENTE PAGO' }, gasto: 40 });
+    expect((await put({ numero: '2026NE000099', valor: 100 })).status).toBe(200);
+    const darf = chamadas.find(([s]) => s.includes('UPDATE darf_acompanhamento'));
+    expect(darf).toBeDefined();
+    expect(darf![1]).toEqual(['2026NE000099', '2026NE000001']);
+  });
+
+  test('N6: sem trocar o número, o DARF não é tocado', async () => {
+    const chamadas = conexao({ ne: { id: 'ne-1', numero: '2026NE000001', valor: '100.00', status: 'EMITIDO' } });
+    expect((await put({ numero: '2026NE000001', valor: 150 })).status).toBe(200);
+    expect(chamadas.some(([s]) => s.includes('darf_acompanhamento'))).toBe(false);
+  });
+
+  test.each([undefined, '', '   '])('N10: PUT sem número (%s) -> 400 e nada gravado', async (numero: any) => {
+    const res = await put({ numero, valor: 100 });
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('Número da NE é obrigatório.');
+    expect(withTransaction).not.toHaveBeenCalled();
+  });
+
+  test('N11: mensagem de redução com valores no formato brasileiro', async () => {
+    conexao({ ne: { id: 'ne-1', numero: '2026NE000001', valor: '5000.00', status: 'PARCIALMENTE PAGO' }, gasto: 1234.5 });
+    const res = await put({ numero: '2026NE000001', valor: 1000 });
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe(
+      'Não é possível reduzir o valor da NE para R$ 1.000,00 pois já foram geradas OPs no valor total de R$ 1.234,50.'
+    );
+  });
+});
