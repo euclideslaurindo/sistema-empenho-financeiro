@@ -34,7 +34,7 @@ describe('Integração API Credores', () => {
 
   test('POST /api/credores cria credor com dados válidos', async () => {
     (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
-    (query as any).mockResolvedValue([{ id: '123' }]); // Mock retorno de checagem do usuario
+    (query as any).mockImplementation(async (sql: string) => (sql.includes('ativo = 0') ? [] : [{ id: '123' }]));
     
     const credorData = {
       nome: 'Empresa Teste LTDA',
@@ -57,7 +57,7 @@ describe('Integração API Credores', () => {
 
   test('POST normaliza município e monta o endereço com ele', async () => {
     (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
-    (query as any).mockResolvedValue([{ id: '123' }]);
+    (query as any).mockImplementation(async (sql: string) => (sql.includes('ativo = 0') ? [] : [{ id: '123' }]));
 
     const req = new NextRequest('http://localhost:3000/api/credores', {
       method: 'POST',
@@ -83,7 +83,7 @@ describe('Integração API Credores', () => {
   describe('Município (Expediente) — T33', () => {
     const postar = async (extra: Record<string, unknown>) => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
-      (query as any).mockResolvedValue([{ id: '123' }]);
+      (query as any).mockImplementation(async (sql: string) => (sql.includes('ativo = 0') ? [] : [{ id: '123' }]));
       const res: any = await POST(
         new NextRequest('http://localhost:3000/api/credores', {
           method: 'POST',
@@ -177,5 +177,49 @@ describe('busca de credor por CPF/CNPJ (correção: só dígitos não achava)', 
     const { sql } = await buscar(busca);
     expect(sql).not.toContain('REPLACE(');
     expect(sql).toContain('nome LIKE ?');
+  });
+});
+
+describe('recadastrar o CPF/CNPJ de um credor excluído (revisão aba 2, C3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getAuthUser as any).mockResolvedValue({ id: 'u1', perfil: 'GESTOR' });
+  });
+
+  const postar = () =>
+    POST(
+      new NextRequest('http://localhost:3000/api/credores', {
+        method: 'POST',
+        body: JSON.stringify({ nome: 'TESTE Nova Razão', cpfCnpj: '11.222.333/0001-81', cidade: 'Recife', uf: 'PE' }),
+      })
+    ) as any;
+
+  test('reativa o cadastro antigo com os dados novos, sem INSERT', async () => {
+    (query as any).mockImplementation(async (sql: string) => {
+      if (sql.includes('ativo = 0') && sql.startsWith('SELECT')) return [{ id: 'antigo-1' }];
+      if (sql.includes('FROM usuarios')) return [{ id: 'u1' }];
+      return { affectedRows: 1 };
+    });
+    const res = await postar();
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, id: 'antigo-1', reativado: true });
+
+    const calls = (query as any).mock.calls.map((c: any[]) => String(c[0]));
+    expect(calls.some((s: string) => s.includes('INSERT INTO credores'))).toBe(false);
+    const [sql, params] = (query as any).mock.calls.find((c: any[]) => String(c[0]).startsWith('UPDATE credores'));
+    expect(sql).toContain('ativo = 1 WHERE id = ? AND ativo = 0');
+    expect(params).toContain('TESTE Nova Razão');
+    expect(params.at(-1)).toBe('antigo-1');
+  });
+
+  test('credor ativo com o mesmo CPF/CNPJ continua dando 409', async () => {
+    (query as any).mockImplementation(async (sql: string) => {
+      if (sql.includes('INSERT INTO credores')) throw Object.assign(new Error('dup'), { code: 'ER_DUP_ENTRY' });
+      if (sql.includes('ativo = 0')) return [];
+      return [{ id: 'u1' }];
+    });
+    const res = await postar();
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toContain('já está cadastrado');
   });
 });

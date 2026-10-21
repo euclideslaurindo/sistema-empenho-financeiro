@@ -30,6 +30,9 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
-    return NextResponse.json({ success: true, id: result.data.id }, { status: result.status });
+    return NextResponse.json(
+      { success: true, id: result.data.id, ...(result.data.reativado ? { reativado: true } : {}) },
+      { status: result.status }
+    );
   });
 }
