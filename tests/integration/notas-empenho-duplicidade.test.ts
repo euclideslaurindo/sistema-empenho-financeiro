@@ -30,7 +30,7 @@ describe('GET /api/notas-empenho/duplicidade (T30, D33)', () => {
     expect(sql).toContain("(ne.elemento = ? OR ? = '')");
     expect(sql).toContain("(ne.subelemento = ? OR ? = '')");
     expect(sql).not.toMatch(/credor|ne_credores|cpf_cnpj/);
-    expect(params).toEqual([100, '3.3.90.36 - Outros', '3.3.90.36 - Outros', 'Locação', 'Locação']);
+    expect(params).toEqual([100, '3.3.90.36 - Outros', '3.3.90.36 - Outros', 'Locação', 'Locação', '', '']);
   });
 
   test('devolve os dados da NE parecida para o "Carregar dados da NE"', async () => {
@@ -56,5 +56,25 @@ describe('GET /api/notas-empenho/duplicidade (T30, D33)', () => {
   test('sem login: 401', async () => {
     (getAuthUser as any).mockResolvedValue(null);
     expect((await consultar('valor=100')).status).toBe(401);
+  });
+});
+
+describe('duplicidade — revisão da aba 3 (N2)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getAuthUser as any).mockResolvedValue({ id: 'u1', perfil: 'GESTOR' });
+    (query as any).mockResolvedValue([]);
+  });
+
+  test('NE cancelada não conta como parecida', async () => {
+    await consultar('valor=100');
+    expect((query as any).mock.calls[0][0]).toContain("ne.status <> 'CANCELADO'");
+  });
+
+  test('editando: a própria NE (ignorarId) fica de fora', async () => {
+    await consultar('valor=100&ignorarId=ne-1');
+    const [sql, params] = (query as any).mock.calls[0];
+    expect(sql).toContain("(ne.id <> ? OR ? = '')");
+    expect(params.slice(-2)).toEqual(['ne-1', 'ne-1']);
   });
 });

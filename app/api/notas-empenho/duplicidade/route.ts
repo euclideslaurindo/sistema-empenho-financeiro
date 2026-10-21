@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
       valor: searchParams.get('valor'),
       elemento: searchParams.get('elemento') || '',
       subelemento: searchParams.get('subelemento') || '',
+      ignorarId: searchParams.get('ignorarId') || '',
     });
     return NextResponse.json(result);
   });

@@ -1,24 +1,29 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { jsPDF } from "jspdf";
-import "jspdf-autotable";
 import { useElementos } from "@/hooks/use-elementos";
 import { notaEmpenhoSchema, type NotaEmpenhoFormValues } from "@/lib/schemas";
 import {
   Plus,
   Save,
   Search,
-  Trash2,
-  Eye,
+  Ban,
   Pencil,
   FileText,
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 import { maskCurrency } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
 import { SubelementoCampo } from "@/components/ne-form/SubelementoCampo";
@@ -58,8 +63,9 @@ const formularioDaNe = (ne: NotaEmpenho) => ({
   dataProvisaoConcedida: ne.dataProvisaoConcedida ? ne.dataProvisaoConcedida.split("T")[0] : "",
 });
 
+const ESPERA_BUSCA_MS = 300;
+
 export default function NotasEmpenho() {
-  const router = useRouter();
   const [notas, setNotas] = useState<NotaEmpenho[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -84,36 +90,56 @@ export default function NotasEmpenho() {
   const { elementos, loading: elementosLoading, erro: elementosErro, recarregar: recarregarElementos } = useElementos();
 
   const [selecionadoId, setSelecionadoId] = useState<string | null>(null);
-  const [formEnabled, setFormEnabled] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
-  const filterItems = () => notas;
   const [editingId, setEditingId] = useState<string | null>(null);
   // Gasto (OPs já emitidas) da NE aberta no formulário; 0 em NE nova (T31).
   const [gastoNeCents, setGastoNeCents] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [confirmarCancelamento, setConfirmarCancelamento] = useState(false);
+  // Perfil Consulta só lê: o servidor já bloqueia, a tela avisa antes.
+  const somenteLeitura = useAppStore((s) => s.userProfile?.perfil) === "CONSULTA";
+  // Só a resposta da última consulta vale (uma busca antiga não sobrescreve a nova).
+  const ultimaConsulta = useRef(0);
+  const esperaBusca = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchNotas = useCallback(async (busca = "", page = 1) => {
+    const consulta = ++ultimaConsulta.current;
     setIsLoading(true);
     try {
       let url = `/api/notas-empenho?page=${page}`;
       if (busca) url += `&busca=${encodeURIComponent(busca)}`;
-      
+
       const data = await apiClient.get(url);
+      if (consulta !== ultimaConsulta.current) return;
       setNotas(data.notas || []);
+      setCurrentPage(page);
       if (data.pagination) {
         setTotalPages(data.pagination.totalPages || 1);
       }
     } catch (error: any) {
+      if (consulta !== ultimaConsulta.current) return;
       toast.error(error.message || "Erro ao carregar Notas de Empenho.");
       setNotas([]);
     } finally {
-      setIsLoading(false);
+      if (consulta === ultimaConsulta.current) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchNotas(searchTerm, currentPage);
-  }, [fetchNotas, currentPage]);
+    const init = async () => {
+      await fetchNotas("", 1);
+    };
+    init();
+    return () => { if (esperaBusca.current) clearTimeout(esperaBusca.current); };
+  }, [fetchNotas]);
+
+  const buscarAoDigitar = (valor: string) => {
+    setSearchTerm(valor);
+    if (esperaBusca.current) clearTimeout(esperaBusca.current);
+    esperaBusca.current = setTimeout(() => fetchNotas(valor, 1), ESPERA_BUSCA_MS);
+  };
+
+  /** Recarrega a lista mantendo a busca e a página (depois de salvar ou cancelar). */
+  const recarregarLista = () => fetchNotas(searchTerm, currentPage);
 
   // Aviso de NE parecida (D33, T30): mesmo valor + elemento + subelemento.
   // Debounce de 500 ms na consulta.
@@ -146,6 +172,8 @@ export default function NotasEmpenho() {
         const params = new URLSearchParams({ valor: String(num) });
         if (elementoWatch) params.append('elemento', elementoWatch);
         if (subelementoWatch) params.append('subelemento', subelementoWatch);
+        // Editando: a própria NE não conta como parecida.
+        if (editingId) params.append('ignorarId', editingId);
         const res = await fetch(`/api/notas-empenho/duplicidade?${params.toString()}`);
         const data = await res.json();
         if (data.duplicado && data.nota) {
@@ -159,7 +187,7 @@ export default function NotasEmpenho() {
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timer);
-  }, [valorNEWatch, elementoWatch, subelementoWatch]);
+  }, [valorNEWatch, elementoWatch, subelementoWatch, editingId]);
 
   // A consulta de duplicidade devolve os dados da NE parecida (T30); antes
   // vinham só número e data, e o formulário ficava quase vazio.
@@ -215,36 +243,49 @@ export default function NotasEmpenho() {
 
       toast.success(editingId ? "NE atualizada com sucesso!" : "NE cadastrada com sucesso!");
       handleIncluir();
-      await fetchNotas();
+      await recarregarLista();
     } catch (error: any) {
       toast.error(error.message || "Erro ao salvar NE.");
     }
   };
 
-  const handleExcluir = async () => {
+  // Cancelar não tem volta (a NE não aceita mais OP): sempre pede confirmação.
+  const handleCancelarNe = () => {
     if (!editingId) {
       toast.error("Nenhuma NE selecionada. Clique em uma NE da tabela primeiro.");
       return;
     }
+    setConfirmarCancelamento(true);
+  };
+
+  const confirmarCancelarNe = async () => {
+    if (!editingId) return;
     try {
       await apiClient.delete(`/api/notas-empenho/${editingId}`);
       toast.success("NE cancelada com sucesso!");
       handleIncluir();
-      await fetchNotas();
+      await recarregarLista();
     } catch (error: any) {
       toast.error(error.message || "Erro ao cancelar NE.");
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'LIQUIDADO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-green-100 text-green-800 border border-green-300">PAGO</span>;
-    if (status === 'CANCELADO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-red-100 text-red-700 border border-red-200">CANCELADO</span>;
-    if (status === 'Processando') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-amber-100 text-amber-700 border border-amber-200">PROCESSANDO</span>;
-    return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-orange-100 text-orange-800 border border-orange-300">A PAGAR</span>;
+  /** Abre a NE no formulário para edição (lápis ou clique na linha). */
+  const editarNe = (ne: NotaEmpenho) => {
+    if (ne.status === 'CANCELADO') return;
+    setSelecionadoId(ne.id);
+    setEditingId(ne.id);
+    reset(formularioDaNe(ne));
+    setGastoNeCents(toCents(ne.saldo?.gasto ?? 0));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const formatCurrency = (value: number) =>
-    value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const getStatusBadge = (status: string) => {
+    if (status === 'LIQUIDADO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-green-100 text-green-800 border border-green-300">PAGO</span>;
+    if (status === 'PARCIALMENTE PAGO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-amber-100 text-amber-800 border border-amber-300">PARCIAL</span>;
+    if (status === 'CANCELADO') return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-red-100 text-red-700 border border-red-200">CANCELADO</span>;
+    return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase bg-orange-100 text-orange-800 border border-orange-300">A PAGAR</span>;
+  };
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "-";
@@ -256,7 +297,7 @@ export default function NotasEmpenho() {
     toast.error("Preencha os campos obrigatórios corretamente.");
   };
 
-  const handleSalvar = handleSubmit(onSubmit, onError);
+  const handleSalvar = () => handleSubmit(onSubmit, onError)();
 
   return (
     <FormProvider {...methods}>
@@ -283,7 +324,9 @@ export default function NotasEmpenho() {
             <button
               type="button"
               onClick={handleSalvar}
-              className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2"
+              disabled={somenteLeitura}
+              title={somenteLeitura ? "O perfil Consulta não altera NEs." : undefined}
+              className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save className="w-4 h-4" /> Salvar
             </button>
@@ -294,13 +337,21 @@ export default function NotasEmpenho() {
               <Search className="w-4 h-4" /> Localizar
             </button>
             <button 
-              onClick={handleExcluir}
-              className="bg-white hover:bg-red-50 text-red-500 text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm border border-slate-200 hover:border-red-200 transition-all flex items-center gap-2"
+              onClick={handleCancelarNe}
+              disabled={somenteLeitura}
+              title={somenteLeitura ? "O perfil Consulta não cancela NEs." : undefined}
+              className="bg-white hover:bg-red-50 text-red-500 text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm border border-slate-200 hover:border-red-200 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Trash2 className="w-4 h-4" /> Excluir
+              <Ban className="w-4 h-4" /> Cancelar NE
             </button>
           </div>
         </div>
+
+        {somenteLeitura && (
+          <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+            Seu perfil é Consulta: você pode ver e buscar NEs, mas não incluir, alterar ou cancelar.
+          </p>
+        )}
 
         {/* FORM SECTION (Glass Panel) */}
         <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
@@ -481,11 +532,7 @@ export default function NotasEmpenho() {
                 type="text"
                 placeholder="Buscar nota..."
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setCurrentPage(1); // Reseta para a pagina 1 ao buscar
-                  fetchNotas(e.target.value, 1);
-                }}
+                onChange={(e) => buscarAoDigitar(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm font-medium focus:outline-none focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
               />
             </div>
@@ -529,13 +576,13 @@ export default function NotasEmpenho() {
                     return (
                     <tr
                       key={ne.id}
-                      onClick={() => setSelecionadoId(ne.id)}
+                      onClick={() => editarNe(ne)}
                       tabIndex={0}
                       role="button"
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
-                          setSelecionadoId(ne.id);
+                          editarNe(ne);
                         }
                       }}
                       className={`group transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset ${baseRowStyle}`}
@@ -580,11 +627,7 @@ export default function NotasEmpenho() {
                               title="Editar"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setSelecionadoId(ne.id);
-                                setEditingId(ne.id);
-                                reset(formularioDaNe(ne));
-                                setGastoNeCents(toCents(ne.saldo?.gasto ?? 0));
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                editarNe(ne);
                               }}
                               className="p-1.5 text-slate-400 hover:text-blue-900 hover:bg-white rounded-md transition-all"
                             >
@@ -608,15 +651,15 @@ export default function NotasEmpenho() {
             </span>
             <div className="flex gap-2">
               <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                onClick={() => fetchNotas(searchTerm, Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
                 className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors shadow-sm"
               >
                 Anterior
               </button>
               <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
+                onClick={() => fetchNotas(searchTerm, Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage >= totalPages}
                 className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors shadow-sm"
               >
                 Próxima
@@ -625,16 +668,24 @@ export default function NotasEmpenho() {
           </div>
         </div>
 
-        <div className="mt-8 pt-4 flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest pb-8">
+        <div className="mt-8 pt-4 text-sm font-bold text-slate-500 uppercase tracking-widest pb-8">
           <p>© 2026 Gestão de Empenho. Todos os direitos reservados.</p>
-          <div className="flex gap-4">
-            <span className="hover:text-slate-600 cursor-pointer">Privacidade</span>
-            <span className="hover:text-slate-600 cursor-pointer">Termos de Uso</span>
-            <span className="hover:text-slate-600 cursor-pointer">Suporte Técnico</span>
-          </div>
         </div>
       </div>
     </div>
+
+    <AlertDialog open={confirmarCancelamento} onOpenChange={setConfirmarCancelamento}>
+      <AlertDialogContent>
+        <AlertDialogTitle>Cancelar NE</AlertDialogTitle>
+        <AlertDialogDescription>
+          Cancelar esta NE não tem volta: ela fica marcada como CANCELADA, não pode mais ser editada e não aceita novas Ordens de Pagamento. Deseja continuar?
+        </AlertDialogDescription>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Voltar</AlertDialogCancel>
+          <AlertDialogAction onClick={confirmarCancelarNe}>Cancelar NE</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </FormProvider>
   );
 }

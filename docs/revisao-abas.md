@@ -12,7 +12,7 @@ Conferência funcional do sistema, uma aba por vez. Para cada aba:
 |---|---|---|
 | 1 | Login e Perfil | ✅ testado e corrigido em 20/10/2026 (L1–L6); L7 e L8 ficam para depois |
 | 2 | Credores | 🔧 C1–C9 corrigidos em 21/10/2026; falta o teste logado |
-| 3 | Notas de Empenho | — |
+| 3 | Notas de Empenho | 🔧 N1–N11 corrigidos em 21/10/2026; falta o teste logado |
 | 4 | Ordem de Pagamento | — |
 | 5 | Consulta / Impressão | — |
 | 6 | DARF | — |
@@ -133,6 +133,69 @@ Não é bug: o aviso "CPF/CNPJ já cadastrado" enquanto se digita só olha os 20
 - [ ] **C-22** Preencher pelo CNPJ → CEP no formato `00000-000` e telefone `(00) 0000-0000` (C6).
 - [ ] **C-23** Digitar rápido na busca → a tabela mostra o resultado do texto final (C4).
 - [ ] **C-24** A tabela não tem mais o botão do olho, e o rodapé não tem mais Termos, Privacidade e Suporte (C7 e C8).
+
+### Resultado do teste
+
+| Item | ✅/❌ | Observação |
+|---|---|---|
+| | | |
+
+---
+
+## Aba 3 — Notas de Empenho
+
+### Achados da revisão do código (antes do teste)
+
+N1 a N5 foram **reproduzidos com teste automático**; os outros, confirmados lendo o código. Conferi também, e **estão certos**: o valor ao editar (correção do ×100), a Unidade Orçamentária e a Gestão, que continuam sendo enviadas mesmo com o campo travado, e o bloqueio de OP em NE cancelada.
+
+| # | Achado | Gravidade | Proposta |
+|---|---|---|---|
+| N1 ✅ corrigido | O botão **Excluir** cancela a NE **na hora, sem pedir confirmação**, e o cancelamento não tem volta: a NE some da edição e não aceita mais OP. O botão diz "Excluir", mas a ação é "cancelar". O cancelamento também não fica registrado na auditoria. | 🟠 média | Pedir confirmação, chamar o botão de "Cancelar NE" e registrar na auditoria quem cancelou e quando. |
+| N2 ✅ corrigido | Ao **editar** uma NE, aparece "Possível Duplicação de Valores" apontando para **a própria NE**. NEs canceladas também entram no aviso. | 🟠 média | Tirar do aviso a própria NE e as canceladas. |
+| N3 ✅ corrigido | Uma NE **parcialmente paga** aparece com o selo **"A PAGAR"**, igual a uma NE sem nenhuma OP. | 🟡 baixa | Selo próprio: "PARCIAL". |
+| N4 ✅ corrigido | Depois de **salvar ou cancelar**, a lista volta para a página 1 **sem o filtro**, mas a caixa de busca continua com o texto e o contador de página fica errado. | 🟡 baixa | Recarregar a mesma busca e a mesma página. |
+| N5 ✅ corrigido | A busca consulta o servidor a cada tecla e não descarta respostas antigas: a lista pode mostrar o resultado de uma busca anterior. Fora da página 1, cada tecla faz duas consultas. | 🟡 baixa | Mesmo ajuste da aba Credores: esperar a digitação e ignorar respostas antigas. |
+| N6 ✅ corrigido | Trocar o **número** de uma NE que já tem OP: as OPs acompanham, mas o **acompanhamento de DARF** fica com o número antigo. | 🟡 baixa | Atualizar também o DARF na mesma operação (só os dados, sem mudar o banco). |
+| N7 ✅ corrigido | O perfil **Consulta** vê os botões Salvar e Excluir. O servidor bloqueia, mas a pessoa só descobre ao clicar. | 🟡 baixa | Aviso na tela e botões desabilitados, como na aba Credores. |
+| N8 ✅ corrigido | No rodapé, "Privacidade", "Termos de Uso" e "Suporte Técnico" parecem links, mas não fazem nada. | 🟡 baixa | Tirar os três. |
+| N9 ✅ corrigido | Clicar numa linha da tabela só a destaca; para editar, é preciso clicar no lápis. Na aba Credores, clicar na linha já abre o cadastro. | 🟡 baixa | Clicar na linha abre a NE para edição, como em Credores. |
+| N10 ✅ corrigido | Pela API, editar uma NE **sem número** grava a NE com o número vazio (a tela não deixa, mas o servidor não confere). | 🟡 baixa | Validar o número no servidor também. |
+| N11 ✅ corrigido | A mensagem "Não é possível reduzir o valor da NE…" mostra os valores no formato americano (`R$ 100.00`). | 🟡 baixa | Formato brasileiro (`R$ 100,00`). |
+
+### Roteiro de teste (marcar ✅ / ❌)
+
+**Cadastro**
+- [ ] **N-1** Cadastrar uma NE `TESTE` com número, valor, elemento e subelemento → "NE cadastrada com sucesso!" e ela aparece no topo da lista com a data de hoje em "Cadastro".
+- [ ] **N-2** Cadastrar com um número que já existe → "já está cadastrada" e nada é gravado.
+- [ ] **N-3** Valor zero ou vazio → erro no campo Valor.
+- [ ] **N-4** Trocar o elemento → o subelemento é limpo e a lista de subelementos muda.
+- [ ] **N-5** Digitar valor, elemento e subelemento iguais aos de outra NE → aviso "Possível Duplicação". O botão "Carregar dados da NE…" abre a outra NE em modo edição.
+
+**Edição**
+- [ ] **N-6** Clicar no lápis de uma NE → os campos carregam, incluindo o valor no formato `1.234,56` e a Data de Provisão.
+- [ ] **N-7** Salvar sem mexer em nada → o valor continua o mesmo (correção do ×100, PR #55).
+- [ ] **N-8** Ao editar uma NE, o aviso de duplicidade **não** aponta para a própria NE (N2 corrigido).
+- [ ] **N-9** Numa NE com OP, reduzir o valor para menos do que já foi gasto → "Não é possível reduzir…".
+- [ ] **N-10** A faixa de saldo mostra valor, gasto e restante corretos de uma NE com OP.
+
+**Lista e busca**
+- [ ] **N-11** Buscar por parte do número → filtra. Com busca ativa, editar e salvar uma NE → a lista continua filtrada e na mesma página (N4 corrigido).
+- [ ] **N-12** Anterior e Próxima funcionam e mostram "Página X de Y".
+- [ ] **N-13** Os selos: NE sem OP = "A PAGAR"; NE paga em parte = "PARCIAL" (N3 corrigido); NE paga toda = "PAGO"; cancelada = "CANCELADO" e riscada.
+- [ ] **N-14** As colunas Valor, Gasto e Restante batem com as OPs da NE.
+
+**Cancelamento**
+- [ ] **N-15** Abrir uma NE **sem OP** e clicar em "Cancelar NE" → pede confirmação. "Voltar" não cancela; confirmando, ela fica CANCELADA (N1 corrigido).
+- [ ] **N-16** Numa NE **com OP**, clicar em "Cancelar NE" e confirmar → "existem N ordem(ns) de pagamento vinculada(s)" e nada muda.
+- [ ] **N-17** Uma NE cancelada não tem lápis de edição e não aceita OP nova.
+
+**Perfil Consulta**
+- [ ] **N-18** Logado como **Consulta**, aparece o aviso "Seu perfil é Consulta" e Salvar/Cancelar NE ficam desabilitados (N7 corrigido).
+
+**Outras correções**
+- [ ] **N-19** Clicar numa linha da tabela (fora do lápis) → a NE abre em "Modo Edição". Numa NE cancelada, nada acontece (N9).
+- [ ] **N-20** Numa NE com OP e com DARF no acompanhamento, trocar o número da NE e salvar → na aba DARF, a NE aparece com o número novo (N6).
+- [ ] **N-21** Reduzir o valor abaixo do gasto → a mensagem mostra os valores como `R$ 1.234,56` (N11).
 
 ### Resultado do teste
 

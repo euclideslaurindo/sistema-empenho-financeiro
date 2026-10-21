@@ -3,7 +3,7 @@ import type { PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 import { NotaEmpenhoDB } from '@/lib/types/db';
 import { parseFormNumber } from '@/lib/utils';
-import { lerValorMonetario, toCents } from '@/lib/money';
+import { formatarBRL, lerValorMonetario, toCents } from '@/lib/money';
 import { statusPeloSaldo } from '@/lib/status-ne';
 import { montarSaldo, saldoParaResposta } from '@/lib/services/saldo-ne';
 
@@ -214,6 +214,9 @@ export class NotasEmpenhoService {
     const { numero, valor, dataPagamento, unidadeOrcamentaria, elemento, subelemento, gestao, historico, dataProvisaoConcedida, dataEmissao } = body;
     const veio = (campo: string) => Object.prototype.hasOwnProperty.call(body ?? {}, campo);
 
+    if (!String(numero ?? '').trim()) {
+      return { success: false, error: 'Número da NE é obrigatório.', status: 400 };
+    }
     const valorDecimal = parseFormNumber(valor);
     if (valorDecimal <= 0) {
       return { success: false, error: 'O valor da NE deve ser maior que zero.', status: 400 };
@@ -248,7 +251,7 @@ export class NotasEmpenhoService {
         // Comparação em centavos (T31). Continua 409 com a mesma mensagem (D46).
         const gastoCents = toCents(opSum[0]?.total_pago ?? 0);
         if (valorCents < gastoCents) {
-          throw { status: 409, error: `Não é possível reduzir o valor da NE para R$ ${valorDecimal.toFixed(2)} pois já foram geradas OPs no valor total de R$ ${(gastoCents / 100).toFixed(2)}.` };
+          throw { status: 409, error: `Não é possível reduzir o valor da NE para R$ ${formatarBRL(valorCents)} pois já foram geradas OPs no valor total de R$ ${formatarBRL(gastoCents)}.` };
         }
         const status = statusPeloSaldo(valorCents, gastoCents, neAntes.status);
 
@@ -280,6 +283,11 @@ export class NotasEmpenhoService {
           `UPDATE notas_empenho SET ${Object.keys(colunas).map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
           [...Object.values(colunas), id]
         );
+        // O acompanhamento de DARF não tem FK com a NE: acompanha a troca de
+        // número aqui, senão ficava com o número antigo.
+        if (numeroNovo !== numeroAntigo) {
+          await conn.execute('UPDATE darf_acompanhamento SET numero_ne = ? WHERE numero_ne = ?', [numeroNovo, numeroAntigo]);
+        }
 
         await registrarAuditoriaNe(
           conn,
@@ -300,16 +308,20 @@ export class NotasEmpenhoService {
     return { success: true, data: null };
   }
 
-  static async cancelar(id: string, perfilSolicitante: string): Promise<ServiceResult> {
+  static async cancelar(id: string, perfilSolicitante: string, usuarioIdSolicitante?: string): Promise<ServiceResult> {
     if (perfilSolicitante === 'CONSULTA') {
       return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
     }
 
     try {
       await withTransaction(async (conn: PoolConnection) => {
-        const [neRows]: any = await conn.execute('SELECT valor, unidade_orcamentaria FROM notas_empenho WHERE id = ? FOR UPDATE', [id]);
+        const [neRows]: any = await conn.execute('SELECT numero, valor, status FROM notas_empenho WHERE id = ? FOR UPDATE', [id]);
         if (!neRows || neRows.length === 0) {
           throw { status: 404, error: 'Nota de empenho não encontrada.' };
+        }
+        const neAntes = neRows[0];
+        if (neAntes.status === 'CANCELADO') {
+          throw { status: 409, error: 'Esta NE já está cancelada.' };
         }
 
         const [opsVinculadas]: any = await conn.execute(
@@ -327,6 +339,17 @@ export class NotasEmpenhoService {
         // estorno desativado pq n tem tabela de dotacao ainda
 
         await conn.execute("UPDATE notas_empenho SET status = 'CANCELADO' WHERE id = ?", [id]);
+        // Cancelar não tem volta: fica na auditoria quem cancelou e quando
+        // (como UPDATE de status, nos valores já usados pela coluna `acao`).
+        const usuarioId = usuarioIdSolicitante ? await resolveUsuarioId(conn, usuarioIdSolicitante) : null;
+        await registrarAuditoriaNe(
+          conn,
+          id,
+          'UPDATE',
+          { numero: neAntes.numero, valor: neAntes.valor, status: neAntes.status },
+          { numero: neAntes.numero, valor: neAntes.valor, status: 'CANCELADO' },
+          usuarioId
+        );
       });
     } catch (error: any) {
       if (error.status && error.error) {
@@ -344,13 +367,15 @@ export class NotasEmpenhoService {
    * ainda podem chegar (cliente antigo), mas não entram na regra (T30).
    * Devolve os dados que o "Carregar dados da NE" usa para preencher a tela.
    */
-  static async verificarDuplicidade(p: { valor: string | null; elemento?: string; subelemento?: string }) {
+  static async verificarDuplicidade(p: { valor: string | null; elemento?: string; subelemento?: string; ignorarId?: string }) {
     if (!p.valor) return { duplicado: false };
 
     const valor = parseFloat(p.valor);
     if (isNaN(valor)) return { duplicado: false };
     const elemento = (p.elemento || '').trim();
     const subelemento = (p.subelemento || '').trim();
+    // A NE em edição não é "parecida" com ela mesma, e NE cancelada não conta.
+    const ignorarId = (p.ignorarId || '').trim();
 
     const rows = await query<any[]>(
       `SELECT ne.id, ne.numero, ne.valor, ne.elemento, ne.subelemento,
@@ -361,9 +386,11 @@ export class NotasEmpenhoService {
         WHERE ne.valor = ?
           AND (ne.elemento = ? OR ? = '')
           AND (ne.subelemento = ? OR ? = '')
+          AND ne.status <> 'CANCELADO'
+          AND (ne.id <> ? OR ? = '')
         ORDER BY ne.created_at DESC
         LIMIT 1`,
-      [valor, elemento, elemento, subelemento, subelemento]
+      [valor, elemento, elemento, subelemento, subelemento, ignorarId, ignorarId]
     );
 
     if (rows && rows.length > 0) {
