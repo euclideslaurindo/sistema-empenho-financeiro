@@ -26,7 +26,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!user) return unauthorizedResponse();
 
     const { id } = await params;
-    const result = await NotasEmpenhoService.cancelar(id, user.perfil);
+    const result = await NotasEmpenhoService.cancelar(id, user.perfil, user.id);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
