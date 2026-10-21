@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Plus,
@@ -9,10 +9,10 @@ import {
   Building2,
   AlertTriangle,
   Pencil,
-  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import { useAppStore } from "@/lib/store";
 import { formatCpfCnpj, formatTelefone, maskCep } from "@/lib/utils";
 import { CIDADE_MAX, completarMunicipio, rotuloMunicipio } from "@/lib/credor-endereco";
 import { encontrarIssMunicipio } from "@/lib/perfis-calculo";
@@ -68,6 +68,7 @@ export default function Credores() {
 }
 
 const PAGE_SIZE = 20;
+const ESPERA_BUSCA_MS = 300;
 
 function CredoresContent() {
   const searchParams = useSearchParams();
@@ -84,6 +85,14 @@ function CredoresContent() {
   const [totalCredores, setTotalCredores] = useState(0);
   // Municípios com cadastro de ISS (T27): sugestões e aviso do Município (Expediente).
   const [municipiosIss, setMunicipiosIss] = useState<IssMunicipioOpcao[]>([]);
+  // Perfil Consulta só lê: o servidor já bloqueia, a tela avisa antes.
+  const somenteLeitura = useAppStore((s) => s.userProfile?.perfil) === "CONSULTA";
+  // Só a resposta da última consulta vale (uma busca antiga não sobrescreve a nova).
+  const ultimaConsulta = useRef(0);
+  const esperaBusca = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Último CNPJ consultado na Receita (ou carregado da tabela).
+  const cnpjConsultado = useRef("");
+  useEffect(() => () => { if (esperaBusca.current) clearTimeout(esperaBusca.current); }, []);
 
   useEffect(() => {
     apiClient
@@ -98,21 +107,30 @@ function CredoresContent() {
 
   // carrega a lista de credores do banco, paginada no servidor
   const fetchCredores = useCallback(async (busca = "", page = 1) => {
+    const consulta = ++ultimaConsulta.current;
     setIsLoading(true);
     try {
       const url = `/api/credores?busca=${encodeURIComponent(busca)}&page=${page}&limit=${PAGE_SIZE}`;
       const data = await apiClient.get(url);
+      if (consulta !== ultimaConsulta.current) return;
       setCredores(data.credores || []);
       setTotalPages(data.pagination?.totalPages || 1);
       setTotalCredores(data.pagination?.total || 0);
       setCurrentPage(page);
     } catch (error: any) {
+      if (consulta !== ultimaConsulta.current) return;
       toast.error(error.message || "Erro de conexão com o servidor.");
       setCredores([]);
     } finally {
-      setIsLoading(false);
+      if (consulta === ultimaConsulta.current) setIsLoading(false);
     }
   }, []);
+
+  const buscarAoDigitar = (valor: string) => {
+    setSearchTerm(valor);
+    if (esperaBusca.current) clearTimeout(esperaBusca.current);
+    esperaBusca.current = setTimeout(() => fetchCredores(valor, 1), ESPERA_BUSCA_MS);
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -140,27 +158,33 @@ function CredoresContent() {
   const handleCnpjBlur = async () => {
     if (!formData.cpfCnpj) return;
     const val = formData.cpfCnpj.replace(/\D/g, "");
-    if (val.length === 14) {
+    // Só consulta quando o CNPJ mudou: passar pelo campo de um credor já
+    // carregado (ou já consultado) não reconsulta a Receita.
+    if (val.length === 14 && val !== cnpjConsultado.current) {
+      cnpjConsultado.current = val;
       toast.info("Consultando CNPJ na Receita Federal...");
       try {
         const res = await fetch(`/api/consulta-cnpj?cnpj=${val}`);
         const data = await res.json();
-        
+
         if (res.ok && data.razao_social) {
+          // Preenche só os campos vazios: o que a pessoa já escreveu fica.
+          const vazio = (v?: string) => !String(v ?? "").trim();
           setFormData(prev => completarMunicipio({
             ...prev,
-            nome: data.razao_social || prev.nome,
-            logradouro: data.logradouro || prev.logradouro,
-            numero: data.numero || prev.numero,
-            bairro: data.bairro || prev.bairro,
-            cep: data.cep || prev.cep,
-            telefone: data.ddd_telefone_1 || prev.telefone
+            nome: vazio(prev.nome) ? data.razao_social : prev.nome,
+            logradouro: vazio(prev.logradouro) ? data.logradouro || prev.logradouro : prev.logradouro,
+            numero: vazio(prev.numero) ? data.numero || prev.numero : prev.numero,
+            bairro: vazio(prev.bairro) ? data.bairro || prev.bairro : prev.bairro,
+            cep: vazio(prev.cep) && data.cep ? maskCep(data.cep) : prev.cep,
+            telefone: vazio(prev.telefone) && data.ddd_telefone_1 ? formatTelefone(data.ddd_telefone_1) : prev.telefone
           }, { cidade: data.municipio, uf: data.uf }));
-          toast.success("Dados da empresa carregados com sucesso!");
+          toast.success("Dados da Receita preenchidos nos campos vazios.");
         } else {
           toast.warning(data.error || "CNPJ não localizado na Receita Federal.");
         }
       } catch {
+        cnpjConsultado.current = ""; // falha de conexão: sair do campo de novo tenta outra vez
         toast.error("Não foi possível consultar o CNPJ externamente.");
       }
     }
@@ -178,8 +202,9 @@ function CredoresContent() {
             setFormData(prev => completarMunicipio({
               ...prev,
               cep: maskCep(val),
-              logradouro: data.logradouro,
-              bairro: data.bairro,
+              // CEP geral de cidade pequena vem sem rua/bairro: não apaga o que já foi digitado.
+              logradouro: data.logradouro || prev.logradouro,
+              bairro: data.bairro || prev.bairro,
             }, { cidade: data.localidade, uf: data.uf }));
             toast.success("Endereço preenchido!");
           }
@@ -199,6 +224,7 @@ function CredoresContent() {
   };
 
   const handleIncluir = () => {
+    cnpjConsultado.current = "";
     setFormData({});
   };
 
@@ -227,7 +253,13 @@ function CredoresContent() {
         setFormData((prev) => ({ ...prev, id: data.id }));
       }
 
-      toast.success(formData.id ? "Credor atualizado!" : "Credor salvo com sucesso!");
+      toast.success(
+        formData.id
+          ? "Credor atualizado!"
+          : data.reativado
+            ? "Este CPF/CNPJ era de um credor excluído: o cadastro foi reativado com os dados informados."
+            : "Credor salvo com sucesso!"
+      );
       await fetchCredores(searchTerm, currentPage);
     } catch (err: any) {
       console.error("Erro ao salvar credor:", err);
@@ -268,6 +300,7 @@ function CredoresContent() {
   };
 
   const handleLoadCredor = (credor: Credor) => {
+    cnpjConsultado.current = (credor.cpfCnpj || "").replace(/\D/g, "");
     setFormData({
       ...credor,
       dataExpedicao: credor.dataExpedicao ? credor.dataExpedicao.split('T')[0] : ""
@@ -298,7 +331,8 @@ function CredoresContent() {
             </button>
             <button 
               onClick={handleSalvar}
-              disabled={isSaving}
+              disabled={isSaving || somenteLeitura}
+              title={somenteLeitura ? "O perfil Consulta não altera credores." : undefined}
               className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
             >
               <Save className="w-4 h-4" /> {isSaving ? "Salvando..." : "Salvar"}
@@ -311,12 +345,20 @@ function CredoresContent() {
             </button>
             <button 
               onClick={handleExcluir}
-              className="bg-white hover:bg-red-50 text-red-500 text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm border border-slate-200 hover:border-red-200 transition-all flex items-center gap-2"
+              disabled={somenteLeitura}
+              title={somenteLeitura ? "O perfil Consulta não exclui credores." : undefined}
+              className="bg-white hover:bg-red-50 text-red-500 text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm border border-slate-200 hover:border-red-200 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Trash2 className="w-4 h-4" /> Excluir
             </button>
           </div>
         </div>
+
+        {somenteLeitura && (
+          <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+            Seu perfil é Consulta: você pode ver e buscar credores, mas não incluir, alterar ou excluir.
+          </p>
+        )}
 
         {/* FORM SECTION (Glass Panel) */}
         <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
@@ -545,10 +587,7 @@ function CredoresContent() {
                 type="text"
                 placeholder="Buscar credor..."
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  fetchCredores(e.target.value, 1);
-                }}
+                onChange={(e) => buscarAoDigitar(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-full text-sm font-medium focus:outline-none focus:ring-4 focus:ring-blue-900/10 focus:border-blue-800 transition-all duration-300"
               />
             </div>
@@ -624,16 +663,6 @@ function CredoresContent() {
                       <td className="py-5 text-right rounded-r-lg pr-2">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            title="Visualizar Detalhes"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toast.info(`Detalhes do credor: ${c.nome}`);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-blue-900 hover:bg-white rounded-md transition-all"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
                             title="Editar"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -646,11 +675,12 @@ function CredoresContent() {
                           <button
                             title="Excluir"
                             aria-label="Excluir credor"
+                            disabled={somenteLeitura}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleExcluirDaTabela(c.id);
                             }}
-                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-white rounded-md transition-all"
+                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-white rounded-md transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -689,13 +719,8 @@ function CredoresContent() {
           )}
         </div>
 
-        <div className="mt-8 pt-4 flex justify-between items-center text-sm font-bold text-slate-500 uppercase tracking-widest pb-8">
+        <div className="mt-8 pt-4 text-sm font-bold text-slate-500 uppercase tracking-widest pb-8">
           <p>© 2026 Gestão de Empenho. Todos os direitos reservados.</p>
-          <div className="flex gap-4">
-            <span className="hover:text-slate-600 cursor-pointer">Termos de Uso</span>
-            <span className="hover:text-slate-600 cursor-pointer">Política de Privacidade</span>
-            <span className="hover:text-slate-600 cursor-pointer">Suporte</span>
-          </div>
         </div>
       </div>
 
@@ -709,7 +734,7 @@ function CredoresContent() {
         <AlertDialogContent>
           <AlertDialogTitle>Excluir credor</AlertDialogTitle>
           <AlertDialogDescription>
-            Tem certeza que deseja excluir este credor? Essa ação pode ser revertida apenas por um administrador.
+            Tem certeza que deseja excluir este credor? Ele sai da lista. Se o mesmo CPF/CNPJ for cadastrado de novo, o cadastro é reativado com os dados novos.
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>

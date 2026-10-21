@@ -150,6 +150,47 @@ describe('Integração API Credores [id]', () => {
       expect(data.error).toContain('Outra Empresa');
     });
 
+    describe('trocar o CPF/CNPJ (revisão aba 2, C5)', () => {
+      const conexao = (totalOps: number) => {
+        const execute = vi.fn(async (sql: string) => {
+          if (sql.includes('FOR UPDATE')) return [[{ id: 'credor-1', cpf_cnpj: '11.222.333/0001-81' }]];
+          if (sql.includes('FROM ordens_pagamento')) return [[{ total: totalOps }]];
+          if (sql.includes('SELECT id FROM usuarios')) return [[{ id: '123' }]];
+          if (sql.includes('UPDATE credores')) return [{ affectedRows: 1 }];
+          return [[]];
+        });
+        (withTransaction as any).mockImplementationOnce(async (cb: any) => cb({ execute }));
+        return execute;
+      };
+      const put = (cpfCnpj: string) =>
+        PUT(
+          new NextRequest('http://localhost:3000/api/credores/credor-1', { method: 'PUT', body: JSON.stringify({ nome: 'Empresa X', cpfCnpj }) }),
+          { params: Promise.resolve({ id: 'credor-1' }) }
+        ) as any;
+
+      test('credor com OP: recusa a troca e não grava', async () => {
+        (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
+        const execute = conexao(3);
+        const res = await put('12.345.678/0001-95');
+        expect(res.status).toBe(409);
+        expect((await res.json()).error).toContain('3 ordem(ns) de pagamento');
+        expect(execute.mock.calls.some(([s]: any[]) => String(s).startsWith('UPDATE'))).toBe(false);
+      });
+
+      test('credor sem OP: troca normalmente', async () => {
+        (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
+        conexao(0);
+        expect((await put('12.345.678/0001-95')).status).toBe(200);
+      });
+
+      test('mesmo CPF/CNPJ: nem consulta as OPs', async () => {
+        (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
+        const execute = conexao(3);
+        expect((await put('11.222.333/0001-81')).status).toBe(200);
+        expect(execute.mock.calls.some(([s]: any[]) => String(s).includes('FROM ordens_pagamento'))).toBe(false);
+      });
+    });
+
     test('Credor inexistente retorna 404', async () => {
       (getAuthUser as any).mockResolvedValue({ id: '123', perfil: 'ADMIN' });
 
