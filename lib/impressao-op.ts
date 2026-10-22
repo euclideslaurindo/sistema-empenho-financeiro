@@ -1,7 +1,7 @@
 // Linhas de "Discriminação dos Descontos" da via impressa da OP (T12).
 // Lê o snapshot gravado na OP (T10) — nunca a config atual —, pra uma
 // reimpressão mostrar exatamente as alíquotas usadas no dia do cálculo.
-import { formatarBRL, toCents } from "@/lib/money";
+import { formatarBRL, toCents, totalItemCents } from "@/lib/money";
 
 export interface LinhaDesconto {
   chave: string; // campo do verso (irrf, iss, ..., taxaBancaria, taxaPix)
@@ -71,4 +71,64 @@ export function linhasDescontoDaOp(op: { retencoesSnapshot?: unknown }): LinhaDe
 
 export function formatarValorOp(valor: string | number | null | undefined): string {
   return formatarBRL(toCents(valor));
+}
+
+export interface ItensImpressao {
+  especificacao: string;
+  unidade: string;
+  quantidade: string;
+  valorUnitario: string;
+  valorTotal: string;
+}
+
+/**
+ * Itens da OP (itens_json) nas células da via, um por linha. O total de cada
+ * item é a mesma conta da OP (lib/money.ts): centavos inteiros, 2 casas
+ * (antes 1,5 × 10,33 saía "15,495"). O mysql2 já entrega o JSON como array;
+ * texto só é lido se vier serializado de outro lugar.
+ */
+export function itensParaImpressao(itensJson: string | any[] | null | undefined): ItensImpressao {
+  const vazio = { especificacao: "", unidade: "", quantidade: "", valorUnitario: "", valorTotal: "" };
+  if (!itensJson) return vazio;
+  let itens: any;
+  try {
+    itens = typeof itensJson === "string" ? JSON.parse(itensJson) : itensJson;
+  } catch {
+    return vazio;
+  }
+  if (!Array.isArray(itens) || itens.length === 0) return vazio;
+  return {
+    especificacao: itens.map((i: any) => i?.especificacao || "").join("\n"),
+    unidade: itens.map((i: any) => i?.unidade || "").join("\n"),
+    quantidade: itens.map((i: any) => String(i?.quantidade ?? "").replace(".", ",")).join("\n"),
+    valorUnitario: itens.map((i: any) => formatarBRL(toCents(i?.valorUnitario))).join("\n"),
+    valorTotal: itens.map((i: any) => formatarBRL(totalItemCents(i?.quantidade, i?.valorUnitario))).join("\n"),
+  };
+}
+
+/** Data 'YYYY-MM-DD' como 'DD/MM/AAAA'; sem data, campo vazio (e não "-") na via. */
+export function dataNaVia(data: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(data ?? "").trim());
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+}
+
+/**
+ * Datas da frente da via:
+ * - "PROVISÃO CONCEDIDA — Data" é a Data de Provisão da NE (antes saía a
+ *   data de emissão da OP);
+ * - "DEDUZIDO / LIQUIDADO / PAGO — DATA" é a data do pagamento da OP (antes
+ *   saía sempre vazia: o campo impresso nunca era preenchido).
+ */
+export function datasDaVia(
+  op: { dataPagamento?: string | null },
+  ne: { dataProvisaoConcedida?: string | null } | null | undefined
+) {
+  const pagamento = dataNaVia(op.dataPagamento);
+  return {
+    provisaoData: dataNaVia(ne?.dataProvisaoConcedida),
+    pagoData: pagamento,
+    deduzidoData: pagamento,
+    liquidadoData: pagamento,
+    pagamentoData: pagamento,
+  };
 }
