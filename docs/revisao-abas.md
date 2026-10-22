@@ -452,7 +452,7 @@ O que está certo:
 
 | Item | ✅/❌ | Observação |
 |---|---|---|
-| | | |
+| U-9 | ✅ | testado pelo usuário em 22/10/2026: usuário com NE não foi excluído (mensagem pediu para bloquear); usuário sem histórico foi excluído |
 
 ---
 
