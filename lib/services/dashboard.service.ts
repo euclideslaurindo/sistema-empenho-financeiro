@@ -1,13 +1,14 @@
 import { query } from '@/lib/db';
 
-// Cache em memória — safe em instância única (standalone Next.js)
-// TTL de 5 minutos: dashboard não precisa de tempo real
-const CACHE_TTL_MS = 5 * 60 * 1000;
+// Cache em memória — safe em instância única (standalone Next.js).
+// 1 minuto (antes 5): depois de emitir uma OP, o painel não fica minutos
+// com o valor antigo. O botão Atualizar da tela pede `fresco` e ignora o cache.
+const CACHE_TTL_MS = 60 * 1000;
 let statsCache: { data: any; expiresAt: number } | null = null;
 
 export class DashboardService {
-  static async obterEstatisticas() {
-    if (statsCache && Date.now() < statsCache.expiresAt) {
+  static async obterEstatisticas({ fresco = false }: { fresco?: boolean } = {}) {
+    if (!fresco && statsCache && Date.now() < statsCache.expiresAt) {
       return statsCache.data;
     }
 
@@ -73,15 +74,6 @@ export class DashboardService {
        LIMIT 5`
     );
 
-    // Atividades recentes (últimas ordens)
-    const ultimasOrdens = await query<Record<string, any>[]>(
-      `SELECT credor_nome as credorNome, valor_pagamento as valorPagamento,
-              DATE_FORMAT(created_at, '%d/%m/%Y às %H:%i') as quando
-       FROM ordens_pagamento
-       ORDER BY created_at DESC
-       LIMIT 3`
-    );
-
     // Calcular variações percentuais reais
     const credoresAtual = credoresCount?.total || 0;
     const credoresAnterior = credoresMesAnterior?.total || 0;
@@ -112,7 +104,8 @@ export class DashboardService {
       pagamentosPendentesTotal: pagAtual,
       pagamentosVariacao: pagVariacao,
       ultimasNes: ultimasNes || [],
-      ultimasOrdens: ultimasOrdens || [],
+      // Quando os números foram lidos do banco (a tela mostra "Atualizado às").
+      atualizadoEm: new Date().toISOString(),
     };
 
     statsCache = { data: responseData, expiresAt: Date.now() + CACHE_TTL_MS };
