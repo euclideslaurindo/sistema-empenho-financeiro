@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { extrairCodigoElemento } from '@/lib/elementos';
 import { calcularRetencoesDaOp, type CacheCalculo } from '@/lib/services/calculo-op.service';
 import type { CampoTributario, CampoDesconto } from '@/lib/retencoes';
-import { toCents, fromCents, itensBatemComValor, somaItensCents } from '@/lib/money';
+import { toCents, fromCents, formatarBRL, itensBatemComValor, lerValorMonetario, somaItensCents } from '@/lib/money';
 import { calcularProximoNumeroOp } from '@/lib/services/numeracao-op';
 import { entraDarfDaConfig, sincronizarDarfDaOp } from '@/lib/services/darf.service';
 
@@ -11,11 +11,33 @@ import { entraDarfDaConfig, sincronizarDarfDaOp } from '@/lib/services/darf.serv
 // que a NE já foi travada. Sem transação, sem retry e sem status da NE — quem
 // chama decide (OP individual recalcula logo depois; o lote, uma vez no fim).
 
-// Helper para higienizar números, exatamente como estava na rota antiga
+// Mesmo leitor de valores da NE: "1.234,56" é R$ 1.234,56 (antes o
+// parseFloat lia R$ 1,23). Texto inválido continua virando 0.
 const safeNumber = z.union([z.string(), z.number()]).transform(val => {
   if (typeof val === 'number') return val;
-  return parseFloat(String(val)) || 0;
+  const lido = lerValorMonetario(val);
+  return Number.isFinite(lido) ? lido : 0;
 });
+
+/** Mensagens com valores sempre como "R$ 1.234,56". */
+const reais = (cents: number) => `R$ ${formatarBRL(cents)}`;
+
+/** Itens que não somam o valor a pagar (criação e edição usam a mesma mensagem). */
+export const mensagemItensNaoBatem = (itensCents: number, brutoCents: number) =>
+  `A soma dos itens (${reais(itensCents)}) não bate com o valor a pagar da OP (${reais(brutoCents)}). Confira os itens.`;
+
+/**
+ * Descontos maiores que o bruto dariam líquido negativo. A tela já não
+ * deixa; o servidor confere também (criação e edição).
+ */
+export function garantirLiquidoNaoNegativo(resultado: { liquidoCents: number; totalDescontosCents: number }, brutoCents: number) {
+  if (resultado.liquidoCents < 0) {
+    throw {
+      status: 400,
+      error: `O total de descontos (${reais(resultado.totalDescontosCents)}) é maior que o valor a pagar (${reais(brutoCents)}).`,
+    };
+  }
+}
 
 // Schema isolado e protegido
 export const ordemPagamentoSchema = z.object({
@@ -151,7 +173,6 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
   );
   // Saldo em centavos inteiros (T31), nunca `valor - pago` em ponto flutuante.
   const saldoCents = toCents(valorNe) - toCents(paidRows[0]?.total_pago ?? 0);
-  const saldoDisponivel = fromCents(saldoCents);
   // Mesma conversão de sempre, mas passando por centavos inteiros (T01)
   // em vez de só Math.round(x*100)/100 — é o valor que entra no motor
   // de retenções, bom já higienizar aqui.
@@ -161,7 +182,7 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
   if (brutoCents > saldoCents) {
     throw {
       status: 422,
-      error: `Saldo insuficiente. Saldo disponível da NE: R$ ${saldoDisponivel.toFixed(2).replace('.', ',')}. Valor solicitado: R$ ${vPagamentoArredondado.toFixed(2).replace('.', ',')}`
+      error: `Saldo insuficiente. Saldo disponível da NE: ${reais(saldoCents)}. Valor solicitado: ${reais(brutoCents)}`
     };
   }
 
@@ -169,7 +190,7 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
   // depois somado; tolerância de 1 centavo.
   const itensCents = somaItensCents(Array.isArray(itens) ? itens : []);
   if (itensCents > 0 && !itensBatemComValor(itensCents, brutoCents)) {
-    throw { status: 400, error: `A soma dos itens (R$ ${fromCents(itensCents).toFixed(2)}) não bate com o valor a pagar da OP (R$ ${vPagamentoArredondado.toFixed(2)}). Fraude detectada.` };
+    throw { status: 400, error: mensagemItensNaoBatem(itensCents, brutoCents) };
   }
 
   const { numeroOp: numeroDaOpGerado, sub: subGerado } = await calcularProximoNumeroOp(
@@ -193,6 +214,7 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
     perfilUsuario: perfil as 'ADMIN' | 'GESTOR' | 'CONSULTA',
     sobrescreverMei: dados.sobrescreverMei,
   }, cache);
+  garantirLiquidoNaoNegativo(resultado, brutoCents);
 
   const finalIrrf = fromCents(resultado.itens.irrf ?? 0);
   const finalIss = fromCents(resultado.itens.iss ?? 0);

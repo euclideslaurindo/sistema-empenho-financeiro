@@ -27,7 +27,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!user) return unauthorizedResponse();
 
     const { id } = await params;
-    const result = await OrdemPagamentoService.excluir(id, user.id, user.perfil);
+    // Motivo da exclusão no corpo ({ motivo }); sem corpo, o serviço recusa.
+    const body = await request.json().catch(() => ({}));
+    const result = await OrdemPagamentoService.excluir(id, user.id, user.perfil, body?.motivo);
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: result.status });

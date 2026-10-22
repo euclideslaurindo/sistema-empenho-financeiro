@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
     if (!user) return unauthorizedResponse();
 
     const body = await request.json();
-    console.log('[POST OP] body recebido:', JSON.stringify(body, null, 2));
     
     const result = await OrdemPagamentoService.criar(body, user.id, user.perfil);
 
