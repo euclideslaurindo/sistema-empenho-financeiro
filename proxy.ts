@@ -14,7 +14,6 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/api/setup') ||
     pathname === '/api/health' ||
     // Arquivos estáticos servidos direto de public/ (imagens, manifest, etc).
     // Sem isso, o brasão de Pernambuco no header (via next/image) quebra:

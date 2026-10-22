@@ -29,23 +29,6 @@ export const notaEmpenhoSchema = z.object({
 export type NotaEmpenhoFormValues = z.input<typeof notaEmpenhoSchema>;
 
 /**
- * Schema Zod para o payload de PUT /api/configuracoes.
- * Os max() batem com o tamanho real das colunas em configuracoes_sistema
- * (nome_completo/email_corporativo VARCHAR(255), unidade_padrao/gestao_padrao VARCHAR(100)).
- */
-export const configuracoesSchema = z.object({
-  nome_completo: z.string().max(255, 'Nome muito longo (máx. 255 caracteres).').optional(),
-  email_corporativo: z.union([z.string().email('Formato de e-mail corporativo inválido.'), z.literal('')]).optional(),
-  unidade_padrao: z.string().max(100, 'Unidade padrão muito longa (máx. 100 caracteres).').optional(),
-  gestao_padrao: z.string().max(100, 'Gestão padrão muito longa (máx. 100 caracteres).').optional(),
-  auto_preencher_credor: z.boolean().optional(),
-  notifica_email_empenho: z.boolean().optional(),
-  exigir_2fa_op: z.boolean().optional(),
-  alerta_integracao: z.boolean().optional(),
-  aviso_manutencao: z.boolean().optional(),
-});
-
-/**
  * Schemas Zod para elementos/subelementos de despesa (projeto Retenções v2, T04).
  * CODIGO_ELEMENTO_REGEX valida o campo cru (ex.: "3.3.90.36"), diferente da regex
  * de extração usada em lib/elementos.ts (que lê o código de um texto maior).
