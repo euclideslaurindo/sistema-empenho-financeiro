@@ -59,7 +59,8 @@ describe('GET /api/darf', () => {
     const [sqlLista, paramsLista] = (query as any).mock.calls.find((c: any[]) => c[0].includes('ORDER BY d.competencia'));
     expect(sqlLista).toContain('competencia = ?');
     expect(sqlLista).toContain('status = ?');
-    expect(paramsLista).toEqual(['2026-10', '2026NE%', '2026NE%', '2026NE%', '%2026NE%', 'PENDENTE', 10, 0]);
+    // OP por trecho; com 4+ dígitos ("2026"), também o documento só com dígitos
+    expect(paramsLista).toEqual(['2026-10', '2026NE%', '%2026NE%', '2026NE%', '%2026NE%', '2026%', 'PENDENTE', 10, 0]);
 
     // totais ignoram o filtro de status (mostram pendente e paga)
     const [sqlTotais, paramsTotais] = (query as any).mock.calls.find((c: any[]) => c[0].includes('GROUP BY d.status'));
@@ -92,14 +93,14 @@ describe('GET /api/darf', () => {
 describe('POST /api/darf/status', () => {
   const ids = Array.from({ length: 10 }, (_, i) => `d${i + 1}`);
 
-  function mockTransacao(existentes: string[]) {
+  function mockTransacao(existentes: string[], statusAtual = 'PENDENTE') {
     const chamadas: Array<[string, any[]]> = [];
     (withTransaction as any).mockImplementationOnce(async (cb: any) =>
       cb({
         execute: vi.fn(async (sql: string, params: any[] = []) => {
           chamadas.push([sql, params]);
           if (sql.includes('SELECT * FROM darf_acompanhamento')) {
-            return [params.filter((p) => existentes.includes(p)).map((id) => ({ id, status: 'PENDENTE', data_pagamento: null }))];
+            return [params.filter((p) => existentes.includes(p)).map((id) => ({ id, status: statusAtual, data_pagamento: null }))];
           }
           return [{ affectedRows: 1 }];
         }),
@@ -143,7 +144,7 @@ describe('POST /api/darf/status', () => {
   });
 
   test('reabrir (PENDENTE) limpa a data de pagamento', async () => {
-    const chamadas = mockTransacao(['d1']);
+    const chamadas = mockTransacao(['d1'], 'PAGA');
     const { status } = await post({ ids: ['d1'], status: 'PENDENTE', dataPagamento: '2026-10-05' });
     expect(status).toBe(200);
     const upd = chamadas.find(([s]) => s.startsWith('UPDATE darf_acompanhamento'))!;

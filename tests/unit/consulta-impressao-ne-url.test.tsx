@@ -61,13 +61,14 @@ const caixa = (sub: string) => screen.getByRole('checkbox', { name: new RegExp('
     expect(caixa('02').checked).toBe(true);
   });
 
-  test('gerar as vias das OPs não consulta mais credores da NE (código morto da T30 removido)', async () => {
+  test('gerar as vias das OPs não consulta credores da NE (T30); a NE é lida uma vez, só para a Data de Provisão', async () => {
     params = new URLSearchParams('ne=2026NE000001');
     render(<ConsultaImpressao />);
     await waitFor(() => expect(caixa('01').checked).toBe(true));
     fireEvent.click(screen.getByRole('button', { name: /GERAR DOCUMENTO\(S\) SELECIONADO\(S\)/ }));
     await waitFor(() => expect(screen.getAllByText(/Ana/).length).toBeGreaterThan(0), { timeout: 3000 });
-    expect((apiClient.get as any).mock.calls.some((c: any[]) => String(c[0]).startsWith('/api/notas-empenho?numero='))).toBe(false);
+    const leiturasDaNe = (apiClient.get as any).mock.calls.filter((c: any[]) => String(c[0]).startsWith('/api/notas-empenho?numero='));
+    expect(leiturasDaNe).toHaveLength(1); // uma vez por geração, não uma por OP
     expect(screen.queryByTestId('credores-ne')).toBeNull();
   });
 });

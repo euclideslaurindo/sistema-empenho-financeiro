@@ -65,7 +65,9 @@ export function numeroPorExtenso(numero: number): string {
   const dezenas = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
   const centenas = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
 
-  if (numero === 0) return "zero";
+  // Em centavos inteiros: 19.99 - 19 em ponto flutuante não vira 98 centavos.
+  const totalCentavos = Math.round((Number(numero) || 0) * 100);
+  if (totalCentavos <= 0) return "zero real";
 
   function converterGrupo(n: number): string {
     if (n === 100) return "cem";
@@ -91,8 +93,8 @@ export function numeroPorExtenso(numero: number): string {
     return texto;
   }
 
-  const reais = Math.floor(numero);
-  const centavos = Math.round((numero - reais) * 100);
+  const reais = Math.floor(totalCentavos / 100);
+  const centavos = totalCentavos % 100;
   
   let partes: string[] = [];
   
@@ -111,7 +113,9 @@ export function numeroPorExtenso(numero: number): string {
     }
     
     let txtReais = partes.join(" ");
-    txtReais += (reais === 1 ? " real" : " reais");
+    // Milhões exatos levam "de": "um milhão de reais", "dois milhões de reais".
+    const soMilhoes = milhoes > 0 && milhares === 0 && unidadesReais === 0;
+    txtReais += reais === 1 ? " real" : soMilhoes ? " de reais" : " reais";
     partes = [txtReais];
   }
   

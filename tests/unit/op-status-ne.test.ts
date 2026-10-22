@@ -65,7 +65,7 @@ describe('status da NE pela OP (T31)', () => {
       gastoDepois: '0',
       oldOp: { id: 'op-1', numero_ne: 'NE-1', valor_pagamento: '90.00' },
     });
-    const r = await OrdemPagamentoService.excluir('op-1', 'u1', 'GESTOR');
+    const r = await OrdemPagamentoService.excluir('op-1', 'u1', 'ADMIN', 'TESTE estorno');
     expect(r.success).toBe(true);
     expect(statusGravado()).toBe('EMITIDO');
     // o status é recalculado depois de apagar a OP, na mesma transação

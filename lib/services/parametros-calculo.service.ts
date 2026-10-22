@@ -2,7 +2,7 @@ import { query, withTransaction } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
 import { CHAVES_TRANSPORTE, type FaixaIrrf, type IssMunicipio, type ParametrosTransporte } from '@/lib/retencoes-transporte';
 import { encontrarIssMunicipio, normalizarMunicipio, type PerfilCalculo } from '@/lib/perfis-calculo';
-import { numero, validarFaixasIrrf, validarMunicipio, validarParametrosTransporte, type FaixaEdicao } from '@/lib/transporte-admin';
+import { numero, reais, validarFaixasIrrf, validarMunicipio, validarParametrosTransporte, valorDoParametro, type FaixaEdicao } from '@/lib/transporte-admin';
 
 async function executar<T>(conn: PoolConnection | undefined, sql: string, values: any[]): Promise<T> {
   if (conn) {
@@ -202,11 +202,11 @@ export async function salvarVigenciaParametros(body: any, usuarioId: string, per
         await conn.execute(
           `INSERT INTO calculo_parametros (perfil, chave, valor, vigente_de, updated_by) VALUES (?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE valor = VALUES(valor), updated_by = VALUES(updated_by)`,
-          [PERFIL_TRANSPORTE, chave, numero(parametros[chave]), vigenteDe, usuarioId]
+          [PERFIL_TRANSPORTE, chave, valorDoParametro(chave, parametros[chave]), vigenteDe, usuarioId]
         );
       }
       const antes = existia ? Object.fromEntries(antesRows.map((r: any) => [r.chave, r.valor])) : null;
-      const depois = Object.fromEntries(CHAVES_TRANSPORTE.map((c) => [c, numero(parametros[c])]));
+      const depois = Object.fromEntries(CHAVES_TRANSPORTE.map((c) => [c, valorDoParametro(c, parametros[c])]));
       await auditar(conn, 'calculo_parametros', `${PERFIL_TRANSPORTE}@${vigenteDe}`, existia ? 'UPDATE' : 'CREATE', antes, depois, usuarioId);
     });
   } catch (e: any) {
@@ -272,9 +272,9 @@ export async function salvarFaixasIrrf(body: any, usuarioId: string, perfil: str
       await conn.execute('DELETE FROM irrf_faixas WHERE vigente_de = ?', [vigenteDe]);
       const depois = faixas.map((f, i) => ({
         ordem: i + 1,
-        limite_ate: i === faixas.length - 1 ? null : numero(f.limiteAte),
+        limite_ate: i === faixas.length - 1 ? null : reais(f.limiteAte),
         aliquota: numero(f.aliquota),
-        parcela_deduzir: numero(f.parcelaDeduzir),
+        parcela_deduzir: reais(f.parcelaDeduzir),
       }));
       for (const f of depois) {
         await conn.execute(
@@ -328,7 +328,7 @@ export async function criarIssMunicipio(body: any, usuarioId: string, perfil: st
     nome: String(body.nome).trim().replace(/\s+/g, ' '),
     uf: String(body.uf).trim().toUpperCase(),
     aliquota: numero(body.aliquota),
-    taxa_expediente: numero(body.taxaExpediente),
+    taxa_expediente: reais(body.taxaExpediente),
     apelidos: normalizarApelidos(body.apelidos),
   };
   try {
@@ -364,7 +364,7 @@ export async function atualizarIssMunicipio(body: any, usuarioId: string, perfil
       const depois = {
         uf: String(body.uf).trim().toUpperCase(),
         aliquota: numero(body.aliquota),
-        taxa_expediente: numero(body.taxaExpediente),
+        taxa_expediente: reais(body.taxaExpediente),
         apelidos: normalizarApelidos(body.apelidos),
         ativo: body.ativo === false ? 0 : 1,
       };

@@ -4,13 +4,8 @@ import { UserCircle, Settings, Shield, Key } from "lucide-react";
 import { ActionToolbar, ActionButton } from "@/components/action-toolbar";
 import { toast } from "sonner";
 import { ChangePasswordModal } from "@/components/change-password-modal";
-
 // Perfil real do usuário (antes a tela mostrava "Nível 1" para todos).
-const ROTULO_PERFIL: Record<string, string> = {
-  ADMIN: "Administrador",
-  GESTOR: "Gestor",
-  CONSULTA: "Consulta (somente leitura)",
-};
+import { ROTULO_PERFIL } from "@/lib/perfis-usuario";
 
 export default function PerfilGestor() {
   const [isEditing, setIsEditing] = useState(false);

@@ -49,7 +49,7 @@ describe('Integração API Usuários [id]', () => {
       (getAuthUser as any).mockResolvedValue({ id: 'admin-2', perfil: 'ADMIN' });
       (query as any)
         .mockResolvedValueOnce([{ id: 'user-3' }]) // SELECT existência
-        .mockResolvedValueOnce([{ id: 'op-1' }]); // SELECT ordens_pagamento vinculadas
+        .mockResolvedValueOnce([{ ops: 1, nes: 0, credores: 0, darfs: 0, auditoria: 0 }]); // registros do usuário
 
       const req = new NextRequest('http://localhost:3000/api/usuarios/user-3', { method: 'DELETE' });
       const res: any = await DELETE(req, { params: Promise.resolve({ id: 'user-3' }) });
@@ -62,7 +62,7 @@ describe('Integração API Usuários [id]', () => {
       (getAuthUser as any).mockResolvedValue({ id: 'admin-2', perfil: 'ADMIN' });
       (query as any)
         .mockResolvedValueOnce([{ id: 'user-3' }]) // SELECT existência
-        .mockResolvedValueOnce([]) // sem OPs vinculadas
+        .mockResolvedValueOnce([{ ops: 0, nes: 0, credores: 0, darfs: 0, auditoria: 0 }]) // sem nenhum registro
         .mockResolvedValueOnce({ affectedRows: 1 }); // DELETE
 
       const req = new NextRequest('http://localhost:3000/api/usuarios/user-3', { method: 'DELETE' });
