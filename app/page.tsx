@@ -1,15 +1,16 @@
 "use client";
 import {
-  Plus,
-  ArrowRight,
-  Printer as PrinterIcon,
   Users,
   FileText,
   Landmark,
   TrendingUp,
+  TrendingDown,
+  RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useAppStore } from "@/lib/store";
 
 interface DashStats {
   credoresTotal: number;
@@ -19,29 +20,54 @@ interface DashStats {
   pagamentosPendentesTotal: number;
   pagamentosVariacao: number;
   ultimasNes: Array<{ numero: string; data: string; unidade: string; valor: number; status: string }>;
+  /** Quando os números foram lidos do banco (ISO). */
+  atualizadoEm?: string;
 }
+
+/** Seta conforme o sinal (antes era sempre para cima, mesmo quando caía). */
+function Seta({ valor, className }: { valor: number; className: string }) {
+  return valor < 0 ? <TrendingDown className={className} aria-hidden="true" /> : <TrendingUp className={className} aria-hidden="true" />;
+}
+
+const horaDe = (iso?: string) =>
+  iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
+
+/** Selos iguais aos da aba Notas de Empenho. */
+const seloNe = (status: string) =>
+  status === "LIQUIDADO" ? "PAGO" : status === "PARCIALMENTE PAGO" ? "PARCIAL" : status === "EMITIDO" ? "A PAGAR" : status.toUpperCase();
 
 export default function Dashboard() {
   const router = useRouter();
+  const somenteLeitura = useAppStore((s) => s.userProfile?.perfil) === "CONSULTA";
   const [mounted, setMounted] = useState(false);
   const [stats, setStats] = useState<DashStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  // Falha na consulta: aviso, em vez de cartões com R$ 0,00 iguais a um sistema vazio.
+  const [erro, setErro] = useState(false);
+
+  // `fresco`: o botão Atualizar lê do banco agora, sem o cache do servidor.
+  const carregar = useCallback(async (fresco = false) => {
+    setStatsLoading(true);
+    try {
+      const r = await fetch(fresco ? "/api/dashboard/stats?atualizar=1" : "/api/dashboard/stats");
+      const data = await r.json();
+      if (!r.ok || data.error) throw new Error(data.error);
+      setStats(data);
+      setErro(false);
+    } catch {
+      setErro(true);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const init = async () => {
       setMounted(true);
-      try {
-        const r = await fetch("/api/dashboard/stats");
-        const data = await r.json();
-        if (!data.error) setStats(data);
-      } catch (err) {
-        // ignore
-      } finally {
-        setStatsLoading(false);
-      }
+      await carregar();
     };
     init();
-  }, []);
+  }, [carregar]);
 
   const handleNavigate = (path: string) => {
     router.push(path);
@@ -62,8 +88,21 @@ export default function Dashboard() {
             <p className="text-slate-500 font-medium text-[1.1rem] max-w-xl leading-relaxed">
               Resumo da execução orçamentária de hoje.
             </p>
+            {stats?.atualizadoEm && (
+              <p className="text-xs font-semibold text-slate-400 mt-1" data-testid="dashboard-atualizado">
+                Atualizado às {horaDe(stats.atualizadoEm)}
+              </p>
+            )}
           </div>
           <div className="mt-6 md:mt-0 flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => carregar(true)}
+              disabled={statsLoading}
+              className="print:hidden bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold py-3 px-4 rounded-xl shadow-sm border border-slate-200 transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${statsLoading ? "animate-spin" : ""}`} aria-hidden="true" /> Atualizar
+            </button>
             <button 
               onClick={() => window.print()}
               className="print:hidden bg-slate-800 hover:bg-slate-700 text-white text-sm font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center gap-2"
@@ -71,20 +110,35 @@ export default function Dashboard() {
               <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
               Imprimir
             </button>
-            <button 
-              onClick={() => handleNavigate("/notas-empenho")}
-              className="print:hidden bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-3 px-6 rounded-xl shadow-[0_8px_20px_rgba(37,99,235,0.25)] transition-all flex items-center gap-2 border border-blue-500"
-            >
-              Novo Empenho
-            </button>
-            <button 
-              onClick={() => handleNavigate("/credores")}
-              className="print:hidden bg-white hover:bg-slate-50 text-blue-900 text-sm font-bold py-3 px-6 rounded-xl shadow-sm border border-slate-200 transition-all flex items-center gap-2"
-            >
-              Novo Credor
-            </button>
+            {/* Perfil Consulta não cadastra: sem os atalhos de "Novo". */}
+            {!somenteLeitura && (
+              <>
+                <button
+                  onClick={() => handleNavigate("/notas-empenho")}
+                  className="print:hidden bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-3 px-6 rounded-xl shadow-[0_8px_20px_rgba(37,99,235,0.25)] transition-all flex items-center gap-2 border border-blue-500"
+                >
+                  Novo Empenho
+                </button>
+                <button
+                  onClick={() => handleNavigate("/credores")}
+                  className="print:hidden bg-white hover:bg-slate-50 text-blue-900 text-sm font-bold py-3 px-6 rounded-xl shadow-sm border border-slate-200 transition-all flex items-center gap-2"
+                >
+                  Novo Credor
+                </button>
+              </>
+            )}
           </div>
         </div>
+
+        {erro && (
+          <div role="alert" className="flex flex-wrap items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-bold text-red-700">
+            <AlertTriangle className="w-5 h-5" aria-hidden="true" />
+            Não foi possível carregar o resumo. Os números abaixo não estão atualizados.
+            <button type="button" onClick={() => carregar(true)} className="underline">
+              Tentar de novo
+            </button>
+          </div>
+        )}
 
         {/* BENTO GRID: METRICS */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 animate-slide-up">
@@ -106,16 +160,18 @@ export default function Dashboard() {
               <div>
                 <p className="text-blue-100/90 text-xs font-black tracking-widest uppercase mb-1">Total a Pagar</p>
                 <h2 className="text-5xl md:text-[4rem] font-black text-white tracking-tighter drop-shadow-sm leading-none mt-2">
-                  {statsLoading 
+                  {statsLoading
                     ? <span className="inline-block w-64 h-14 bg-white/20 rounded-xl animate-pulse" />
-                    : `R$ ${Number(stats?.pagamentosPendentesTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : stats
+                      ? `R$ ${Number(stats.pagamentosPendentesTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : "—"
                   }
                 </h2>
               </div>
               
               <div className="mt-12 flex">
                 <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 text-white text-xs font-bold backdrop-blur-md">
-                   <TrendingUp className="w-3.5 h-3.5" /> {stats?.pagamentosVariacao !== undefined ? `${stats.pagamentosVariacao > 0 ? '+' : ''}${stats.pagamentosVariacao}%` : '...'} vs mês anterior
+                   <Seta valor={stats?.pagamentosVariacao ?? 0} className="w-3.5 h-3.5" /> {stats?.pagamentosVariacao !== undefined ? `${stats.pagamentosVariacao > 0 ? '+' : ''}${stats.pagamentosVariacao}%` : '...'} vs 30 dias atrás
                 </div>
               </div>
             </div>
@@ -132,8 +188,11 @@ export default function Dashboard() {
                   <Users className="w-5 h-5" />
                 </div>
                 {stats?.credoresVariacao !== undefined && (
-                  <div className={`flex items-center text-xs font-black px-2 py-1 rounded-full ${stats.credoresVariacao >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
-                    <TrendingUp className="w-3 h-3 mr-1" /> {stats.credoresVariacao > 0 ? '+' : ''}{stats.credoresVariacao}%
+                  <div
+                    title="Crescimento de credores ativos nos últimos 30 dias"
+                    className={`flex items-center text-xs font-black px-2 py-1 rounded-full ${stats.credoresVariacao >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}
+                  >
+                    <Seta valor={stats.credoresVariacao} className="w-3 h-3 mr-1" /> {stats.credoresVariacao > 0 ? '+' : ''}{stats.credoresVariacao}% em 30 dias
                   </div>
                 )}
               </div>
@@ -142,7 +201,7 @@ export default function Dashboard() {
                 <h2 className="text-4xl font-black text-slate-800 tracking-tight">
                   {statsLoading 
                     ? <span className="inline-block w-16 h-10 bg-slate-100 rounded-lg animate-pulse" />
-                    : stats?.credoresTotal ?? 0
+                    : stats ? stats.credoresTotal ?? 0 : "—"
                   }
                 </h2>
               </div>
@@ -157,19 +216,23 @@ export default function Dashboard() {
                   <FileText className="w-5 h-5" />
                 </div>
                 {stats?.nesVariacao !== undefined && (
-                  <div className={`flex items-center text-xs font-black px-2 py-1 rounded-full ${stats.nesVariacao >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
-                    <TrendingUp className="w-3 h-3 mr-1" /> {stats.nesVariacao > 0 ? '+' : ''}{stats.nesVariacao}%
+                  <div
+                    title="Comparado com os 30 dias anteriores"
+                    className={`flex items-center text-xs font-black px-2 py-1 rounded-full ${stats.nesVariacao >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}
+                  >
+                    <Seta valor={stats.nesVariacao} className="w-3 h-3 mr-1" /> {stats.nesVariacao > 0 ? '+' : ''}{stats.nesVariacao}%
                   </div>
                 )}
               </div>
               <div>
                 <p className="text-slate-400 text-xs font-black tracking-widest uppercase mb-1">Notas Emitidas</p>
                 <h2 className="text-4xl font-black text-slate-800 tracking-tight">
-                  {statsLoading 
+                  {statsLoading
                     ? <span className="inline-block w-12 h-10 bg-slate-100 rounded-lg animate-pulse" />
-                    : stats?.nesUltimos30 ?? 0
+                    : stats ? stats.nesUltimos30 ?? 0 : "—"
                   }
                 </h2>
+                <p className="text-xs font-semibold text-slate-400 mt-1">nos últimos 30 dias</p>
               </div>
             </div>
           </div>
@@ -230,10 +293,10 @@ export default function Dashboard() {
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase border ${
                           ne.status === 'LIQUIDADO' ? 'bg-green-100 text-green-800 border-green-300' :
                           ne.status === 'CANCELADO' ? 'bg-red-100 text-red-700 border-red-200' :
-                          ne.status === 'Processando' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                          ne.status === 'PARCIALMENTE PAGO' ? 'bg-amber-100 text-amber-800 border-amber-300' :
                           'bg-orange-100 text-orange-800 border-orange-300'
                         }`}>
-                          {ne.status === 'LIQUIDADO' ? 'PAGO' : ne.status === 'EMITIDO' ? 'A PAGAR' : ne.status.toUpperCase()}
+                          {seloNe(ne.status)}
                         </span>
                       </td>
                     </tr>

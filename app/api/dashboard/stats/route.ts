@@ -8,7 +8,9 @@ export async function GET(request: NextRequest) {
   if (!user) return unauthorizedResponse();
 
   try {
-    const stats = await DashboardService.obterEstatisticas();
+    // ?atualizar=1 (botão Atualizar): lê do banco agora, sem o cache.
+    const fresco = request.nextUrl.searchParams.get('atualizar') === '1';
+    const stats = await DashboardService.obterEstatisticas({ fresco });
     return NextResponse.json(stats);
   } catch (error: any) {
     console.error('[API GET /dashboard/stats] Erro:', error);
