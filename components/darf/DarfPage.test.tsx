@@ -57,7 +57,7 @@ describe('Tela /darf', () => {
     expect(screen.getByTestId('resumo-pendentes')).toHaveTextContent('3 credores');
     expect(screen.getByTestId('resumo-total')).toHaveTextContent('R$ 1.340,00');
     expect(screen.getAllByText('Garanhuns/PE').length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: '2026.OP.0001' })).toHaveAttribute('href', '/consulta-impressao?ne=2026NE000001');
+    expect(screen.getByRole('link', { name: '2026.OP.0001' })).toHaveAttribute('href', '/consulta-impressao?ne=2026NE000001&ops=op1');
   });
 
   test('"Por credor" pede agrupar=credor, mostra a soma e esconde a seleção', async () => {

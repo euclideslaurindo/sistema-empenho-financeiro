@@ -178,9 +178,15 @@ export async function listarDarf(filtros: FiltrosDarf) {
   }
   if (busca && busca.trim()) {
     const b = busca.trim();
-    // Prefixo nos campos indexados (NE, CPF/CNPJ); nome do credor por trecho.
-    condicoes.push('(d.numero_ne LIKE ? OR d.numero_op LIKE ? OR d.credor_cpf_cnpj LIKE ? OR d.credor_nome LIKE ?)');
-    params.push(`${b}%`, `${b}%`, `${b}%`, `%${b}%`);
+    const digitos = b.replace(/\D/g, '');
+    // NE e CPF/CNPJ por prefixo (indexados); OP e nome do credor por trecho
+    // ("0012" acha "2026.OP.0012"). Com 4+ dígitos, compara também só os
+    // dígitos do documento: "11111111111" acha "111.111.111-11".
+    const porDigitos = digitos.length >= 4
+      ? ` OR REPLACE(REPLACE(REPLACE(REPLACE(d.credor_cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') LIKE ?`
+      : '';
+    condicoes.push(`(d.numero_ne LIKE ? OR d.numero_op LIKE ? OR d.credor_cpf_cnpj LIKE ? OR d.credor_nome LIKE ?${porDigitos})`);
+    params.push(`${b}%`, `%${b}%`, `${b}%`, `%${b}%`, ...(porDigitos ? [`${digitos}%`] : []));
   }
   const whereSemStatus = condicoes.length ? ` WHERE ${condicoes.join(' AND ')}` : '';
   const condicoesComStatus = status ? [...condicoes, 'd.status = ?'] : condicoes;
@@ -313,6 +319,15 @@ export async function alterarStatusDarf(
         throw {
           status: 404,
           error: `${unicos.length - encontrados.length} DARF(s) não encontrada(s). Nenhuma foi alterada.`,
+        };
+      }
+      // Já no status pedido: não regrava a data/observação de DARF já paga
+      // nem conta como "reaberta" a que já estava pendente.
+      const jaNoStatus = encontrados.filter((r: any) => r.status === status).length;
+      if (jaNoStatus > 0) {
+        throw {
+          status: 409,
+          error: `${jaNoStatus} DARF(s) já está(ão) ${status === 'PAGA' ? 'paga(s)' : 'pendente(s)'}. Nenhuma foi alterada.`,
         };
       }
 
