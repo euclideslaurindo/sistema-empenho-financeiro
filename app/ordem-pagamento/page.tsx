@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useForm, FormProvider, useFieldArray, useWatch } from "react-hook-form";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { apiClient } from "@/lib/api-client";
+import { useAppStore } from "@/lib/store";
 import { toCents, formatarBRL } from "@/lib/money";
 import { idNaLinha, type Perfil } from "@/lib/retencoes-form";
 import {
@@ -76,12 +77,18 @@ const valoresIniciais = (): EmissaoForm => ({
  */
 export default function OrdemPagamento() {
   const [ops, setOps] = useState<any[]>([]);
-  const [userRole, setUserRole] = useState<string>("GESTOR");
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
   const [errosLinhas, setErrosLinhas] = useState<Record<string, ErrosLinha>>({});
   const [emitindo, setEmitindo] = useState(false);
   const [resultado, setResultado] = useState<ResultadoEmissao | null>(null);
   const [confirmarLimpar, setConfirmarLimpar] = useState(false);
+  const [confirmarNovaEmissao, setConfirmarNovaEmissao] = useState(false);
+  // Busca das OPs recentes: só a resposta da última consulta vale.
+  const buscaOps = useRef("");
+  const ultimaConsultaOps = useRef(0);
+  // Perfil do login (carregado pelo Shell); a consulta própria cobre o primeiro acesso.
+  const perfilDoLogin = useAppStore((s) => s.userProfile?.perfil);
 
   const { config: configRetencoes, erro: erroConfigRetencoes } = useRetencoesConfig({
     comElementos: false,
@@ -96,14 +103,20 @@ export default function OrdemPagamento() {
   const { saldo, erro: erroSaldo, recarregar: recarregarSaldo } = useSaldoNe(neCarregada);
   const { numeros, recarregar: recarregarNumeros } = useNumerosPrevistos(neCarregada, fields.length);
   const saldoRestanteCents = saldo ? toCents(saldo.restante) : null;
-  const perfil = userRole as Perfil;
+  const perfil = (perfilDoLogin || userRole || "GESTOR") as Perfil;
+  const somenteLeitura = perfil === "CONSULTA";
+  const ehAdmin = perfil === "ADMIN";
 
-  const fetchOps = useCallback(async (busca: string = "") => {
+  const fetchOps = useCallback(async (busca: string = buscaOps.current) => {
+    buscaOps.current = busca;
+    const consulta = ++ultimaConsultaOps.current;
     try {
       const url = busca ? `/api/ordens-pagamento?busca=${encodeURIComponent(busca)}` : "/api/ordens-pagamento";
       const data = await apiClient.get(url);
+      if (consulta !== ultimaConsultaOps.current) return;
       setOps(data.ordens || []);
     } catch (error: any) {
+      if (consulta !== ultimaConsultaOps.current) return;
       toast.error(error.message || "Erro ao carregar Ordens.");
     }
   }, []);
@@ -135,6 +148,26 @@ export default function OrdemPagamento() {
   const novaEmissao = () => {
     reset(valoresIniciais());
     esquecerEstadoDasLinhas();
+  };
+
+  // Com credores na lista, "Nova emissão" descartaria o que foi digitado: pergunta antes.
+  const pedirNovaEmissao = () => (fields.length > 0 ? setConfirmarNovaEmissao(true) : novaEmissao());
+
+  /** Exclusão de OP (só ADMIN): devolve o saldo à NE; true fecha o diálogo. */
+  const excluirOp = async (op: any, motivo: string): Promise<boolean> => {
+    try {
+      await apiClient.delete(`/api/ordens-pagamento/${encodeURIComponent(op.id)}`, { body: JSON.stringify({ motivo }) });
+      toast.success(`OP ${op.numeroEmpenho}${op.sub ? ` /${op.sub}` : ""} excluída. O valor voltou para o saldo da NE ${op.numeroNe}.`);
+      await fetchOps();
+      if (op.numeroNe && op.numeroNe === getValues("neCarregada")) {
+        recarregarSaldo();
+        recarregarNumeros();
+      }
+      return true;
+    } catch (error: any) {
+      toast.error(error?.message || "Erro ao excluir a OP.");
+      return false;
+    }
   };
 
   const adicionarCredor = (credor: CredorApi) => {
@@ -275,13 +308,19 @@ export default function OrdemPagamento() {
           <div className="mt-6 md:mt-0 flex items-center gap-3">
             <button
               type="button"
-              onClick={novaEmissao}
+              onClick={pedirNovaEmissao}
               className="bg-blue-900 hover:bg-blue-800 text-white text-sm font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2"
             >
               <Plus className="w-4 h-4" /> Nova emissão
             </button>
           </div>
         </div>
+
+        {somenteLeitura && (
+          <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+            Seu perfil é Consulta: você pode ver as ordens de pagamento, mas não emitir.
+          </p>
+        )}
 
         <FormProvider {...methods}>
           {/* Enter num campo não emite: só o botão Emitir. */}
@@ -307,13 +346,13 @@ export default function OrdemPagamento() {
           <BarraTotaisEmissao
             saldoRestanteCents={saldoRestanteCents}
             emitindo={emitindo}
-            podeEmitir={!!neCarregada}
+            podeEmitir={!!neCarregada && !somenteLeitura}
             onEmitir={emitir}
             onLimpar={() => setConfirmarLimpar(true)}
           />
         </FormProvider>
 
-        <OpRecentTable ops={ops} onSearch={fetchOps} />
+        <OpRecentTable ops={ops} onSearch={fetchOps} onExcluir={ehAdmin ? excluirOp : undefined} />
       </div>
 
       <DialogoEmissao resultado={resultado} onFechar={() => setResultado(null)} />
@@ -325,6 +364,19 @@ export default function OrdemPagamento() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={limparLista}>Limpar lista</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmarNovaEmissao} onOpenChange={setConfirmarNovaEmissao}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Começar uma nova emissão?</AlertDialogTitle>
+          <AlertDialogDescription>
+            A NE e os {fields.length === 1 ? "dados do credor" : `${fields.length} credores`} desta emissão serão descartados.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar esta emissão</AlertDialogCancel>
+            <AlertDialogAction onClick={novaEmissao}>Descartar e começar de novo</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

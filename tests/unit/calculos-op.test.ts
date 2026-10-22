@@ -211,7 +211,7 @@ describe('OrdemPagamentoService.criar — Edge Cases de Cálculos', () => {
     expect(resultado.success).toBe(false);
     if (!resultado.success) {
       expect(resultado.status).toBe(400);
-      expect(resultado.error).toMatch(/fraude/i);
+      expect(resultado.error).toMatch(/não bate com o valor a pagar.*Confira os itens/);
     }
   });
 
