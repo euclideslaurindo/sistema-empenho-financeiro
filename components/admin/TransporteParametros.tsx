@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Plus, Save } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
 import { CHAVES_TRANSPORTE } from "@/lib/retencoes-transporte";
-import { ROTULOS_PARAMETROS, diffParametros, numero, validarParametrosTransporte } from "@/lib/transporte-admin";
+import { ROTULOS_PARAMETROS, diffParametros, validarParametrosTransporte, valorDoParametro } from "@/lib/transporte-admin";
 import ConfirmarDiffDialog from "@/components/admin/ConfirmarDiffDialog";
 import { formatarData, motivoSoLeitura, paraCampo, type ListaParametros } from "@/components/admin/transporte-tipos";
 
@@ -74,7 +74,7 @@ export default function TransporteParametros({ dados, onSalvo, onDirtyChange }: 
     try {
       await apiClient.put("/api/configuracoes/calculo-transporte", {
         vigenteDe: nova ? novaData : selecionada,
-        parametros: Object.fromEntries(CHAVES_TRANSPORTE.map((c) => [c, numero(valores[c])])),
+        parametros: Object.fromEntries(CHAVES_TRANSPORTE.map((c) => [c, valorDoParametro(c, valores[c])])),
       });
       toast.success("Parâmetros do transporte salvos.");
       setDiff(null);

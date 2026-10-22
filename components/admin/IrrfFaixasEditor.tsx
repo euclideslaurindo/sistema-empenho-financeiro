@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { diffFaixas, numero, validarFaixasIrrf, type FaixaEdicao } from "@/lib/transporte-admin";
+import { diffFaixas, numero, reais, validarFaixasIrrf, type FaixaEdicao } from "@/lib/transporte-admin";
 import ConfirmarDiffDialog from "@/components/admin/ConfirmarDiffDialog";
 import { formatarData, motivoSoLeitura, paraCampo, type ListaIrrf } from "@/components/admin/transporte-tipos";
 
@@ -86,9 +86,9 @@ export default function IrrfFaixasEditor({ dados, onSalvo, onDirtyChange }: Prop
       await apiClient.put("/api/configuracoes/irrf", {
         vigenteDe: nova ? novaData : selecionada,
         faixas: linhas.map((l, i) => ({
-          limiteAte: i === linhas.length - 1 ? null : numero(l.limiteAte),
+          limiteAte: i === linhas.length - 1 ? null : reais(l.limiteAte),
           aliquota: numero(l.aliquota),
-          parcelaDeduzir: numero(l.parcelaDeduzir),
+          parcelaDeduzir: reais(l.parcelaDeduzir),
         })),
       });
       toast.success("Tabela do IRRF salva.");

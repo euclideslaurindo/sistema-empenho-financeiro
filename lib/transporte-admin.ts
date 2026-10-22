@@ -1,6 +1,7 @@
 // Regras da tela do admin do transporte (T27) — puras, usadas na tela
 // (validação imediata e diff) e no servidor (validação definitiva).
 import { CHAVES_TRANSPORTE } from "@/lib/retencoes-transporte";
+import { lerValorMonetario } from "@/lib/money";
 
 export type ChaveTransporte = (typeof CHAVES_TRANSPORTE)[number];
 
@@ -42,13 +43,28 @@ export function numero(v: unknown): number {
 const vazio = (v: unknown) => v === null || v === undefined || String(v).trim() === "";
 const fmt = (v: unknown) => (vazio(v) ? "—" : String(numero(v)).replace(".", ","));
 
+/**
+ * Valor em reais: a mesma leitura da NE e da OP. "2.428" é dois mil
+ * quatrocentos e vinte e oito (antes `numero` lia 2,428); "2.428,80" e
+ * "2428.80" também valem. Vazio ou inválido -> NaN.
+ */
+export function reais(v: unknown): number {
+  return vazio(v) ? NaN : lerValorMonetario(v);
+}
+const fmtReais = (v: unknown) => (vazio(v) ? "—" : String(reais(v)).replace(".", ","));
+
+/** Parâmetros do transporte que são valores em reais (os demais são % ou coeficiente). */
+export const PARAMETROS_EM_REAIS: ReadonlySet<string> = new Set(["desconto_simplificado", "redutor_constante"]);
+export const valorDoParametro = (chave: string, v: unknown) => (PARAMETROS_EM_REAIS.has(chave) ? reais(v) : numero(v));
+const fmtParametro = (chave: string, v: unknown) => (PARAMETROS_EM_REAIS.has(chave) ? fmtReais(v) : fmt(v));
+
 export const vigenciaEditavel = (vigenteDe: string, hoje: string) => vigenteDe >= hoje;
 
 export function validarParametrosTransporte(p: Partial<Record<string, unknown>>): string[] {
   const erros: string[] = [];
   for (const chave of CHAVES_TRANSPORTE) {
     const { rotulo, percentual } = ROTULOS_PARAMETROS[chave];
-    const v = numero(p[chave]);
+    const v = valorDoParametro(chave, p[chave]);
     if (!Number.isFinite(v)) erros.push(`${rotulo}: informe um número.`);
     else if (v < 0) erros.push(`${rotulo}: não pode ser negativo.`);
     else if (percentual && v > 100) erros.push(`${rotulo}: não pode passar de 100%.`);
@@ -66,7 +82,7 @@ export function validarFaixasIrrf(faixas: FaixaEdicao[]): string[] {
     if (vazio(f.limiteAte)) {
       if (!ultima) erros.push(`Faixa ${n}: só a última faixa pode ficar sem limite.`);
     } else {
-      const limite = numero(f.limiteAte);
+      const limite = reais(f.limiteAte);
       if (!Number.isFinite(limite) || limite <= 0) erros.push(`Faixa ${n}: limite inválido.`);
       else if (limite <= limiteAnterior) erros.push(`Faixa ${n}: o limite deve ser maior que o da faixa ${n - 1}.`);
       else limiteAnterior = limite;
@@ -74,7 +90,7 @@ export function validarFaixasIrrf(faixas: FaixaEdicao[]): string[] {
     }
     const aliquota = numero(f.aliquota);
     if (!Number.isFinite(aliquota) || aliquota < 0 || aliquota > 100) erros.push(`Faixa ${n}: alíquota deve estar entre 0 e 100.`);
-    const parcela = numero(f.parcelaDeduzir);
+    const parcela = reais(f.parcelaDeduzir);
     if (!Number.isFinite(parcela) || parcela < 0) erros.push(`Faixa ${n}: parcela a deduzir inválida.`);
   });
   return erros;
@@ -86,7 +102,7 @@ export function validarMunicipio(m: Partial<MunicipioEdicao>): string[] {
   if (!/^[A-Za-z]{2}$/.test(String(m.uf ?? "").trim())) erros.push("UF deve ter 2 letras.");
   const aliquota = numero(m.aliquota);
   if (!Number.isFinite(aliquota) || aliquota < 0 || aliquota > 100) erros.push("Alíquota do ISS deve estar entre 0 e 100.");
-  const taxa = numero(m.taxaExpediente);
+  const taxa = reais(m.taxaExpediente);
   if (!Number.isFinite(taxa) || taxa < 0) erros.push("Taxa de expediente inválida.");
   return erros;
 }
@@ -95,8 +111,8 @@ export function validarMunicipio(m: Partial<MunicipioEdicao>): string[] {
 // Diffs para a confirmação antes de salvar
 // ---------------------------------------------------------------------------
 export function diffParametros(antes: Partial<Record<string, unknown>>, depois: Partial<Record<string, unknown>>): string[] {
-  return CHAVES_TRANSPORTE.filter((c) => numero(antes[c]) !== numero(depois[c])).map(
-    (c) => `${ROTULOS_PARAMETROS[c].rotulo}: ${fmt(antes[c])} → ${fmt(depois[c])}`
+  return CHAVES_TRANSPORTE.filter((c) => valorDoParametro(c, antes[c]) !== valorDoParametro(c, depois[c])).map(
+    (c) => `${ROTULOS_PARAMETROS[c].rotulo}: ${fmtParametro(c, antes[c])} → ${fmtParametro(c, depois[c])}`
   );
 }
 
@@ -108,19 +124,19 @@ export function diffFaixas(antes: FaixaEdicao[], depois: FaixaEdicao[]): string[
     const d = depois[i];
     const n = i + 1;
     if (!a) {
-      linhas.push(`Faixa ${n} incluída: até ${fmt(d!.limiteAte)} · ${fmt(d!.aliquota)}% · deduz ${fmt(d!.parcelaDeduzir)}`);
+      linhas.push(`Faixa ${n} incluída: até ${fmtReais(d!.limiteAte)} · ${fmt(d!.aliquota)}% · deduz ${fmtReais(d!.parcelaDeduzir)}`);
       continue;
     }
     if (!d) {
       linhas.push(`Faixa ${n} removida`);
       continue;
     }
-    if (numero(a.limiteAte) !== numero(d.limiteAte) && !(vazio(a.limiteAte) && vazio(d.limiteAte))) {
-      linhas.push(`Faixa ${n}: limite ${fmt(a.limiteAte)} → ${fmt(d.limiteAte)}`);
+    if (reais(a.limiteAte) !== reais(d.limiteAte) && !(vazio(a.limiteAte) && vazio(d.limiteAte))) {
+      linhas.push(`Faixa ${n}: limite ${fmtReais(a.limiteAte)} → ${fmtReais(d.limiteAte)}`);
     }
     if (numero(a.aliquota) !== numero(d.aliquota)) linhas.push(`Faixa ${n}: ${fmt(a.aliquota)}% → ${fmt(d.aliquota)}%`);
-    if (numero(a.parcelaDeduzir) !== numero(d.parcelaDeduzir)) {
-      linhas.push(`Faixa ${n}: parcela a deduzir ${fmt(a.parcelaDeduzir)} → ${fmt(d.parcelaDeduzir)}`);
+    if (reais(a.parcelaDeduzir) !== reais(d.parcelaDeduzir)) {
+      linhas.push(`Faixa ${n}: parcela a deduzir ${fmtReais(a.parcelaDeduzir)} → ${fmtReais(d.parcelaDeduzir)}`);
     }
   }
   return linhas;
@@ -128,13 +144,13 @@ export function diffFaixas(antes: FaixaEdicao[], depois: FaixaEdicao[]): string[
 
 export function diffMunicipio(antes: MunicipioEdicao | null, depois: MunicipioEdicao): string[] {
   if (!antes) {
-    return [`Novo município: ${depois.nome}/${depois.uf.toUpperCase()} · ISS ${fmt(depois.aliquota)}% · expediente ${fmt(depois.taxaExpediente)}`];
+    return [`Novo município: ${depois.nome}/${depois.uf.toUpperCase()} · ISS ${fmt(depois.aliquota)}% · expediente ${fmtReais(depois.taxaExpediente)}`];
   }
   const linhas: string[] = [];
   const nome = antes.nome;
   if (numero(antes.aliquota) !== numero(depois.aliquota)) linhas.push(`${nome}: ISS ${fmt(antes.aliquota)}% → ${fmt(depois.aliquota)}%`);
-  if (numero(antes.taxaExpediente) !== numero(depois.taxaExpediente)) {
-    linhas.push(`${nome}: taxa de expediente ${fmt(antes.taxaExpediente)} → ${fmt(depois.taxaExpediente)}`);
+  if (reais(antes.taxaExpediente) !== reais(depois.taxaExpediente)) {
+    linhas.push(`${nome}: taxa de expediente ${fmtReais(antes.taxaExpediente)} → ${fmtReais(depois.taxaExpediente)}`);
   }
   if ((antes.apelidos || "") !== (depois.apelidos || "")) linhas.push(`${nome}: apelidos "${antes.apelidos || ""}" → "${depois.apelidos || ""}"`);
   if (antes.uf.toUpperCase() !== depois.uf.toUpperCase()) linhas.push(`${nome}: UF ${antes.uf} → ${depois.uf.toUpperCase()}`);
