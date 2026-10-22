@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Key, Percent, Shapes, UserCircle } from "lucide-react";
+import { ArrowRight, Key, Percent, Shapes, UserCircle, Users } from "lucide-react";
 import { ChangePasswordModal } from "@/components/change-password-modal";
 import { useAppStore } from "@/lib/store";
 
@@ -54,6 +54,17 @@ export default function Configuracoes() {
                   <span>
                     <span className="block font-bold text-slate-800">Elementos e Subelementos</span>
                     <span className="block text-xs text-slate-500 mt-1">Cadastre e desative elementos de despesa.</span>
+                  </span>
+                </span>
+                <ArrowRight className="w-5 h-5 text-slate-500 shrink-0" />
+              </Link>
+              {/* A tela de Usuários não tinha atalho em nenhum menu (só pelo endereço). */}
+              <Link href="/usuarios" className={`${cartao} bg-white border-slate-200`}>
+                <span className="flex items-start gap-3">
+                  <Users className="w-5 h-5 mt-0.5 text-slate-600" />
+                  <span>
+                    <span className="block font-bold text-slate-800">Usuários</span>
+                    <span className="block text-xs text-slate-500 mt-1">Crie usuários, troque o perfil, bloqueie e exclua.</span>
                   </span>
                 </span>
                 <ArrowRight className="w-5 h-5 text-slate-500 shrink-0" />

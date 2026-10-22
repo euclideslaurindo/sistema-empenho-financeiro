@@ -94,6 +94,7 @@ describe('CF2: página de Configurações', () => {
     render(<Configuracoes />);
     expect(screen.getByRole('link', { name: /Retenções e Descontos/ })).toHaveAttribute('href', '/configuracoes/retencoes');
     expect(screen.getByRole('link', { name: /Elementos e Subelementos/ })).toHaveAttribute('href', '/configuracoes/elementos');
+    expect(screen.getByRole('link', { name: /^Usuários/ })).toHaveAttribute('href', '/usuarios');
     expect(screen.getByRole('link', { name: /Meu Perfil/ })).toHaveAttribute('href', '/perfil');
   });
 
@@ -101,6 +102,7 @@ describe('CF2: página de Configurações', () => {
     useAppStore.setState({ userProfile: { id: 'u', nome: 'X', email: 'x', perfil: 'USER' as any } });
     render(<Configuracoes />);
     expect(screen.queryByRole('link', { name: /Retenções e Descontos/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Usuários/ })).toBeNull();
     expect(screen.getByRole('button', { name: /Alterar senha/ })).toBeInTheDocument();
   });
 

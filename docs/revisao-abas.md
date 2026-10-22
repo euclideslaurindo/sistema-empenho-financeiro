@@ -17,7 +17,7 @@ Conferência funcional do sistema, uma aba por vez. Para cada aba:
 | 5 | Consulta / Impressão | 🔧 I1–I9 corrigidos em 21/10/2026; falta o teste logado |
 | 6 | DARF | 🔧 D1–D5 corrigidos em 21/10/2026; falta o teste logado |
 | 7 | Configurações (retenções, transporte, elementos) | 🔧 CF1–CF3 corrigidos em 21/10/2026 (CF2 pela opção a); falta o teste logado |
-| 8 | Usuários | 🔧 U1–U6 corrigidos em 21/10/2026; falta o teste logado |
+| 8 | Usuários | 🔧 U1–U7 corrigidos em 21/10/2026; falta o teste logado |
 | 9 | Dashboard | 🔧 B1–B5 corrigidos em 22/10/2026; falta o teste logado |
 
 ---
@@ -431,10 +431,11 @@ O que está certo:
 | U4 ✅ corrigido | Abrir "Novo Usuário" de novo mostra os **dados do usuário anterior**, inclusive a senha digitada. | 🟡 baixa | Limpar o formulário ao abrir. |
 | U5 ✅ corrigido | Quem não é admin consegue abrir `/usuarios`: vê o botão "Novo Usuário" e uma mensagem "Você é ADMIN?". Os botões de bloquear e excluir aparecem também para o **próprio usuário** e para o **admin raiz**, e o servidor recusa só depois do clique. | 🟡 baixa | Tela só para admin, com aviso. Sem esses botões na linha do próprio usuário e do admin raiz. |
 | U6 ✅ corrigido | A coluna "Cargo" mostra o código (`GESTOR`, `CONSULTA`), diferente do Perfil, que mostra "Gestor", "Consulta (somente leitura)". Depois de excluir o último usuário de uma página, a lista fica numa página vazia. | 🟡 baixa | Mesmos nomes do Perfil e voltar uma página quando ela esvaziar. |
+| U7 ✅ corrigido | A tela de Usuários **não tinha atalho em nenhum menu**: só abria digitando `/usuarios` no endereço (o link existia num menu lateral que não é mostrado). | 🟡 baixa | Cartão **Usuários** na página de Configurações, só para o Admin. |
 
 ### Roteiro de teste (marcar ✅ / ❌)
 
-- [ ] **U-1** Como **Admin**, abrir Usuários → a lista carrega, com perfil e status.
+- [ ] **U-1** Como **Admin**, abrir **Configurações → Usuários** → a lista carrega, com perfil e status (U7).
 - [ ] **U-2** Criar um usuário `TESTE` com e-mail novo e senha de 8+ caracteres → aparece na lista e consegue entrar.
 - [ ] **U-3** Criar com e-mail que já existe → "Esse e-mail já está em uso."
 - [ ] **U-4** Criar com senha `1` → "A senha provisória deve ter no mínimo 8 caracteres." (U2 corrigido).
