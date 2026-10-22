@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
-import { excluirUsuario, alterarStatusUsuario } from '@/lib/services/usuario.service';
+import { excluirUsuario, alterarPerfilUsuario, alterarStatusUsuario } from '@/lib/services/usuario.service';
 
 // DELETE /api/usuarios/[id] - Deleta um usuário
 export async function DELETE(
@@ -24,7 +24,7 @@ export async function DELETE(
   }
 }
 
-// PUT /api/usuarios/[id] - Bloqueia/Desbloqueia usuário
+// PUT /api/usuarios/[id] - Bloqueia/Desbloqueia ({ ativo }) ou troca o perfil ({ perfil })
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -36,7 +36,9 @@ export async function PUT(
 
   try {
     const body = await request.json();
-    const result = await alterarStatusUsuario(idToUpdate, user.id, !!body.ativo);
+    const result = Object.prototype.hasOwnProperty.call(body ?? {}, 'perfil')
+      ? await alterarPerfilUsuario(idToUpdate, user.id, body.perfil)
+      : await alterarStatusUsuario(idToUpdate, user.id, !!body.ativo);
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

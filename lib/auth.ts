@@ -24,7 +24,9 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
 
     // Consulta o banco em tempo real para garantir revogação imediata de acesso
     const { query } = await import('@/lib/db');
-    const users: any[] = await query('SELECT ativo FROM usuarios WHERE id = ?', [id]);
+    // O perfil também vem do banco: trocar o perfil na tela de Usuários vale
+    // no próximo clique, sem esperar o token de 8 h expirar.
+    const users: any[] = await query('SELECT ativo, perfil FROM usuarios WHERE id = ?', [id]);
     const isAtivo = (users && users.length > 0 && users[0].ativo);
 
     if (!isAtivo) {
@@ -35,7 +37,7 @@ export async function getAuthUser(request: NextRequest): Promise<AuthUser | null
       id,
       nome: payload.nome as string,
       email: payload.email as string,
-      perfil: payload.perfil as string,
+      perfil: (users[0].perfil as string) || (payload.perfil as string),
     };
   } catch {
     return null;
