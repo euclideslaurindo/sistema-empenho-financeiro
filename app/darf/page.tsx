@@ -72,7 +72,11 @@ export default function DarfPage() {
     () => (porOp && dados ? (dados.itens as DarfItemOp[]).filter((i) => selecionados.has(i.id)) : []),
     [dados, porOp, selecionados]
   );
-  const totalSelecionadoCents = itensSelecionados.reduce((t, i) => t + toCents(i.valorDarf), 0);
+  // Cada botão age só nas DARFs do status certo: "Marcar como paga" não
+  // regrava a data das já pagas, e "Reabrir" não conta as já pendentes.
+  const paraPagar = itensSelecionados.filter((i) => i.status !== "PAGA");
+  const paraReabrir = itensSelecionados.filter((i) => i.status === "PAGA");
+  const totalParaPagarCents = paraPagar.reduce((t, i) => t + toCents(i.valorDarf), 0);
 
   const mudarFiltros = (parcial: Partial<FiltrosTela>) => {
     setFiltros((f) => ({ ...f, ...parcial }));
@@ -97,7 +101,7 @@ export default function DarfPage() {
     setSelecionados(marcar && dados ? new Set((dados.itens as DarfItemOp[]).map((i) => i.id)) : new Set());
 
   const enviarStatus = async (status: StatusDarf, dataPagamento?: string, observacao?: string) => {
-    const ids = itensSelecionados.map((i) => i.id);
+    const ids = (status === "PAGA" ? paraPagar : paraReabrir).map((i) => i.id);
     const resposta = await apiClient.post<{ atualizadas: number }>("/api/darf/status", {
       ids,
       status,
@@ -131,7 +135,7 @@ export default function DarfPage() {
           <DarfFiltros filtros={filtros} onChange={mudarFiltros} />
         </div>
 
-        <DarfResumo totais={dados?.totais ?? null} />
+        <DarfResumo totais={dados?.totais ?? null} competencia={filtros.competencia} />
 
         <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
           {podeAlterar && (
@@ -145,19 +149,21 @@ export default function DarfPage() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    disabled={itensSelecionados.length === 0}
+                    disabled={paraPagar.length === 0}
                     onClick={() => setBaixaAberta(true)}
+                    title={paraReabrir.length > 0 && paraPagar.length > 0 ? "As já pagas da seleção ficam como estão." : undefined}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <CheckCircle2 className="w-4 h-4" /> Marcar como paga
+                    <CheckCircle2 className="w-4 h-4" /> Marcar como paga{paraPagar.length > 0 ? ` (${paraPagar.length})` : ""}
                   </button>
                   <button
                     type="button"
-                    disabled={itensSelecionados.length === 0}
+                    disabled={paraReabrir.length === 0}
                     onClick={() => setReabrirAberto(true)}
+                    title={paraReabrir.length > 0 && paraPagar.length > 0 ? "As pendentes da seleção ficam como estão." : undefined}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <RotateCcw className="w-4 h-4" /> Reabrir
+                    <RotateCcw className="w-4 h-4" /> Reabrir{paraReabrir.length > 0 ? ` (${paraReabrir.length})` : ""}
                   </button>
                 </div>
               )}
@@ -169,6 +175,7 @@ export default function DarfPage() {
             itens={dados?.itens ?? []}
             carregando={carregando}
             competencia={filtros.competencia}
+            filtrado={!!filtros.status || !!filtros.busca.trim()}
             podeSelecionar={podeAlterar && porOp}
             selecionados={selecionados}
             onAlternar={alternar}
@@ -204,8 +211,8 @@ export default function DarfPage() {
       {baixaAberta && (
         <DarfBaixaModal
           aberto
-          quantidade={itensSelecionados.length}
-          totalCents={totalSelecionadoCents}
+          quantidade={paraPagar.length}
+          totalCents={totalParaPagarCents}
           onFechar={() => setBaixaAberta(false)}
           onConfirmar={async (data, observacao) => {
             try {
@@ -223,7 +230,8 @@ export default function DarfPage() {
         <AlertDialogContent>
           <AlertDialogTitle>Reabrir DARF(s)?</AlertDialogTitle>
           <AlertDialogDescription>
-            {itensSelecionados.length} DARF(s) voltarão para PENDENTE e a data de pagamento será apagada.
+            {paraReabrir.length} DARF(s) paga(s) voltarão para PENDENTE e a data de pagamento será apagada.
+            {paraPagar.length > 0 && ` As ${paraPagar.length} pendente(s) da seleção ficam como estão.`}
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
