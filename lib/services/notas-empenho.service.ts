@@ -333,7 +333,7 @@ export class NotasEmpenhoService {
 
         const totalOps = parseInt(opsVinculadas[0]?.total || 0);
         if (totalOps > 0) {
-          throw { status: 409, error: `Não é possível cancelar esta NE pois existem ${totalOps} ordem(ns) de pagamento vinculada(s). Exclua as OPs primeiro.` };
+          throw { status: 409, error: `Não é possível cancelar esta NE pois existem ${totalOps} ordem(ns) de pagamento vinculada(s). Um administrador pode excluir as OPs em Ordem de Pagamento > Ordens Recentes.` };
         }
 
         // estorno desativado pq n tem tabela de dotacao ainda

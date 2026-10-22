@@ -1,59 +1,33 @@
 "use client";
-import { ActionToolbar, ActionButton } from "@/components/action-toolbar";
 import {
-  Plus,
-  Save,
   Search,
   Printer as PrinterIcon,
   FileText,
-  Edit,
 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { numeroPorExtenso, formatDateOnlyBR } from "@/lib/utils";
+import { numeroPorExtenso } from "@/lib/utils";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
-import * as htmlToImage from "html-to-image";
 import { apiClient } from "@/lib/api-client";
 import { selecaoInicialDasOps } from "@/lib/selecao-ops-impressao";
+import { formatarBRL, toCents } from "@/lib/money";
+import { useDebouncedCallback } from "@/hooks/use-debounce";
 
 import { EmpenhoVia } from "@/components/consulta-impressao/EmpenhoVia";
 import { ReciboVia } from "@/components/consulta-impressao/ReciboVia";
-import { LINHAS_DOCUMENTO_EM_BRANCO, formatarValorOp, linhasDescontoDaOp, notaDescontosDaOp } from "@/lib/impressao-op";
+import {
+  LINHAS_DOCUMENTO_EM_BRANCO,
+  datasDaVia,
+  formatarValorOp,
+  itensParaImpressao,
+  linhasDescontoDaOp,
+  notaDescontosDaOp,
+} from "@/lib/impressao-op";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// dados de exemplo removidos, agora carrega do banco mesmo
-
-// Decodifica itens_json (array {especificacao, quantidade, unidade, valorUnitario})
-// e formata especificacao/unidade/quantidade/valor para as células de impressão,
-// que aceitam múltiplas linhas (whitespace-pre-wrap) — um item por linha, sem
-// limite de N, todas as colunas alinhadas linha a linha.
-//
-// A coluna `itens_json` no banco é do tipo JSON nativo do MySQL — o driver
-// (mysql2) já entrega um array/objeto JS pronto, NUNCA uma string. Por isso
-// aqui só chamamos JSON.parse() se realmente vier como string (ex: valor
-// veio de outro lugar serializado); passar um array pro JSON.parse() força
-// a coerção pra "[object Object]", que quebra o parse e derrubava
-// silenciosamente todo o bloco pro `catch`, zerando Unidade/Quantidade/Valor.
-function formatarItensParaImpressao(itensJson: string | any[] | null | undefined) {
-  const vazio = { especificacao: "", unidade: "", quantidade: "", valorUnitario: "", valorTotal: "" };
-  if (!itensJson) return vazio;
-  try {
-    const itens = typeof itensJson === "string" ? JSON.parse(itensJson) : itensJson;
-    if (!Array.isArray(itens) || itens.length === 0) return vazio;
-    const fmt = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-    return {
-      especificacao: itens.map((i: any) => i.especificacao || "").join("\n"),
-      unidade: itens.map((i: any) => i.unidade || "").join("\n"),
-      quantidade: itens.map((i: any) => String(i.quantidade ?? "")).join("\n"),
-      valorUnitario: itens.map((i: any) => fmt(Number(i.valorUnitario) || 0)).join("\n"),
-      valorTotal: itens.map((i: any) => fmt((Number(i.quantidade) || 0) * (Number(i.valorUnitario) || 0))).join("\n"),
-    };
-  } catch {
-    return vazio;
-  }
-}
+/** Valor do banco ("1234.50") como "1.234,50", sempre em centavos e com 2 casas. */
+const brl = (v: unknown) => formatarBRL(toCents(v as any));
 
 /**
  * Lê `?ne=` e, opcionalmente, `?ops=id1,id2` (link "Imprimir esta emissão" da
@@ -80,7 +54,6 @@ export default function ConsultaImpressao() {
     "frente" | "verso" | "ambos"
   >("ambos");
   const [isEditing, setIsEditing] = useState(false);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [searchMode, setSearchMode] = useState<"single" | "batch">("single");
 
   const [batchInput, setBatchInput] = useState("");
@@ -96,50 +69,41 @@ export default function ConsultaImpressao() {
   const [showNeModal, setShowNeModal] = useState(false);
   const [searchNeQuery, setSearchNeQuery] = useState("");
   const [nesDB, setNesDB] = useState<any[]>([]);
+  // "carregando" só enquanto a consulta está em andamento: sem resultado, a
+  // janela diz "Nenhuma NE encontrada" (antes ficava "Carregando..." para sempre).
+  const [nesCarregando, setNesCarregando] = useState(false);
+  const ultimaConsultaNes = useRef(0);
 
-  const fetchNesForModal = async (busca = "") => {
+  // A API pesquisa só pelo número da NE. Só a resposta da última consulta vale.
+  const fetchNesForModal = useCallback(async (busca = "") => {
+    const consulta = ++ultimaConsultaNes.current;
+    setNesCarregando(true);
     try {
       const url = busca ? `/api/notas-empenho?busca=${encodeURIComponent(busca)}` : '/api/notas-empenho';
-      const r = await fetch(url);
-      const d = await r.json();
-      if (d.notas) {
-        setNesDB(d.notas.map((n: any) => ({
-          numero: n.numero, valor: n.valor, historico: n.historico || '', status: n.status,
-          empenho: n.numero, gestao: n.gestao, unidade: n.unidadeOrcamentaria,
-          elementoSubelemento: n.elementoSubelemento, nomeCredor: '', cpfCnpj: ''
-        })));
-      }
-    } catch (e) {}
+      const d = await apiClient.get(url);
+      if (consulta !== ultimaConsultaNes.current) return;
+      setNesDB((d?.notas || []).map((n: any) => ({ numero: n.numero, valor: n.valor, historico: n.historico || '', status: n.status })));
+    } catch {
+      if (consulta === ultimaConsultaNes.current) setNesDB([]);
+    } finally {
+      if (consulta === ultimaConsultaNes.current) setNesCarregando(false);
+    }
+  }, []);
+  const buscarNesAoDigitar = useDebouncedCallback((valor: string) => fetchNesForModal(valor), 300);
+
+  const abrirConsultaNe = () => {
+    setShowNeModal(true);
+    setSearchNeQuery("");
+    fetchNesForModal("");
   };
 
-  useEffect(() => {
-    if (showNeModal && nesDB.length === 0) {
-      fetchNesForModal("");
-    }
-  }, [showNeModal]);
-
-  const handleDownloadPDF = async () => {
-    setIsGeneratingPdf(true);
-    const wasEditing = isEditing;
-    
-    if (wasEditing) {
-      setIsEditing(false);
-      await new Promise(resolve => setTimeout(resolve, 150));
-    }
-
+  /** Dados da NE para a via (Data de Provisão); sem a NE, o documento sai sem essa data. */
+  const buscarNe = async (numero: string): Promise<any | null> => {
     try {
-      toast.info("Preparando documento...");
-      // pequeno delay pra garantir que os elementos renderizaram antes de imprimir
-      await new Promise(resolve => setTimeout(resolve, 300));
-      window.print();
-    } catch (error) {
-      console.error("Erro ao preparar documento:", error);
-      toast.error("Erro ao preparar o documento.");
-    } finally {
-      if (wasEditing) {
-        setIsEditing(true);
-      }
-      setIsGeneratingPdf(false);
+      const neData = await apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(numero)}`);
+      return neData?.ne ?? null;
+    } catch {
+      return null;
     }
   };
 
@@ -215,10 +179,6 @@ export default function ConsultaImpressao() {
     ordSaqueNo: "",
   });
 
-  const viasList = [
-    "VIA ÚNICA\nPRESTAÇÃO DE CONTAS / ARQUIVO",
-  ];
-
   const [mounted, setMounted] = useState(false);
   const [documentList, setDocumentList] = useState<
     { frente: typeof frenteData; verso: typeof versoData }[]
@@ -228,66 +188,18 @@ export default function ConsultaImpressao() {
     setMounted(true);
   }, []);
 
+  // Cada documento é uma OP (de um credor): editar mexe só no documento
+  // editado, também no lote (antes o lote copiava o campo para todos e
+  // numerava NE e cheque em sequência, herança do lote de parcelas).
   const handleFrenteChange = (index: number, field: string, value: any) => {
     setDocumentList((prev) =>
-      prev.map((doc, i) => {
-        if (searchMode === "batch") {
-          if (field === "numeroEmpenho") {
-            const match = value.match(/^(.*?)(\d+)$/);
-            let newNE = value;
-            if (match) {
-              const prefix = match[1];
-              const initNum = parseInt(match[2], 10);
-              const padding = match[2].length;
-              const diff = i - index;
-              newNE = `${prefix}${String(initNum + diff).padStart(padding, "0")}`;
-            }
-            return {
-              ...doc,
-              frente: { ...doc.frente, [field]: newNE },
-            };
-          } else {
-            return {
-              ...doc,
-              frente: { ...doc.frente, [field]: value },
-            };
-          }
-        } else {
-          return i === index
-            ? { ...doc, frente: { ...doc.frente, [field]: value } }
-            : doc;
-        }
-      }),
+      prev.map((doc, i) => (i === index ? { ...doc, frente: { ...doc.frente, [field]: value } } : doc)),
     );
   };
 
   const handleVersoChange = (index: number, field: string, value: any) => {
     setDocumentList((prev) =>
-      prev.map((doc, i) => {
-        if (searchMode === "batch") {
-          if (field === "numeroCheque") {
-            const numVal = parseInt(value, 10);
-            let newCheque = value;
-            if (!isNaN(numVal)) {
-              const diff = i - index;
-              newCheque = String(numVal + diff).padStart(value.length, "0");
-            }
-            return {
-              ...doc,
-              verso: { ...doc.verso, [field]: newCheque },
-            };
-          } else {
-            return {
-              ...doc,
-              verso: { ...doc.verso, [field]: value },
-            };
-          }
-        } else {
-          return i === index
-            ? { ...doc, verso: { ...doc.verso, [field]: value } }
-            : doc;
-        }
-      }),
+      prev.map((doc, i) => (i === index ? { ...doc, verso: { ...doc.verso, [field]: value } } : doc)),
     );
   };
 
@@ -352,22 +264,28 @@ export default function ConsultaImpressao() {
     }
   };
 
-  const gerarDocFormatado = (op: any, formattedNe: string, ano: string, i: number) => {
-    const valorF = Number(op.valorPagamento || op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-    const liquidoF = Number(op.valorLiquido || op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-    const itensFormatados = formatarItensParaImpressao(op.itensJson);
+  /**
+   * Um documento (frente + verso) por OP. As datas da via vêm da OP e da NE
+   * (datasDaVia); OP sem cheque deixa o número em branco (antes saía um
+   * número inventado, 040496 + posição); valores sempre em centavos.
+   */
+  const gerarDocFormatado = (op: any, formattedNe: string, ano: string, ne: any | null) => {
+    const valorF = brl(op.valorPagamento ?? op.valorEmpenho);
+    const liquido = op.valorLiquido ?? op.valorPagamento ?? 0;
+    const itensFormatados = itensParaImpressao(op.itensJson);
     return {
       frente: {
         ...frenteData,
+        ...datasDaVia(op, ne),
         numeroEmpenho: formattedNe,
         sub: op.sub || "",
         emissaoAno: ano,
         credorNome: op.credorNome || "",
         credorCpfCnpj: op.credorCpfCnpj || "",
         credorEndereco: op.credorEndereco || "",
-        valorEmpenho: Number(op.valorEmpenho).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
-        saldoAnterior: Number(op.saldoAnterior).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
-        saldoAtual: Number((op.saldoAnterior || 0) - (op.valorPagamento || 0)).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
+        valorEmpenho: brl(op.valorEmpenho),
+        saldoAnterior: brl(op.saldoAnterior),
+        saldoAtual: formatarBRL(toCents(op.saldoAnterior) - toCents(op.valorPagamento)),
         gestaoUE: op.gestao || "",
         unidadeOrcamentaria: op.unidadeOrcamentaria || "",
         elementoSubelemento: [op.elemento, op.subelemento].filter(Boolean).join(' / '),
@@ -379,21 +297,18 @@ export default function ConsultaImpressao() {
         valorUnitario: itensFormatados.valorUnitario,
         valorTotal: itensFormatados.valorTotal || valorF,
         totalEspecificacao: valorF,
-        deduzidoData: formatDateOnlyBR(op.dataPagamento),
-        provisaoData: formatDateOnlyBR(op.dataEmissao),
-        pagamentoData: formatDateOnlyBR(op.dataPagamento),
       },
       verso: {
         ...versoData,
-        numeroCheque: op.numeroCheque || String(40496 + i).padStart(6, "0"),
+        numeroCheque: op.numeroCheque || "",
         referenteA: op.historico || "",
         valorBase: valorF,
         cpfCnpj: op.credorCpfCnpj || "",
         endereco: op.credorEndereco || "",
         rg: op.credorRg || "",
         nomeRecebedor: op.credorNome || "",
-        valorExtenso: numeroPorExtenso(Number(op.valorLiquido || op.valorEmpenho)),
-        descontosExtenso: numeroPorExtenso(Number(op.totalDescontos || 0)),
+        valorExtenso: numeroPorExtenso(toCents(liquido) / 100),
+        descontosExtenso: numeroPorExtenso(toCents(op.totalDescontos) / 100),
         irrf: formatarValorOp(op.irrf),
         iss: formatarValorOp(op.iss),
         inss: formatarValorOp(op.inss),
@@ -404,102 +319,17 @@ export default function ConsultaImpressao() {
         taxaPix: formatarValorOp(op.taxaPix),
         linhasDescontos: linhasDescontoDaOp(op),
         notaDescontos: notaDescontosDaOp(op),
-        totalDescontos: Number(op.totalDescontos || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
-        valorRecibo: liquidoF,
+        totalDescontos: brl(op.totalDescontos),
+        valorRecibo: brl(liquido),
       }
     };
   };
 
-  const gerarLote = async () => {
-    toast.info("Processando impressões, por favor aguarde...");
-    let allDocs: any[] = [];
-    
-    if (searchMode === "single") {
-      const formattedNe = (batchInput.trim() || "").toUpperCase();
-      if (!formattedNe) { toast.error("Informe o número do Empenho."); return; }
-      const match = formattedNe.match(/^(\d{4})NE/i);
-      const ano = match ? match[1] : frenteData.emissaoAno;
+  /** Ano da via: o do número da NE (2026NE…); senão o padrão do formulário. */
+  const anoDaNe = (numeroNe: string) => /^(\d{4})NE/i.exec(numeroNe)?.[1] ?? frenteData.emissaoAno;
 
-      // modo individual: verifica se existem OPs vinculadas e usa as selecionadas
-      const opsParaGerar = opListSingle.filter(op => selectedOpsSingle[op.id]);
-
-      if (opsParaGerar.length > 0) {
-        // tem OPs salvas selecionadas: gera documentos com os dados delas
-        opsParaGerar.forEach((op, opIndex) => {
-          allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex));
-        });
-      } else {
-        // nenhuma OP salva selecionada: gera documento em branco baseado na NE
-        let neDB: any = null;
-        try {
-          const neData = await apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(formattedNe)}`);
-          if (neData && neData.ne) neDB = neData.ne;
-        } catch (e) {
-          console.error("Erro na busca da NE", e);
-        }
-
-        const finalNome = neDB?.credorNome || frenteData.credorNome;
-        const finalCpf = neDB?.cpfCnpj || frenteData.credorCpfCnpj;
-        const finalEndereco = frenteData.credorEndereco; // API de NE não retorna endereço do credor
-        const finalValor = neDB ? neDB.valor : parseFloat(frenteData.valorEmpenho.replace(',','.'));
-        const finalGestao = neDB ? neDB.gestao : frenteData.gestaoUE;
-        const finalUnidade = neDB ? neDB.unidadeOrcamentaria : frenteData.unidadeOrcamentaria;
-        const finalElemento = neDB
-          ? [neDB.elemento, neDB.subelemento].filter(Boolean).join(' / ')
-          : frenteData.elementoSubelemento;
-        const finalHistorico = neDB ? neDB.historico : frenteData.especificacao;
-
-        const valorFormatado = Number(finalValor).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-        const vExtenso = numeroPorExtenso(Number(finalValor));
-        const dExtenso = numeroPorExtenso(0);
-
-        allDocs.push({
-          frente: {
-            ...frenteData,
-            numeroEmpenho: formattedNe,
-            emissaoAno: ano,
-            credorNome: finalNome,
-            credorCpfCnpj: finalCpf,
-            credorEndereco: finalEndereco,
-            valorEmpenho: valorFormatado,
-            gestaoUE: finalGestao,
-            unidadeOrcamentaria: finalUnidade,
-            elementoSubelemento: finalElemento,
-            saldoAnterior: valorFormatado,
-            especificacao: finalHistorico,
-          },
-          verso: {
-            ...versoData,
-            numeroCheque: String(40496).padStart(6, "0"),
-            referenteA: finalHistorico || "",
-            valorBase: valorFormatado,
-            cpfCnpj: finalCpf,
-            endereco: finalEndereco,
-            rg: versoData.rg,
-            nomeRecebedor: finalNome,
-            valorExtenso: vExtenso,
-            descontosExtenso: dExtenso,
-          },
-        });
-      }
-    } else {
-      // modo lote: pega apenas as ops selecionadas na lista
-      const selectedOpData = opList.filter(op => selectedOps[op.id]);
-      if (selectedOpData.length === 0) {
-        toast.error("Nenhuma parcela selecionada.");
-        return;
-      }
-      
-      const formattedNe = batchInput.trim().toUpperCase();
-      const match = formattedNe.match(/^(\d{4})NE/i);
-      const ano = match ? match[1] : frenteData.emissaoAno;
-
-      selectedOpData.forEach((op, opIndex) => {
-        allDocs.push(gerarDocFormatado(op, formattedNe, ano, opIndex));
-      });
-    }
-
-    // Renderização em lotes (chunks) para não travar a UI thread
+  // Renderização em lotes (chunks) para não travar a UI thread.
+  const exibirDocumentos = async (allDocs: any[]) => {
     setDocumentList([]);
     await new Promise(resolve => setTimeout(resolve, 50));
 
@@ -507,20 +337,79 @@ export default function ConsultaImpressao() {
     for (let i = 0; i < allDocs.length; i += CHUNK_SIZE) {
       const chunk = allDocs.slice(i, i + CHUNK_SIZE);
       setDocumentList((prev) => [...prev, ...chunk]);
-      // Yield main thread
       await new Promise(resolve => setTimeout(resolve, 50));
     }
 
-    if (allDocs.length > 1) {
-      toast.success(`${allDocs.length} impressões prontas.`);
-    } else {
-      toast.success("Documento pronto para impressão!");
-    }
+    toast.success(allDocs.length > 1 ? `${allDocs.length} impressões prontas.` : "Documento pronto para impressão!");
 
     setTimeout(() => {
       setView("document");
       setIsEditing(true);
     }, 100);
+  };
+
+  /** Documentos das OPs marcadas (Consulta Individual ou Impressão em Lote). */
+  const gerarLote = async () => {
+    const formattedNe = batchInput.trim().toUpperCase();
+    if (!formattedNe) { toast.error("Informe o número do Empenho."); return; }
+    const marcadas = searchMode === "single"
+      ? opListSingle.filter(op => selectedOpsSingle[op.id])
+      : opList.filter(op => selectedOps[op.id]);
+    if (marcadas.length === 0) {
+      toast.error(searchMode === "single" ? "Marque ao menos uma OP, ou use \"Gerar Documento em Branco\"." : "Nenhuma parcela selecionada.");
+      return;
+    }
+
+    toast.info("Processando impressões, por favor aguarde...");
+    const ne = await buscarNe(formattedNe);
+    const ano = anoDaNe(formattedNe);
+    await exibirDocumentos(marcadas.map((op) => gerarDocFormatado(op, formattedNe, ano, ne)));
+  };
+
+  /**
+   * Documento em branco da NE, para preencher à mão. Sempre em branco, mesmo
+   * com OPs marcadas na lista (antes gerava as OPs marcadas).
+   */
+  const gerarEmBranco = async () => {
+    const formattedNe = batchInput.trim().toUpperCase();
+    if (!formattedNe) { toast.error("Informe o número do Empenho."); return; }
+
+    const neDB = await buscarNe(formattedNe);
+    const valorFormatado = neDB ? brl(neDB.valor) : frenteData.valorEmpenho;
+    const valorReais = neDB ? toCents(neDB.valor) / 100 : 0;
+    const finalHistorico = neDB ? neDB.historico || "" : frenteData.especificacao;
+    // Só NEs antigas (antes da rodada 2) ainda têm credor; as novas saem sem.
+    const finalNome = neDB?.credorNome || frenteData.credorNome;
+    const finalCpf = neDB?.cpfCnpj || frenteData.credorCpfCnpj;
+
+    await exibirDocumentos([{
+      frente: {
+        ...frenteData,
+        ...datasDaVia({}, neDB),
+        numeroEmpenho: formattedNe,
+        emissaoAno: anoDaNe(formattedNe),
+        credorNome: finalNome,
+        credorCpfCnpj: finalCpf,
+        valorEmpenho: valorFormatado,
+        gestaoUE: neDB ? neDB.gestao || "" : frenteData.gestaoUE,
+        unidadeOrcamentaria: neDB ? neDB.unidadeOrcamentaria || "" : frenteData.unidadeOrcamentaria,
+        elementoSubelemento: neDB
+          ? [neDB.elemento, neDB.subelemento].filter(Boolean).join(' / ')
+          : frenteData.elementoSubelemento,
+        saldoAnterior: valorFormatado,
+        especificacao: finalHistorico,
+      },
+      verso: {
+        ...versoData,
+        numeroCheque: "",
+        nomeRecebedor: finalNome,
+        cpfCnpj: finalCpf,
+        referenteA: finalHistorico,
+        valorBase: valorFormatado,
+        valorExtenso: numeroPorExtenso(valorReais),
+        descontosExtenso: numeroPorExtenso(0),
+      },
+    }]);
   };
 
   if (!mounted) return null;
@@ -584,7 +473,8 @@ export default function ConsultaImpressao() {
                           className="w-full p-4 rounded-l-lg border border-r-0 border-slate-200/80 bg-gray-50 text-sm focus:bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/20 font-bold tracking-wide transition-all"
                         />
                         <button
-                          onClick={() => setShowNeModal(true)}
+                          onClick={abrirConsultaNe}
+                          aria-label="Consultar NE cadastrada"
                           className="bg-gray-200 px-4 border border-slate-200/80 rounded-r-lg border-l-0 text-zinc-600 hover:bg-gray-300 transition-colors"
                         >
                           <Search className="w-5 h-5" />
@@ -643,10 +533,10 @@ export default function ConsultaImpressao() {
                     </div>
                   )}
 
-                  {/* Botão para gerar documento em branco (mesmo sem OPs) */}
+                  {/* Documento em branco: sempre em branco, mesmo com OPs marcadas */}
                   {batchInput.trim() && (
                     <button
-                      onClick={gerarLote}
+                      onClick={gerarEmBranco}
                       className="w-full bg-gradient-to-r from-slate-600 to-slate-700 text-white font-bold py-3 px-8 rounded-lg text-sm hover:opacity-90 transition-all flex justify-center items-center gap-2 mt-1"
                     >
                       <FileText className="w-4 h-4" /> Gerar Documento em Branco
@@ -669,7 +559,8 @@ export default function ConsultaImpressao() {
                           className="w-full p-4 rounded-l-lg border border-r-0 border-slate-200/80 bg-gray-50 text-sm focus:bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 focus:outline-none focus:border-[#1e293b] focus:ring-2 focus:ring-[#1e293b]/20 font-bold tracking-wide transition-all"
                         />
                         <button
-                          onClick={() => setShowNeModal(true)}
+                          onClick={abrirConsultaNe}
+                          aria-label="Consultar NE cadastrada"
                           className="bg-gray-200 px-4 border border-slate-200/80 rounded-r-lg border-l-0 text-zinc-600 hover:bg-gray-300 transition-colors"
                         >
                           <Search className="w-5 h-5" />
@@ -697,7 +588,7 @@ export default function ConsultaImpressao() {
                             setSelectedOps(newSelected);
                           }}
                         >
-                          Selecionar Todos
+                          {Object.values(selectedOps).every(v => v) ? 'Desmarcar Todos' : 'Selecionar Todos'}
                         </button>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -798,22 +689,19 @@ export default function ConsultaImpressao() {
               >
                 {isEditing ? 'Modo Leitura' : 'Editar Valores'}
               </button>
+              {/* Um botão só: o PDF sai pela própria janela de impressão ("Salvar como PDF"). */}
               <button
                 onClick={() => window.print()}
+                title='Para salvar em PDF, escolha "Salvar como PDF" no destino da janela de impressão.'
                 className="px-6 py-2.5 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-white font-bold rounded-xl transition-all shadow-md flex items-center gap-2 text-sm ml-2"
               >
                 <PrinterIcon className="w-4 h-4" />
-                IMPRIMIR
-              </button>
-              <button
-                onClick={handleDownloadPDF}
-                disabled={isGeneratingPdf}
-                className={`px-6 py-2.5 font-bold rounded-xl transition-all shadow-md flex items-center gap-2 text-sm ml-2 ${isGeneratingPdf ? 'bg-blue-300 text-white cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'}`}
-              >
-                <FileText className="w-4 h-4" />
-                {isGeneratingPdf ? 'GERANDO...' : 'BAIXAR PDF'}
+                IMPRIMIR / SALVAR PDF
               </button>
             </div>
+            <p className="print:hidden text-xs text-zinc-500 mb-3">
+              Para salvar em PDF: clique em &quot;Imprimir / Salvar PDF&quot; e escolha &quot;Salvar como PDF&quot; no destino.
+            </p>
 
             {isEditing && (
               <div className="w-full max-w-[210mm] text-center text-[#1e293b] font-bold uppercase tracking-widest text-sm bg-blue-50 py-3 rounded-t-lg border border-blue-200 print:hidden mb-4 shadow-sm relative overflow-hidden mx-auto">
@@ -822,8 +710,8 @@ export default function ConsultaImpressao() {
                   ? "Frente (Empenho)"
                   : documentType === "verso"
                     ? "Verso (Recibo)"
-                    : "Ambos"}{" "}
-                Sincronizadamente
+                    : "Frente e Verso"}{" "}
+                · cada documento separadamente
               </div>
             )}
 
@@ -889,18 +777,19 @@ export default function ConsultaImpressao() {
               Consultar NE Cadastrada
             </DialogTitle>
             <DialogDescription className="sr-only">
-              Busque uma Nota de Empenho por número, CPF/CNPJ ou nome do credor para carregar os dados na tela de impressão.
+              Busque uma Nota de Empenho pelo número para carregar os dados na tela de impressão.
             </DialogDescription>
           </div>
           <div className="p-4 border-b border-zinc-100">
             <div className="flex">
               <input
                 type="text"
-                placeholder="Pesquisar por NE, CPF/CNPJ ou Credor..."
+                aria-label="Pesquisar pelo número da NE"
+                placeholder="Pesquisar pelo número da NE..."
                 value={searchNeQuery}
                 onChange={(e) => {
                   setSearchNeQuery(e.target.value);
-                  fetchNesForModal(e.target.value);
+                  buscarNesAoDigitar(e.target.value);
                 }}
                 className="w-full pl-4 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-l-md text-sm focus:outline-none focus:border-slate-400 transition-shadow"
               />
@@ -913,16 +802,14 @@ export default function ConsultaImpressao() {
             </div>
           </div>
           <div className="p-6 overflow-y-auto space-y-3">
-            {nesDB.length === 0 && (
-              <p className="text-sm text-zinc-500 text-center py-4">Carregando NEs do banco...</p>
+            {nesCarregando && nesDB.length === 0 && (
+              <p className="text-sm text-zinc-500 text-center py-4">Carregando NEs...</p>
+            )}
+            {!nesCarregando && nesDB.length === 0 && (
+              <p role="status" className="text-sm text-zinc-500 text-center py-4">Nenhuma NE encontrada.</p>
             )}
             {[...nesDB]
               .filter((ne: any, idx, arr) => arr.findIndex((x: any) => x.numero === ne.numero) === idx)
-              .filter((ne: any) =>
-                ne.numero.toLowerCase().includes(searchNeQuery.toLowerCase()) ||
-                (ne.historico && ne.historico.toLowerCase().includes(searchNeQuery.toLowerCase())) ||
-                (ne.nomeCredor && ne.nomeCredor.toLowerCase().includes(searchNeQuery.toLowerCase()))
-              )
               .map((ne: any, i: number) => (
                 <div
                   key={i}
@@ -934,24 +821,12 @@ export default function ConsultaImpressao() {
                   }}
                 >
                   <div>
-                    <p className="font-bold text-slate-800 text-sm">
-                      NE: {ne.numero}{" "}
-                      <span className="font-normal text-zinc-500 ml-2">
-                        Empenho: {ne.empenho || '-'}
-                      </span>
-                    </p>
-                    <p className="text-xs font-semibold text-zinc-600 mt-1">
-                      Credor: {ne.nomeCredor || '-'}
-                    </p>
-                    <p className="text-xs text-zinc-500 mt-1 line-clamp-1">
-                      {ne.historico}
-                    </p>
+                    <p className="font-bold text-slate-800 text-sm">NE: {ne.numero}</p>
+                    {ne.historico && <p className="text-xs text-zinc-500 mt-1 line-clamp-1">{ne.historico}</p>}
                   </div>
                   <div className="text-right flex flex-col justify-center shrink-0 ml-4">
                     <p className="text-xs text-zinc-500">Valor</p>
-                    <p className="text-sm font-bold text-slate-700">
-                      R$ {Number(ne.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                    </p>
+                    <p className="text-sm font-bold text-slate-700">R$ {brl(ne.valor)}</p>
                   </div>
                 </div>
               ))}

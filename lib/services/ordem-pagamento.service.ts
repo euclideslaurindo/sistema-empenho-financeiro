@@ -7,7 +7,8 @@ import { toCents, fromCents, itensBatemComValor, somaItensCents } from '@/lib/mo
 import { calcularProximoNumeroOp } from '@/lib/services/numeracao-op';
 import { recalcularStatusNe } from '@/lib/services/saldo-ne';
 import { entraDarfDaConfig, removerDarfDaOp, sincronizarDarfDaOp } from '@/lib/services/darf.service';
-import { criarOpNaTransacao, montarInformados, ordemPagamentoSchema, toDecimal } from '@/lib/services/ordem-pagamento-core';
+import { criarOpNaTransacao, garantirLiquidoNaoNegativo, mensagemItensNaoBatem, montarInformados, ordemPagamentoSchema, toDecimal } from '@/lib/services/ordem-pagamento-core';
+import { formatarBRL } from '@/lib/money';
 
 export type ServiceResult<T = any> = 
   | { success: true; data: T; status?: number }
@@ -88,9 +89,9 @@ export class OrdemPagamentoService {
     let countSql = 'SELECT COUNT(*) as total FROM ordens_pagamento';
     const countParams: any[] = [];
     if (busca) {
-      countSql += ' WHERE credor_nome LIKE ? OR numero_empenho LIKE ? OR credor_cpf_cnpj LIKE ?';
+      countSql += ' WHERE credor_nome LIKE ? OR numero_empenho LIKE ? OR credor_cpf_cnpj LIKE ? OR numero_ne LIKE ?';
       const b = `%${busca}%`;
-      countParams.push(b, b, b);
+      countParams.push(b, b, b, b);
     }
     const countResult = await query<any[]>(countSql, countParams);
     const total = countResult[0]?.total || 0;
@@ -106,9 +107,9 @@ export class OrdemPagamentoService {
     const sqlParams: any[] = [];
 
     if (busca) {
-      sql += ' WHERE credor_nome LIKE ? OR numero_empenho LIKE ? OR credor_cpf_cnpj LIKE ?';
+      sql += ' WHERE credor_nome LIKE ? OR numero_empenho LIKE ? OR credor_cpf_cnpj LIKE ? OR numero_ne LIKE ?';
       const b = `%${busca}%`;
-      sqlParams.push(b, b, b);
+      sqlParams.push(b, b, b, b);
     }
 
     sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
@@ -233,7 +234,6 @@ export class OrdemPagamentoService {
           [id, neSegura]
         );
 
-        let saldoDisp = 0;
         const brutoCents = toCents(vPagamento);
         const vPagamentoArredondado = fromCents(brutoCents);
         // Elemento/subelemento SEMPRE vêm da NE atual (nunca do payload do
@@ -250,9 +250,8 @@ export class OrdemPagamentoService {
           }
           // Em centavos (T31). O SQL já soma em DECIMAL; aqui só se compara.
           const saldoCents = toCents(neObj.saldoDisponivel ?? 0);
-          saldoDisp = fromCents(saldoCents);
           if (brutoCents > saldoCents) {
-            throw { status: 409, error: `Valor do pagamento excede o saldo disponível da NE (R$ ${saldoDisp.toFixed(2)}).` };
+            throw { status: 409, error: `Valor do pagamento excede o saldo disponível da NE (R$ ${formatarBRL(saldoCents)}).` };
           }
           elementoGravado = neObj.elemento || '';
           subelementoGravado = neObj.subelemento || '';
@@ -264,7 +263,7 @@ export class OrdemPagamentoService {
         // tolerância de 1 centavo.
         const itensCents = somaItensCents(Array.isArray(itens) ? itens : []);
         if (itensCents > 0 && !itensBatemComValor(itensCents, brutoCents)) {
-          throw { status: 400, error: `A soma dos itens (R$ ${fromCents(itensCents).toFixed(2)}) não bate com o valor a pagar da OP (R$ ${vPagamentoArredondado.toFixed(2)}). Fraude detectada.` };
+          throw { status: 400, error: mensagemItensNaoBatem(itensCents, brutoCents) };
         }
 
         // D12: só recalcula se valor, credor ou elemento mudaram desde a
@@ -296,6 +295,7 @@ export class OrdemPagamentoService {
             perfilUsuario: perfil as 'ADMIN' | 'GESTOR' | 'CONSULTA',
           sobrescreverMei: parsedData.sobrescreverMei,
           });
+          garantirLiquidoNaoNegativo(resultado, brutoCents);
           finalIrrf = fromCents(resultado.itens.irrf ?? 0);
           finalIss = fromCents(resultado.itens.iss ?? 0);
           finalInss = fromCents(resultado.itens.inss ?? 0);
@@ -394,9 +394,17 @@ export class OrdemPagamentoService {
     }
   }
 
-  static async excluir(id: string, usuarioId: string, perfilSolicitante: string): Promise<ServiceResult> {
-    if (perfilSolicitante === 'CONSULTA') {
-      return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+  /**
+   * Exclui (estorna) a OP e devolve o saldo à NE. Só ADMIN, com motivo, que
+   * fica na auditoria junto com a OP apagada. DARF já paga bloqueia (409).
+   */
+  static async excluir(id: string, usuarioId: string, perfilSolicitante: string, motivo?: string | null): Promise<ServiceResult> {
+    if (perfilSolicitante !== 'ADMIN') {
+      return { success: false, error: 'Só o administrador pode excluir uma ordem de pagamento.', status: 403 };
+    }
+    const motivoLimpo = String(motivo ?? '').trim();
+    if (motivoLimpo.length < 5) {
+      return { success: false, error: 'Informe o motivo da exclusão (pelo menos 5 caracteres).', status: 400 };
     }
 
     try {
@@ -417,7 +425,7 @@ export class OrdemPagamentoService {
         await conn.execute(
           `INSERT INTO auditoria_financeira (id, entidade, entidade_id, acao, dados_anteriores, dados_novos, usuario_id)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [crypto.randomUUID(), 'ordens_pagamento', id, 'DELETE', JSON.stringify(oldOp), null, usuarioId]
+          [crypto.randomUUID(), 'ordens_pagamento', id, 'DELETE', JSON.stringify(oldOp), JSON.stringify({ motivo: motivoLimpo.slice(0, 500) }), usuarioId]
         );
 
         // devolve o saldo à NE e recalcula o status (regra única, T31)

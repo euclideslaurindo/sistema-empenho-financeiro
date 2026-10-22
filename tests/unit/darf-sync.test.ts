@@ -249,7 +249,7 @@ describe('OP x DARF', () => {
       };
       return cb(conn);
     });
-    const r = await OrdemPagamentoService.excluir('op-1', 'u1', 'GESTOR');
+    const r = await OrdemPagamentoService.excluir('op-1', 'u1', 'ADMIN', 'TESTE estorno');
     expect(r.success).toBe(false);
     if (!r.success) expect(r.status).toBe(409);
     expect(chamadas.some(([s]) => s.includes('DELETE FROM ordens_pagamento'))).toBe(false);

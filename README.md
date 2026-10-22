@@ -63,23 +63,13 @@ Ou pelo Docker: `docker compose up -d --build`. Roteiro completo de entrega e ro
    ```
    Edit `.env.local` and set:
    - `MYSQL_HOST`, `MYSQL_USER`, `MYSQL_PASSWORD` (your database details)
-   - `ENABLE_SETUP=true` (only for development)
-   - `ADMIN_INITIAL_PASSWORD=YourSecurePassword` (or leave empty for default `Mudar@123`)
 
-2. **Create initial admin user:**
-   Run the setup route once to create the database tables and admin user:
-   ```bash
-   curl http://localhost:3000/api/setup
-   # or open in browser: http://localhost:3000/api/setup
-   ```
-   This creates:
-   - Database tables (`usuarios`, `configuracoes_sistema`, etc.)
-   - Admin user with email `admin@admin.com` and password from `ADMIN_INITIAL_PASSWORD` (or `Mudar@123` as fallback)
+2. **Create the database and the initial admin user:**
+   The database is shared with other systems: tables and users are created by the SQL scripts in `database/`, run in MySQL Workbench by whoever maintains the database. The app has no setup route (the old `/api/setup` routes were removed because they were public and changed the database).
 
-3. **Disable setup route:**
-   After initial setup, set `ENABLE_SETUP=false` in `.env.local` to prevent accidental re-runs.
+   For the E2E tests only, `e2e/global-setup.ts` creates the `usuarios` table and the admin user (`admin@admin.com` / `ADMIN_INITIAL_PASSWORD` or `Mudar@123`) directly in a **local** test database, when `ENABLE_SETUP=true` (as in CI).
 
-4. **Login:**
+3. **Login:**
    - **Email:** `admin@admin.com`
    - **Password:** Value set in `ADMIN_INITIAL_PASSWORD` env var, or `Mudar@123` if not specified
 

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Save } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { diffMunicipio, numero, validarMunicipio, type MunicipioEdicao } from "@/lib/transporte-admin";
+import { diffMunicipio, numero, reais, validarMunicipio, type MunicipioEdicao } from "@/lib/transporte-admin";
 import ConfirmarDiffDialog from "@/components/admin/ConfirmarDiffDialog";
 import { paraCampo, type IssMunicipioAdmin } from "@/components/admin/transporte-tipos";
 
@@ -77,7 +77,7 @@ export default function IssMunicipiosTable({ municipios, onSalvo, onDirtyChange 
       nome: d.nome,
       uf: d.uf,
       aliquota: numero(d.aliquota),
-      taxaExpediente: numero(d.taxaExpediente),
+      taxaExpediente: reais(d.taxaExpediente),
       apelidos: d.apelidos,
       ativo: d.ativo,
     };

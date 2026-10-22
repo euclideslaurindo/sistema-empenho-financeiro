@@ -29,10 +29,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nome, e-mail e senha são obrigatórios' }, { status: 400 });
     }
 
-    // ADMIN só é permitido se explicitamente escolhido; qualquer outro valor cai em GESTOR
-    const roleValue = perfil === 'ADMIN' ? 'ADMIN' : 'GESTOR';
+    // Administrador, Gestor ou Consulta. Sem perfil (ou "USER", da tela antiga), Gestor.
+    const roleValue = perfil === undefined || perfil === null || perfil === '' || perfil === 'USER' ? 'GESTOR' : perfil;
 
-    const result = await criarUsuario({ nome, email, senha, perfil: roleValue });
+    const result = await criarUsuario({ nome: String(nome).trim(), email: String(email).trim(), senha, perfil: roleValue });
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

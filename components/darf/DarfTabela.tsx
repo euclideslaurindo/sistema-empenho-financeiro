@@ -28,11 +28,40 @@ export function BadgeStatusDarf({ status }: { status: string }) {
 const th = "pb-3 px-2 text-[11px] font-black text-slate-500 uppercase tracking-widest";
 const td = "py-3 px-2";
 
+/** Retenções que podem entrar na DARF (Configurações), na ordem da via. */
+const COLUNAS_DARF: Array<[string, string]> = [
+  ["irrf", "IRRF"],
+  ["iss", "ISS"],
+  ["inss", "INSS"],
+  ["patronal", "Patronal"],
+  ["sest_senat", "SEST/SENAT"],
+];
+const COLUNAS_PADRAO = ["inss", "patronal", "sest_senat"];
+
+/**
+ * Uma coluna para cada retenção que entra na DARF das linhas da página
+ * (antes eram fixas: com IRRF/ISS na DARF, o Total somava algo invisível).
+ * Sem detalhe nenhum, ficam as três do padrão.
+ */
+export function colunasDaDarf(linhas: DarfItemOp[]): Array<[string, string]> {
+  const presentes = new Set<string>();
+  for (const l of linhas) for (const campo of Object.keys(detalheDaDarf(l.detalhe))) presentes.add(campo);
+  const usar = presentes.size > 0 ? presentes : new Set(COLUNAS_PADRAO);
+  return COLUNAS_DARF.filter(([campo]) => usar.has(campo));
+}
+
+/** Vazio conforme o filtro (antes era sempre "neste mês"). */
+export function textoSemDarf(competencia: string, filtrado: boolean): string {
+  if (filtrado) return "Nenhuma DARF encontrada com estes filtros.";
+  return competencia ? "Nenhuma DARF neste mês." : "Nenhuma DARF encontrada.";
+}
+
 export function DarfTabela({
   agrupar,
   itens,
   carregando,
   competencia,
+  filtrado = false,
   podeSelecionar,
   selecionados,
   onAlternar,
@@ -42,6 +71,8 @@ export function DarfTabela({
   itens: Array<DarfItemOp | DarfItemCredor>;
   carregando: boolean;
   competencia: string;
+  /** Busca ou status ativos: o vazio é do filtro, não do mês. */
+  filtrado?: boolean;
   podeSelecionar: boolean;
   selecionados: Set<string>;
   onAlternar: (id: string) => void;
@@ -62,7 +93,7 @@ export function DarfTabela({
   }
 
   if (itens.length === 0) {
-    return <p className="py-12 text-center text-slate-400 font-bold">Nenhuma DARF neste mês.</p>;
+    return <p className="py-12 text-center text-slate-400 font-bold">{textoSemDarf(competencia, filtrado)}</p>;
   }
 
   if (agrupar === "credor") {
@@ -100,6 +131,7 @@ export function DarfTabela({
 
   const linhas = itens as DarfItemOp[];
   const todosMarcados = linhas.length > 0 && linhas.every((l) => selecionados.has(l.id));
+  const colunas = colunasDaDarf(linhas);
 
   return (
     <div className="overflow-x-auto">
@@ -123,9 +155,9 @@ export function DarfTabela({
             <th scope="col" className={th}>NE/Sub</th>
             <th scope="col" className={th}>OP</th>
             <th scope="col" className={th}>Comp.</th>
-            <th scope="col" className={`${th} text-right`}>INSS</th>
-            <th scope="col" className={`${th} text-right`}>Patronal</th>
-            <th scope="col" className={`${th} text-right`}>SEST/SENAT</th>
+            {colunas.map(([campo, rotulo]) => (
+              <th key={campo} scope="col" className={`${th} text-right`}>{rotulo}</th>
+            ))}
             <th scope="col" className={`${th} text-right`}>Total</th>
             <th scope="col" className={`${th} text-center`}>Status</th>
             <th scope="col" className={th}>Pago em</th>
@@ -156,7 +188,7 @@ export function DarfTabela({
                 </td>
                 <td className={td}>
                   <Link
-                    href={`/consulta-impressao?ne=${encodeURIComponent(d.numeroNe)}`}
+                    href={`/consulta-impressao?ne=${encodeURIComponent(d.numeroNe)}&ops=${encodeURIComponent(d.ordemPagamentoId)}`}
                     className="font-bold text-blue-900 hover:underline"
                     title="Abrir impressão da OP"
                   >
@@ -164,9 +196,9 @@ export function DarfTabela({
                   </Link>
                 </td>
                 <td className={`${td} text-slate-500`}>{competenciaBR(d.competencia)}</td>
-                <td className={`${td} text-right`}>{brl(det.inss)}</td>
-                <td className={`${td} text-right`}>{brl(det.patronal)}</td>
-                <td className={`${td} text-right`}>{brl(det.sest_senat)}</td>
+                {colunas.map(([campo]) => (
+                  <td key={campo} className={`${td} text-right`}>{brl(det[campo])}</td>
+                ))}
                 <td className={`${td} text-right font-black`}>R$ {brl(d.valorDarf)}</td>
                 <td className={`${td} text-center`}>
                   <BadgeStatusDarf status={d.status} />

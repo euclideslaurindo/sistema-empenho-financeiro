@@ -39,8 +39,7 @@ describe('Integração API Dashboard Stats', () => {
       .mockResolvedValueOnce([{ total: 4 }]) // nesCountAnterior
       .mockResolvedValueOnce([{ total: 1000 }]) // pagamentosPendentes
       .mockResolvedValueOnce([{ total: 500 }]) // pagamentosMesAnterior
-      .mockResolvedValueOnce([{ numero: 'NE-001', data: '01/01/2026', valor: 100, status: 'EMITIDO', unidade: 'Sistema' }]) // ultimasNes
-      .mockResolvedValueOnce([{ credorNome: 'Fulano', valorPagamento: 100, quando: '01/01/2026 às 10:00' }]); // ultimasOrdens
+      .mockResolvedValueOnce([{ numero: 'NE-001', data: '01/01/2026', valor: 100, status: 'EMITIDO', unidade: 'Sistema' }]); // ultimasNes
 
     const { GET } = await import('@/app/api/dashboard/stats/route');
     const req = new NextRequest('http://localhost:3000/api/dashboard/stats', { method: 'GET' });
@@ -54,7 +53,8 @@ describe('Integração API Dashboard Stats', () => {
     expect(data.pagamentosPendentesTotal).toBe(1000);
     expect(data.pagamentosVariacao).toBe(100); // (1000-500)/500 * 100
     expect(data.ultimasNes).toHaveLength(1);
-    expect(data.ultimasOrdens).toHaveLength(1);
+    expect(data).not.toHaveProperty('ultimasOrdens'); // consulta sem uso removida (B5)
+    expect(typeof data.atualizadoEm).toBe('string');
   });
 
   test('Pagamentos pendentes sem período anterior retorna variação 0 (não 100)', async () => {

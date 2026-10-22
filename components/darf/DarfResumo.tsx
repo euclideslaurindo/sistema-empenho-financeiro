@@ -5,7 +5,7 @@ import type { DarfResposta } from "./tipos";
 const brl = (v: number) => `R$ ${formatarBRL(toCents(v))}`;
 const credoresTxt = (n: number) => `${n} ${n === 1 ? "credor" : "credores"}`;
 
-export function DarfResumo({ totais }: { totais: DarfResposta["totais"] | null }) {
+export function DarfResumo({ totais, competencia }: { totais: DarfResposta["totais"] | null; competencia?: string }) {
   const pendente = totais?.pendente ?? { qtd: 0, valor: 0, credores: 0 };
   const paga = totais?.paga ?? { qtd: 0, valor: 0, credores: 0 };
   const totalCents = toCents(pendente.valor) + toCents(paga.valor);
@@ -27,7 +27,7 @@ export function DarfResumo({ totais }: { totais: DarfResposta["totais"] | null }
         </p>
       </div>
       <div className="rounded-2xl border border-slate-200 bg-white p-5" data-testid="resumo-total">
-        <p className="text-xs font-black uppercase tracking-widest text-slate-500">Total do mês</p>
+        <p className="text-xs font-black uppercase tracking-widest text-slate-500">{competencia ? "Total do mês" : "Total"}</p>
         <p className="mt-1 text-2xl font-black text-slate-800">R$ {formatarBRL(totalCents)}</p>
         <p className="text-sm font-semibold text-slate-500">{pendente.qtd + paga.qtd} OP(s)</p>
       </div>
