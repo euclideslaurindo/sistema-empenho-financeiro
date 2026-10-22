@@ -1,8 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Plus, Save, Search, Trash2, ShieldAlert, UserX, UserCheck } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, ShieldAlert, Trash2, UserX, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import { useAppStore } from "@/lib/store";
+import { ID_ADMIN_RAIZ, PERFIS_USUARIO, ROTULO_PERFIL, SENHA_MINIMA } from "@/lib/perfis-usuario";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -14,32 +16,64 @@ import {
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 
+const FORM_VAZIO = { nome: "", email: "", senha: "", perfil: "GESTOR" };
+const PAGE_SIZE = 10;
+const COR_PERFIL: Record<string, string> = {
+  ADMIN: "bg-purple-100 text-purple-700",
+  GESTOR: "bg-blue-100 text-blue-700",
+  CONSULTA: "bg-slate-100 text-slate-700",
+};
+const campo = "w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none";
+const rotulo = "block text-sm font-black text-slate-500 uppercase tracking-widest mb-2";
+
 export default function UsuariosPage() {
+  const userProfile = useAppStore((s) => s.userProfile);
+  const ehAdmin = userProfile?.perfil === "ADMIN";
+
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState({ nome: "", email: "", senha: "", perfil: "USER" });
+  const [formData, setFormData] = useState(FORM_VAZIO);
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  const PAGE_SIZE = 10;
+  const [trocaPerfil, setTrocaPerfil] = useState<{ usuario: any; perfil: string } | null>(null);
 
-  const fetchUsuarios = async () => {
+  const totalPaginas = Math.max(1, Math.ceil(usuarios.length / PAGE_SIZE));
+
+  const fetchUsuarios = useCallback(async () => {
     try {
       const data = await apiClient.get<{ usuarios: any[] }>("/api/usuarios");
-      setUsuarios(data.usuarios);
+      setUsuarios(data.usuarios || []);
     } catch (error: any) {
-      toast.error(error.message || "Erro ao carregar usuários. Você é ADMIN?");
+      toast.error(error.message || "Erro ao carregar usuários.");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchUsuarios();
   }, []);
 
+  // Só o admin carrega a lista (os outros veem o aviso, sem chamar a API).
+  useEffect(() => {
+    if (!ehAdmin) return;
+    const init = async () => {
+      await fetchUsuarios();
+    };
+    init();
+  }, [ehAdmin, fetchUsuarios]);
+
+  // Excluir o último da página não deixa a lista numa página vazia.
+  const paginaAtual = Math.min(currentPage, totalPaginas);
+
+  // Sem botões de bloquear/excluir/trocar perfil para si mesmo e para o admin raiz
+  // (o servidor recusa; antes a recusa só vinha depois do clique).
+  const protegido = (u: any) => u.id === userProfile?.id || u.id === ID_ADMIN_RAIZ;
+
+  const abrirNovo = () => {
+    setFormData(FORM_VAZIO); // antes reabria com os dados (e a senha) do anterior
+    setShowModal(true);
+  };
+
   const handleCreate = async () => {
-    if (!formData.nome || !formData.email || !formData.senha) {
+    if (!formData.nome.trim() || !formData.email.trim() || !formData.senha) {
       toast.error("Preencha todos os campos");
       return;
     }
@@ -49,47 +83,72 @@ export default function UsuariosPage() {
       toast.error("Formato de e-mail inválido.");
       return;
     }
+    if (formData.senha.length < SENHA_MINIMA) {
+      toast.error(`A senha provisória deve ter no mínimo ${SENHA_MINIMA} caracteres.`);
+      return;
+    }
 
     try {
-      const { error } = await apiClient.post("/api/usuarios", formData);
-      if (error) throw new Error(error.message);
+      await apiClient.post("/api/usuarios", formData);
       toast.success("Usuário criado com sucesso!");
       setShowModal(false);
+      setFormData(FORM_VAZIO);
       fetchUsuarios();
     } catch (error: any) {
       toast.error(error.message || "Erro ao criar usuário");
     }
   };
 
-  const handleDelete = (id: string) => {
-    setDeleteTargetId(id);
-  };
-
   const confirmDelete = async () => {
     if (!deleteTargetId) return;
     try {
-      const { error } = await apiClient.delete(`/api/usuarios/${deleteTargetId}`);
-      if (error) throw new Error(error.message);
-      toast.success("Usuário deletado");
+      await apiClient.delete(`/api/usuarios/${deleteTargetId}`);
+      toast.success("Usuário excluído");
       fetchUsuarios();
     } catch (error: any) {
-      toast.error(error.message || "Erro ao deletar");
+      toast.error(error.message || "Erro ao excluir");
     } finally {
       setDeleteTargetId(null);
     }
   };
 
   const handleToggleBloqueio = async (id: string, ativoAtual: number) => {
-    const novoStatus = ativoAtual === 1 ? 0 : 1;
+    const novoStatus = Number(ativoAtual) === 1 ? 0 : 1;
     try {
-      const { error } = await apiClient.put(`/api/usuarios/${id}`, { ativo: novoStatus });
-      if (error) throw new Error(error.message);
-      toast.success(`Usuário ${novoStatus === 1 ? 'desbloqueado' : 'bloqueado'}!`);
+      await apiClient.put(`/api/usuarios/${id}`, { ativo: novoStatus });
+      toast.success(`Usuário ${novoStatus === 1 ? "desbloqueado" : "bloqueado"}!`);
       fetchUsuarios();
     } catch (error: any) {
       toast.error(error.message || "Erro ao atualizar status");
     }
   };
+
+  const confirmarTrocaPerfil = async () => {
+    if (!trocaPerfil) return;
+    const { usuario, perfil } = trocaPerfil;
+    try {
+      await apiClient.put(`/api/usuarios/${usuario.id}`, { perfil });
+      toast.success(`${usuario.nome} agora é ${ROTULO_PERFIL[perfil]}.`);
+      fetchUsuarios();
+    } catch (error: any) {
+      toast.error(error.message || "Erro ao trocar o perfil");
+    } finally {
+      setTrocaPerfil(null);
+    }
+  };
+
+  if (!userProfile) {
+    return <div className="p-8 text-slate-400 font-bold">Carregando...</div>;
+  }
+  if (!ehAdmin) {
+    return (
+      <div className="p-8">
+        <p role="alert" className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+          <ShieldAlert className="w-5 h-5" /> Acesso restrito a administradores.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative p-8">
@@ -101,7 +160,7 @@ export default function UsuariosPage() {
           </p>
         </div>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={abrirNovo}
           className="bg-blue-900 text-white px-6 py-3 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-blue-800 transition-colors shadow-[0_8px_20px_rgba(37,99,235,0.25)] flex items-center gap-2"
         >
           <Plus size={16} /> Novo Usuário
@@ -114,7 +173,7 @@ export default function UsuariosPage() {
             <tr className="border-b border-slate-100">
               <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Nome</th>
               <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">E-mail</th>
-              <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Cargo</th>
+              <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Perfil</th>
               <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest">Status</th>
               <th className="pb-4 text-sm font-black text-slate-500 uppercase tracking-widest text-right">Ações</th>
             </tr>
@@ -122,30 +181,65 @@ export default function UsuariosPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={5} className="py-8 text-center text-slate-400 font-bold">Carregando...</td></tr>
-            ) : usuarios.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE).map((u) => (
-              <tr key={u.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                <td className="py-4 font-bold text-slate-700">{u.nome}</td>
-                <td className="py-4 font-semibold text-slate-500">{u.email}</td>
-                <td className="py-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${u.perfil === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {u.perfil}
-                  </span>
-                </td>
-                <td className="py-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${u.ativo === 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                    {u.ativo === 1 ? 'Ativo' : 'Bloqueado'}
-                  </span>
-                </td>
-                <td className="py-4 flex items-center justify-end gap-2">
-                  <button onClick={() => handleToggleBloqueio(u.id, u.ativo)} className={`p-2 rounded-lg ${u.ativo === 1 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`} title={u.ativo === 1 ? 'Bloquear' : 'Desbloquear'}>
-                    {u.ativo === 1 ? <UserX size={16} /> : <UserCheck size={16} />}
-                  </button>
-                  <button onClick={() => handleDelete(u.id)} className="p-2 rounded-lg bg-red-100 text-red-700" title="Excluir (CUIDADO)">
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
+            ) : usuarios.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE).map((u) => {
+              const ativo = Number(u.ativo) === 1;
+              return (
+                <tr key={u.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                  <td className="py-4 font-bold text-slate-700">{u.nome}</td>
+                  <td className="py-4 font-semibold text-slate-500">{u.email}</td>
+                  <td className="py-4">
+                    {protegido(u) ? (
+                      <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${COR_PERFIL[u.perfil] || COR_PERFIL.GESTOR}`}>
+                        {ROTULO_PERFIL[u.perfil] || u.perfil}
+                      </span>
+                    ) : (
+                      <select
+                        aria-label={`Perfil de ${u.nome}`}
+                        value={u.perfil}
+                        onChange={(e) => setTrocaPerfil({ usuario: u, perfil: e.target.value })}
+                        className={`px-2 py-1 rounded-full text-xs font-black uppercase border-0 ${COR_PERFIL[u.perfil] || COR_PERFIL.GESTOR}`}
+                      >
+                        {!(PERFIS_USUARIO as readonly string[]).includes(u.perfil) && <option value={u.perfil}>{u.perfil}</option>}
+                        {PERFIS_USUARIO.map((p) => (
+                          <option key={p} value={p}>{ROTULO_PERFIL[p]}</option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                  <td className="py-4">
+                    <span className={`px-3 py-1 rounded-full text-xs font-black uppercase ${ativo ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                      {ativo ? "Ativo" : "Bloqueado"}
+                    </span>
+                  </td>
+                  <td className="py-4 flex items-center justify-end gap-2">
+                    {protegido(u) ? (
+                      <span className="text-xs font-semibold text-slate-400">
+                        {u.id === userProfile.id ? "Você" : "Admin raiz"}
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleToggleBloqueio(u.id, u.ativo)}
+                          className={`p-2 rounded-lg ${ativo ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
+                          title={ativo ? "Bloquear" : "Desbloquear"}
+                          aria-label={`${ativo ? "Bloquear" : "Desbloquear"} ${u.nome}`}
+                        >
+                          {ativo ? <UserX size={16} /> : <UserCheck size={16} />}
+                        </button>
+                        <button
+                          onClick={() => setDeleteTargetId(u.id)}
+                          className="p-2 rounded-lg bg-red-100 text-red-700"
+                          title="Excluir"
+                          aria-label={`Excluir ${u.nome}`}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -153,19 +247,19 @@ export default function UsuariosPage() {
         {!loading && usuarios.length > PAGE_SIZE && (
           <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-100">
             <span className="text-sm font-semibold text-slate-500">
-              Página {currentPage} de {Math.ceil(usuarios.length / PAGE_SIZE)} — {usuarios.length} usuários
+              Página {paginaAtual} de {totalPaginas} — {usuarios.length} usuários
             </span>
             <div className="flex gap-2">
               <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(Math.max(1, paginaAtual - 1))}
+                disabled={paginaAtual === 1}
                 className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
               >
                 Anterior
               </button>
               <button
-                onClick={() => setCurrentPage(p => Math.min(Math.ceil(usuarios.length / PAGE_SIZE), p + 1))}
-                disabled={currentPage === Math.ceil(usuarios.length / PAGE_SIZE)}
+                onClick={() => setCurrentPage(Math.min(totalPaginas, paginaAtual + 1))}
+                disabled={paginaAtual === totalPaginas}
                 className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
               >
                 Próxima
@@ -180,22 +274,32 @@ export default function UsuariosPage() {
           <DialogTitle className="text-2xl font-black text-slate-800 tracking-tight mb-6">Novo Usuário</DialogTitle>
           <div className="space-y-4">
             <div>
-              <label htmlFor="novo-usuario-nome" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Nome</label>
-              <input id="novo-usuario-nome" value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none" />
+              <label htmlFor="novo-usuario-nome" className={rotulo}>Nome</label>
+              <input id="novo-usuario-nome" value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} className={campo} />
             </div>
             <div>
-              <label htmlFor="novo-usuario-email" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">E-mail (Login)</label>
-              <input id="novo-usuario-email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} type="email" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none" />
+              <label htmlFor="novo-usuario-email" className={rotulo}>E-mail (Login)</label>
+              <input id="novo-usuario-email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} type="email" className={campo} />
             </div>
             <div>
-              <label htmlFor="novo-usuario-senha" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Senha Provisória</label>
-              <input id="novo-usuario-senha" value={formData.senha} onChange={(e) => setFormData({ ...formData, senha: e.target.value })} type="password" className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none" />
+              <label htmlFor="novo-usuario-senha" className={rotulo}>Senha Provisória</label>
+              <input
+                id="novo-usuario-senha"
+                value={formData.senha}
+                onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
+                type="password"
+                minLength={SENHA_MINIMA}
+                aria-describedby="novo-usuario-senha-ajuda"
+                className={campo}
+              />
+              <p id="novo-usuario-senha-ajuda" className="text-xs text-slate-500 mt-1">Mínimo de {SENHA_MINIMA} caracteres.</p>
             </div>
             <div>
-              <label htmlFor="novo-usuario-perfil" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">Permissão</label>
-              <select id="novo-usuario-perfil" value={formData.perfil} onChange={(e) => setFormData({ ...formData, perfil: e.target.value })} className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 font-bold focus:border-blue-800 outline-none">
-                <option value="USER">Comum</option>
-                <option value="ADMIN">Administrador</option>
+              <label htmlFor="novo-usuario-perfil" className={rotulo}>Perfil</label>
+              <select id="novo-usuario-perfil" value={formData.perfil} onChange={(e) => setFormData({ ...formData, perfil: e.target.value })} className={campo}>
+                {PERFIS_USUARIO.map((p) => (
+                  <option key={p} value={p}>{ROTULO_PERFIL[p]}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -206,15 +310,30 @@ export default function UsuariosPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
+      <AlertDialog open={!!trocaPerfil} onOpenChange={(open) => !open && setTrocaPerfil(null)}>
         <AlertDialogContent>
-          <AlertDialogTitle>Deletar usuário</AlertDialogTitle>
+          <AlertDialogTitle>Trocar o perfil?</AlertDialogTitle>
           <AlertDialogDescription>
-            Tem certeza que deseja DELETAR este usuário? Essa ação não pode ser desfeita e pode quebrar dados caso ele tenha notas empenhadas.
+            {trocaPerfil?.usuario.nome} passa de {ROTULO_PERFIL[trocaPerfil?.usuario.perfil] || trocaPerfil?.usuario.perfil} para{" "}
+            {trocaPerfil ? ROTULO_PERFIL[trocaPerfil.perfil] : ""}. Vale a partir do próximo clique dele no sistema.
           </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Deletar</AlertDialogAction>
+            <AlertDialogAction onClick={confirmarTrocaPerfil}>Trocar perfil</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTargetId} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
+          <AlertDialogDescription>
+            Só é possível excluir quem nunca registrou nada no sistema. Quem já tem NE, credor, OP, DARF ou registro na auditoria
+            deve ser bloqueado, para preservar o histórico de quem fez cada coisa.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Excluir</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
