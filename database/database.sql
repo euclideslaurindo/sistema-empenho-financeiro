@@ -122,8 +122,6 @@ CREATE TABLE IF NOT EXISTS ordens_pagamento (
 -- DADOS INICIAIS
 -- ============================================================
 
--- Usuário administrador padrão (senha: admin123)
--- Os usuários já foram inseridos pelo setup_db.js, então pulamos esta etapa aqui.
 -- Credores de exemplo
 INSERT IGNORE INTO credores (id, nome, endereco, cpf_cnpj, pis, rg, data_expedicao) VALUES
 ('1', 'Jose Silva Oliveira', 'Rua A, 123, Recife - PE', '111.111.111-11', '', '123456 SDS-PE', '2020-01-01'),

@@ -21,7 +21,7 @@
 -- data_emissao, senão hoje). Assim a tabela de 2027 pode ser cadastrada
 -- antes de valer e OPs antigas continuam com a tabela da época.
 --
--- Conferido contra docs/projeto-retencoes-v2/fixtures/eja-campo-5a-parcela.json:
+-- Conferido contra tests/fixtures/eja-campo-5a-parcela.json:
 -- com estes valores, as 68 linhas não isentas batem centavo a centavo.
 -- D22: o redutor do IRRF é máx(0; redutor_constante − redutor_coeficiente
 -- × BRUTO) — sobre a base tributável 38 linhas divergem da planilha.
