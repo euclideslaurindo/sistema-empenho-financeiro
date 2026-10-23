@@ -113,4 +113,4 @@ docs/             documentação do projeto
 ## Documentação
 
 - [`docs/revisao-abas.md`](docs/revisao-abas.md) — revisão funcional de cada tela: problemas encontrados, correções e roteiro de teste.
-- [`docs/projeto-retencoes-v2/`](docs/projeto-retencoes-v2/) — projeto das retenções: decisões, arquitetura e homologação.
+- [`docs/projeto-retencoes-v2/`](docs/projeto-retencoes-v2/) — projeto das retenções: requisitos, decisões e arquitetura.

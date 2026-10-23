@@ -11,7 +11,6 @@ vi.mock('@/lib/db', () => ({ query: vi.fn(), withTransaction: vi.fn() }));
 import { query } from '@/lib/db';
 import { calcularRetencoesDaOp } from '@/lib/services/calculo-op.service';
 import fixture from '../fixtures/eja-campo-5a-parcela.json';
-import fixtureDocs from '../../docs/projeto-retencoes-v2/fixtures/eja-campo-5a-parcela.json';
 import {
   FAIXAS_SEED,
   MUNICIPIOS_SEED,
@@ -64,10 +63,6 @@ beforeAll(async () => {
 });
 
 describe('fixture da planilha EJA Campo', () => {
-  test('a cópia em tests/fixtures é idêntica à da documentação', () => {
-    expect(fixture).toEqual(fixtureDocs);
-  });
-
   test('91 linhas: 63 exatas + 5 com divergência conhecida + 23 isentas', () => {
     expect(LINHAS).toHaveLength(91);
     expect(LINHAS.filter((l) => tipo(l) === 'exata')).toHaveLength(63);

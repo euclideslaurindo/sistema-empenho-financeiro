@@ -1,39 +1,23 @@
+# Dependências e build
 node_modules/
 .next/
 coverage/
-.DS_Store
-*.log
+*.tsbuildinfo
+
+# Relatórios dos testes de ponta a ponta
+test-results/
+playwright-report/
+
+# Variáveis de ambiente: só o exemplo vai para o repositório
 .env*
 !.env.example
-*.exe
-*.tsbuildinfo
-*.txt
-*.html
-test-output.css
-output.css
-fix_*.js
-refactor_*.js
-premium_design.js
-update-db.ts
+
+# Sistema e logs
+.DS_Store
+*.log
+
+# Planilhas e documentos de trabalho (podem conter dados reais)
 *.xlsx
 *.xls
-*.pdf
 *.csv
-RESUMO_IA.md
-CONTEXTO_PROJETO.md
-PENDENCIAS_ATUAIS.md
-varredura_completa_melhorias.md
-PLANO_IMPLEMENTACAO_PENDENCIAS.md
-ROTEIRO_TESTE_MANUAL.md
-PENDENCIAS_ABERTAS.md
-GUIA_DEPLOY_SERVIDOR.md
-scripts/tests/
-test*.js
-test*.ts
-parse_excel.js
-get_ip.js
-setup_db.js
-remove-mocks.js
-update_colors*.js
-CLAUDE.md
-deploy-pacote/
+*.pdf
