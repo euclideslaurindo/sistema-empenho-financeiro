@@ -9,9 +9,9 @@ export type StandardResponse<T = any> = {
 };
 
 // wrapper pra tratar excecoes nas rotas da api sem ter que repetir try/catch em todo lugar
-export async function withErrorHandler(
-  handler: () => Promise<NextResponse>
-): Promise<NextResponse> {
+export async function withErrorHandler<T extends Response = NextResponse>(
+  handler: () => Promise<T>
+): Promise<T | NextResponse> {
   try {
     return await handler();
   } catch (error: any) {
