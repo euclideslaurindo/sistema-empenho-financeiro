@@ -158,7 +158,7 @@ export function totaisDoAno(pessoas: PessoaFisicaIr[]): TotaisIr {
 // CSV para o Excel em português
 // ---------------------------------------------------------------------------
 
-const BOM = '﻿';
+const BOM = '\uFEFF';
 const SEP = ';';
 const FIM_LINHA = '\r\n';
 

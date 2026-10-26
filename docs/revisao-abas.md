@@ -19,6 +19,7 @@ Conferência funcional do sistema, uma aba por vez. Para cada aba:
 | 7 | Configurações (retenções, transporte, elementos) | 🔧 CF1–CF3 corrigidos em 21/10/2026 (CF2 pela opção a); falta o teste logado |
 | 8 | Usuários | 🔧 U1–U7 corrigidos em 21/10/2026; falta o teste logado |
 | 9 | Dashboard | 🔧 B1–B5 corrigidos em 22/10/2026; falta o teste logado |
+| 6b | DARF → Pessoas físicas (IR) | 🆕 visão nova em 26/10/2026 (migration_18, API e tela); falta o teste logado |
 
 ---
 
@@ -481,6 +482,40 @@ As contas do servidor estão certas: os totais são somados no banco, em DECIMAL
 - [ ] **B-7** Logado como **Consulta** → sem os botões "Novo Empenho" e "Novo Credor" (B5 corrigido).
 - [ ] **B-8** Com o servidor do banco fora do ar (ou sem rede) → aviso "Não foi possível carregar o resumo" com "Tentar de novo", e não R$ 0,00 (B2).
 - [ ] **B-9** Os cartões dizem o período ("nos últimos 30 dias", "em 30 dias", "vs 30 dias atrás"), e a seta aponta para baixo quando o número cai (B3).
+
+### Resultado do teste
+
+| Item | ✅/❌ | Observação |
+|---|---|---|
+| | | |
+
+---
+
+## Aba 6b — DARF → Pessoas físicas (IR)
+
+Visão nova da aba DARF, pedida pelos supervisores para a **declaração anual do Imposto de Renda**: para cada pessoa física (CPF) que recebeu OP no ano, quanto recebeu e o que foi retido, com a marcação de quem já foi informado.
+
+**Como os números são calculados (o mesmo da consulta `database/consultas/conferencia_ir_pessoas_fisicas.sql`):**
+- **quem entra:** os credores com CPF (11 dígitos); CNPJ fica de fora;
+- **ano da OP:** a data de pagamento, senão a de emissão, senão a de lançamento (a mesma regra da competência da DARF);
+- **valores:** bruto, IRRF, INSS, ISS e líquido somados por pessoa; retenção vazia conta como 0;
+- **marcação:** só Admin e Gestor marcam; desmarcar apaga a data e a observação, e tudo fica na auditoria.
+
+### Roteiro de teste (marcar ✅ / ❌)
+
+- [ ] **IR-1** Logado como **Gestor**, aba DARF → abre em "Recolhimento (DARF)" e funciona como antes (filtrar, marcar como paga, reabrir).
+- [ ] **IR-2** Clicar em "Pessoas físicas (IR)" → abre no ano mais recente com OPs. Os cartões (pessoas, bruto, IRRF, INSS, ISS) batem com a **consulta 1** do SQL de conferência rodada com o mesmo `@ano`.
+- [ ] **IR-3** A lista bate com a **consulta 2** do SQL (uma linha por CPF, mesmos valores). Nenhuma empresa (CNPJ) aparece.
+- [ ] **IR-4** Buscar um nome **sem acento** (ex.: "joao" acha "João") e um CPF **com máscara** → acha a pessoa. "Pendentes" e "Informadas" filtram; o rodapé diz "Mostrando X de Y" e soma só as que estão na tela.
+- [ ] **IR-5** Trocar o ano no seletor → a lista e os cartões mudam para o ano escolhido.
+- [ ] **IR-6** Marcar uma pessoa (um clique) → fica marcada, o cartão "informadas" aumenta, e a **consulta 3** do SQL mostra o CPF.
+- [ ] **IR-7** Clicar duas vezes seguidas, rápido, na mesma caixinha → marca uma vez só (a consulta 3 mostra uma linha).
+- [ ] **IR-8** Abrir os detalhes (seta ▸) → as OPs batem com a consulta 2; o link da OP abre a impressão; "Informado em … por …" mostra a data e o seu nome.
+- [ ] **IR-9** Escrever uma observação e salvar → recarregar a página (F5) e abrir de novo: a observação continua lá.
+- [ ] **IR-10** Desmarcar → pede confirmação; "Cancelar" não muda nada; "Desmarcar" volta a pessoa para pendente e apaga a observação.
+- [ ] **IR-11** "Exportar CSV do ano" → baixa `pessoas-fisicas-ir-AAAA.csv`. Abrindo no **Excel**: acentos certos, cada valor numa coluna, vírgula decimal, "Sim"/"Não" na coluna Informado e a linha **TOTAL** no fim, igual aos cartões.
+- [ ] **IR-12** O CSV traz **todas** as pessoas do ano, mesmo com busca ou filtro ativos na tela.
+- [ ] **IR-13** Logado como **Consulta** → vê a lista, os detalhes e exporta, mas não tem caixinha nem campo de observação (só os selos Informado/Pendente).
 
 ### Resultado do teste
 
