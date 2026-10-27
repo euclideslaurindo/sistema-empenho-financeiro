@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
+  BarChart3,
   Users,
   FileText,
   Banknote,
@@ -17,6 +18,7 @@ import { useAppStore } from "@/lib/store";
 
 const navItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Análises", href: "/analises", icon: BarChart3 },
   { name: "Credores", href: "/credores", icon: Users },
   { name: "Notas de Empenho", href: "/notas-empenho", icon: FileText },
   { name: "Ordem de Pagamento", href: "/ordem-pagamento", icon: Banknote },
