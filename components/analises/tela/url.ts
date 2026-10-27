@@ -41,6 +41,35 @@ export function montarUrlAnalises(f: FiltrosAnalises): string | null {
   return `/api/analises?${p.toString()}`;
 }
 
+/**
+ * Filtros vindos do endereço (?periodo=…&ano=…), validados: o que não for
+ * válido cai no padrão. Assim o endereço da tela pode ser compartilhado, e o
+ * relatório volta para a tela com os mesmos filtros.
+ */
+export function filtrosDaUrl(sp: { get(nome: string): string | null }): FiltrosAnalises {
+  const periodo = sp.get('periodo');
+  const ano = Number(sp.get('ano'));
+  const base = sp.get('base');
+  const elemento = sp.get('elemento') ?? '';
+  return {
+    periodo: periodo === 's1' || periodo === 's2' || periodo === 'ano' || periodo === 'intervalo' ? periodo : 'ano',
+    ano: Number.isInteger(ano) && ano >= 2000 && ano <= 2100 ? ano : null,
+    inicio: sp.get('inicio') ?? '',
+    fim: sp.get('fim') ?? '',
+    base: base === 'exercicio' ? 'exercicio' : 'civil',
+    elemento: /^\d(\.\d+)+$/.test(elemento) ? elemento : '',
+  };
+}
+
+/**
+ * Consulta (?…) com os filtros que estão NA TELA, o ano já resolvido: o
+ * relatório e o CSV saem exatamente do que a pessoa está vendo.
+ */
+export function consultaDaTela(f: FiltrosAnalises, anoExibido: number): string | null {
+  const url = montarUrlAnalises({ ...f, ano: f.periodo === 'intervalo' ? f.ano : f.ano ?? anoExibido });
+  return url ? url.slice(url.indexOf('?')) : null;
+}
+
 const ultimoDia = (mes: string) => {
   const [a, m] = mes.split('-').map(Number);
   return `${mes}-${String(new Date(Date.UTC(a, m, 0)).getUTCDate()).padStart(2, '0')}`;

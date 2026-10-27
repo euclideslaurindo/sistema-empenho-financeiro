@@ -5,6 +5,7 @@ import { fromCents, toCents, type Centavos } from '@/lib/money';
 import { extrairCodigoElemento } from '@/lib/elementos';
 import { somenteDigitos } from '@/lib/ne-credores';
 import { formatCpfCnpj } from '@/lib/utils';
+import { BOM, FIM_LINHA, SEP, textoCsv, valorCsv } from '@/lib/csv';
 
 export const ANO_MIN = 2000;
 export const ANO_MAX = 2100;
@@ -157,23 +158,6 @@ export function totaisDoAno(pessoas: PessoaFisicaIr[]): TotaisIr {
 // ---------------------------------------------------------------------------
 // CSV para o Excel em português
 // ---------------------------------------------------------------------------
-
-const BOM = '\uFEFF';
-const SEP = ';';
-const FIM_LINHA = '\r\n';
-
-/** Centavos → "1234,50" (vírgula decimal, sem ponto de milhar). */
-function valorCsv(c: Centavos): string {
-  const abs = Math.abs(c);
-  return `${c < 0 ? '-' : ''}${Math.floor(abs / 100)},${String(abs % 100).padStart(2, '0')}`;
-}
-
-/** Campo de texto: neutraliza fórmula (= + - @ tab CR no início) e protege ; " e quebras. */
-function textoCsv(v: unknown): string {
-  let s = String(v ?? '');
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
-  return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
 
 /** "2026-10-26 14:30" → "26/10/2026 14:30". */
 function dataCsv(em: string | null): string {

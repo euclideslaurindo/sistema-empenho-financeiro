@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Key, Percent, Shapes, UserCircle, Users } from "lucide-react";
 import { ChangePasswordModal } from "@/components/change-password-modal";
+import { IdentificacaoRelatorios } from "@/components/admin/IdentificacaoRelatorios";
 import { useAppStore } from "@/lib/store";
 
 // Configurações (revisão da aba 7, CF2): só o que funciona. Antes a tela tinha
@@ -69,6 +70,7 @@ export default function Configuracoes() {
                 </span>
                 <ArrowRight className="w-5 h-5 text-slate-500 shrink-0" />
               </Link>
+              <IdentificacaoRelatorios />
             </div>
           </section>
         )}

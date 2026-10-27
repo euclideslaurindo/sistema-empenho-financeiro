@@ -1,21 +1,38 @@
 "use client";
-import { useEffect, useState } from "react";
-import { BarChart3, RefreshCw } from "lucide-react";
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { BarChart3, Download, FileText, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import { baixarArquivo } from "@/lib/baixar-arquivo";
+import { nomeArquivoCsvAnalises } from "@/lib/analises-csv";
 import { useElementos } from "@/hooks/use-elementos";
 import { FiltrosAnalisesBarra } from "@/components/analises/tela/Filtros";
 import { CartoesAnalises } from "@/components/analises/tela/Cartoes";
 import { ResumoAnalises } from "@/components/analises/tela/Resumo";
 import { GraficosAnalises } from "@/components/analises/tela/Graficos";
 import { PainelDetalhe, type EstadoDetalhe } from "@/components/analises/tela/PainelDetalhe";
-import { FILTROS_INICIAIS, montarUrlAnalises, montarUrlOps, recorteDoMes, validarIntervalo, type FiltrosAnalises } from "@/components/analises/tela/url";
+import { consultaDaTela, filtrosDaUrl, montarUrlAnalises, montarUrlOps, recorteDoMes, validarIntervalo, type FiltrosAnalises } from "@/components/analises/tela/url";
 import type { RespostaAnalises, RespostaOps } from "@/components/analises/tela/tipos";
 
 const horaBR = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 const dataBR = (iso: string) => iso.split("-").reverse().join("/");
 
+// useSearchParams fora de <Suspense> trava a página no build (Next 16).
 export default function AnalisesPage() {
-  const [filtros, setFiltros] = useState<FiltrosAnalises>(FILTROS_INICIAIS);
+  return (
+    <Suspense fallback={null}>
+      <AnalisesTela />
+    </Suspense>
+  );
+}
+
+function AnalisesTela() {
+  const sp = useSearchParams();
+  // Os filtros podem vir do endereço (link compartilhado, volta do relatório).
+  const [filtros, setFiltros] = useState<FiltrosAnalises>(() => filtrosDaUrl(sp));
+  const [exportando, setExportando] = useState(false);
   const [versao, setVersao] = useState(0);
   // A resposta guarda a URL de onde veio: trocar de filtro rápido nunca mostra o filtro anterior.
   const [resultado, setResultado] = useState<{ url: string; dados: RespostaAnalises | null; erro: string | null } | null>(null);
@@ -52,6 +69,20 @@ export default function AnalisesPage() {
   const dados = !carregando && resultado?.dados ? resultado.dados : null;
   const falhou = !carregando && url !== null && !!resultado?.erro;
   const anoExibido = filtros.ano ?? resultado?.dados?.periodo.ano ?? new Date().getFullYear();
+  // O relatório e o CSV saem do que está na tela (com o ano já resolvido).
+  const consulta = consultaDaTela(filtros, anoExibido);
+
+  const exportarCsv = async () => {
+    if (!consulta || !dados || exportando) return;
+    setExportando(true);
+    try {
+      await baixarArquivo(`/api/analises/csv${consulta}`, nomeArquivoCsvAnalises(dados));
+    } catch (e: any) {
+      toast.error(e?.message || "Não foi possível exportar a planilha.");
+    } finally {
+      setExportando(false);
+    }
+  };
 
   const mudarFiltros = (parcial: Partial<FiltrosAnalises>) => {
     setDetalheAberto(null);
@@ -110,6 +141,26 @@ export default function AnalisesPage() {
               className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#c8d1de] bg-white px-3 text-xs font-semibold text-blue-900 hover:bg-slate-50 disabled:opacity-40"
             >
               <RefreshCw aria-hidden="true" className="h-3.5 w-3.5" /> Atualizar
+            </button>
+            {consulta && dados ? (
+              <Link
+                href={`/analises/relatorio${consulta}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-blue-900 bg-white px-3 text-xs font-semibold text-blue-900 hover:bg-blue-50"
+              >
+                <FileText aria-hidden="true" className="h-3.5 w-3.5" /> Relatório A4
+              </Link>
+            ) : (
+              <span aria-disabled="true" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#c8d1de] bg-white px-3 text-xs font-semibold text-slate-400">
+                <FileText aria-hidden="true" className="h-3.5 w-3.5" /> Relatório A4
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={exportarCsv}
+              disabled={!consulta || !dados || exportando}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-blue-900 bg-white px-3 text-xs font-semibold text-blue-900 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Download aria-hidden="true" className="h-3.5 w-3.5" /> {exportando ? "Exportando..." : "Exportar CSV"}
             </button>
           </div>
         </header>
