@@ -15,17 +15,15 @@ import {
   type TotaisIr,
 } from '@/lib/ir-pessoas-fisicas';
 import type { ServiceResult } from '@/lib/services/darf.service';
+import { DATA_OP, DIGITOS_CPF } from '@/lib/sql-op';
 
 // ---------------------------------------------------------------------------
 // Expressões SQL (uma fonte só, conferidas nos testes)
 // ---------------------------------------------------------------------------
 
-/** CPF/CNPJ da OP só com dígitos (a máscara gravada varia). */
-export const DIGITOS_CPF =
-  "REPLACE(REPLACE(REPLACE(REPLACE(op.credor_cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '')";
-
+export { DIGITOS_CPF } from '@/lib/sql-op';
 /** Data que define o ano da OP: a mesma regra da competência da DARF. */
-export const DATA_COMPETENCIA = 'COALESCE(op.data_pagamento, op.data_emissao, DATE(op.created_at))';
+export const DATA_COMPETENCIA = DATA_OP;
 
 const FILTRO_PF = `CHAR_LENGTH(${DIGITOS_CPF}) = 11`;
 
