@@ -17,6 +17,8 @@ import { DarfFiltros } from "@/components/darf/DarfFiltros";
 import { DarfResumo } from "@/components/darf/DarfResumo";
 import { DarfTabela } from "@/components/darf/DarfTabela";
 import { DarfBaixaModal } from "@/components/darf/DarfBaixaModal";
+import { IrPessoasFisicas } from "@/components/darf/ir/IrPessoasFisicas";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   mesAtual,
   montarUrlDarf,
@@ -28,7 +30,14 @@ import {
 
 const LIMITE = 50;
 
+type Visao = "darf" | "ir";
+const VISOES: Array<[Visao, string]> = [
+  ["darf", "Recolhimento (DARF)"],
+  ["ir", "Pessoas físicas (IR)"],
+];
+
 export default function DarfPage() {
+  const [visao, setVisao] = useState<Visao>("darf");
   const [filtros, setFiltros] = useState<FiltrosTela>({ competencia: mesAtual(), status: "", busca: "", agrupar: "op" });
   const [page, setPage] = useState(1);
   const [versao, setVersao] = useState(0);
@@ -131,81 +140,103 @@ export default function DarfPage() {
           </h1>
         </div>
 
-        <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
-          <DarfFiltros filtros={filtros} onChange={mudarFiltros} />
-        </div>
-
-        <DarfResumo totais={dados?.totais ?? null} competencia={filtros.competencia} />
-
-        <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
-          {podeAlterar && (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm font-bold text-slate-500" aria-live="polite">
-                {porOp
-                  ? `${itensSelecionados.length} selecionada(s) nesta página`
-                  : "Para marcar como paga ou reabrir, volte para a visão Por OP."}
-              </p>
-              {porOp && (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={paraPagar.length === 0}
-                    onClick={() => setBaixaAberta(true)}
-                    title={paraReabrir.length > 0 && paraPagar.length > 0 ? "As já pagas da seleção ficam como estão." : undefined}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <CheckCircle2 className="w-4 h-4" /> Marcar como paga{paraPagar.length > 0 ? ` (${paraPagar.length})` : ""}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={paraReabrir.length === 0}
-                    onClick={() => setReabrirAberto(true)}
-                    title={paraReabrir.length > 0 && paraPagar.length > 0 ? "As pendentes da seleção ficam como estão." : undefined}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <RotateCcw className="w-4 h-4" /> Reabrir{paraReabrir.length > 0 ? ` (${paraReabrir.length})` : ""}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          <DarfTabela
-            agrupar={filtros.agrupar}
-            itens={dados?.itens ?? []}
-            carregando={carregando}
-            competencia={filtros.competencia}
-            filtrado={!!filtros.status || !!filtros.busca.trim()}
-            podeSelecionar={podeAlterar && porOp}
-            selecionados={selecionados}
-            onAlternar={alternar}
-            onAlternarPagina={alternarPagina}
-          />
-
-          <div className="flex justify-between items-center mt-6">
-            <span className="text-sm font-semibold text-slate-500">
-              Página {page} de {totalPaginas}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => mudarPagina(Math.max(1, page - 1))}
-                disabled={page <= 1}
-                className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+        <Tabs value={visao} onValueChange={(v) => setVisao(v as Visao)}>
+          <TabsList aria-label="Visão da aba DARF" className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+            {VISOES.map(([valor, texto]) => (
+              <TabsTrigger
+                key={valor}
+                value={valor}
+                className={`rounded-xl px-4 py-2 text-xs font-black uppercase tracking-widest transition-colors ${
+                  visao === valor ? "bg-blue-900 text-white" : "text-slate-500 hover:bg-slate-50"
+                }`}
               >
-                Anterior
-              </button>
-              <button
-                type="button"
-                onClick={() => mudarPagina(Math.min(totalPaginas, page + 1))}
-                disabled={page >= totalPaginas}
-                className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
-              >
-                Próxima
-              </button>
+                {texto}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        {visao === "ir" && <IrPessoasFisicas podeAlterar={podeAlterar} />}
+
+        {visao === "darf" && (
+          <>
+          <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
+            <DarfFiltros filtros={filtros} onChange={mudarFiltros} />
+          </div>
+
+          <DarfResumo totais={dados?.totais ?? null} competencia={filtros.competencia} />
+
+          <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)]">
+            {podeAlterar && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-bold text-slate-500" aria-live="polite">
+                  {porOp
+                    ? `${itensSelecionados.length} selecionada(s) nesta página`
+                    : "Para marcar como paga ou reabrir, volte para a visão Por OP."}
+                </p>
+                {porOp && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={paraPagar.length === 0}
+                      onClick={() => setBaixaAberta(true)}
+                      title={paraReabrir.length > 0 && paraPagar.length > 0 ? "As já pagas da seleção ficam como estão." : undefined}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <CheckCircle2 className="w-4 h-4" /> Marcar como paga{paraPagar.length > 0 ? ` (${paraPagar.length})` : ""}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={paraReabrir.length === 0}
+                      onClick={() => setReabrirAberto(true)}
+                      title={paraReabrir.length > 0 && paraPagar.length > 0 ? "As pendentes da seleção ficam como estão." : undefined}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <RotateCcw className="w-4 h-4" /> Reabrir{paraReabrir.length > 0 ? ` (${paraReabrir.length})` : ""}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <DarfTabela
+              agrupar={filtros.agrupar}
+              itens={dados?.itens ?? []}
+              carregando={carregando}
+              competencia={filtros.competencia}
+              filtrado={!!filtros.status || !!filtros.busca.trim()}
+              podeSelecionar={podeAlterar && porOp}
+              selecionados={selecionados}
+              onAlternar={alternar}
+              onAlternarPagina={alternarPagina}
+            />
+
+            <div className="flex justify-between items-center mt-6">
+              <span className="text-sm font-semibold text-slate-500">
+                Página {page} de {totalPaginas}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => mudarPagina(Math.max(1, page - 1))}
+                  disabled={page <= 1}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+                >
+                  Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() => mudarPagina(Math.min(totalPaginas, page + 1))}
+                  disabled={page >= totalPaginas}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+                >
+                  Próxima
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+          </>
+        )}
       </div>
 
       {baixaAberta && (
