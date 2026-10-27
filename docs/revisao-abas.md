@@ -20,6 +20,7 @@ Conferência funcional do sistema, uma aba por vez. Para cada aba:
 | 8 | Usuários | 🔧 U1–U7 corrigidos em 21/10/2026; falta o teste logado |
 | 9 | Dashboard | 🔧 B1–B5 corrigidos em 22/10/2026; falta o teste logado |
 | 6b | DARF → Pessoas físicas (IR) | 🆕 visão nova em 26/10/2026 (migration_18, API e tela); falta o teste logado |
+| 10 | Análises | 🆕 aba nova em 27/10/2026 (protótipo aprovado, API e tela); falta o teste logado |
 
 ---
 
@@ -516,6 +517,40 @@ Visão nova da aba DARF, pedida pelos supervisores para a **declaração anual d
 - [ ] **IR-11** "Exportar CSV do ano" → baixa `pessoas-fisicas-ir-AAAA.csv`. Abrindo no **Excel**: acentos certos, cada valor numa coluna, vírgula decimal, "Sim"/"Não" na coluna Informado e a linha **TOTAL** no fim, igual aos cartões.
 - [ ] **IR-12** O CSV traz **todas** as pessoas do ano, mesmo com busca ou filtro ativos na tela.
 - [ ] **IR-13** Logado como **Consulta** → vê a lista, os detalhes e exporta, mas não tem caixinha nem campo de observação (só os selos Informado/Pendente).
+
+### Resultado do teste
+
+| Item | ✅/❌ | Observação |
+|---|---|---|
+| | | |
+
+---
+
+## Aba 10 — Análises
+
+Aba nova para **apresentações e prestação de contas** (gestão interna e tribunal de contas), no visual aprovado pelos supervisores. Só leitura: os três perfis veem.
+
+**Como os números são calculados (o mesmo da consulta `database/consultas/conferencia_analises.sql`):**
+- **Período:** 1º semestre, 2º semestre, ano ou intervalo (dentro de um ano), cortado em hoje e comparado com os mesmos dias do ano anterior.
+- **Ano civil:** OPs pela data de pagamento (sem ela, pela de emissão), inclusive restos a pagar de NEs de anos anteriores. **Exercício da NE:** só OPs de NEs do exercício.
+- **Ponte do orçamento:** NEs empenhadas no período, na posição do fim do período: empenhado − cancelado − líquido pago − retenções e descontos = saldo a pagar.
+- **DARF:** pela competência; não muda com a base nem com o elemento.
+
+### Roteiro de teste (marcar ✅ / ❌)
+
+- [ ] **AN-1** O menu lateral tem **Análises**, logo depois do Dashboard. A página abre no ano mais recente com movimento, com o selo "Período em andamento" se o ano não acabou.
+- [ ] **AN-2** Rodar a conferência SQL com `@inicio`/`@fim` do período da tela (fim = hoje, se o período não acabou): **Pago**, **Retido**, os restos a pagar e a quantidade de OPs batem com os cartões; a **ponte** bate com a consulta 2; a **situação das NEs** com a consulta 3.
+- [ ] **AN-3** Trocar para 1º semestre, 2º semestre e Ano: os números, o resumo e os gráficos mudam; a comparação diz o recorte certo (ex.: "jan–out/2025").
+- [ ] **AN-4** Trocar a base para **Exercício da NE**: o cartão "Pago no período" deixa de mostrar "de NEs anteriores" e o resumo não fala em restos a pagar.
+- [ ] **AN-5** **Intervalo** com a data de início depois da de fim → mensagem embaixo dos campos, sem mudar a tela; com datas certas → os números do intervalo.
+- [ ] **AN-6** Escolher um **elemento** na lista, e depois clicar numa barra de "Pago por elemento" → a página filtra; o chip "Elemento: … ✕" tira o filtro.
+- [ ] **AN-7** Clicar num mês (Execução ou Pagamentos) → abre o painel com as OPs do mês; o **total do painel é igual ao da barra**; o link da OP abre a impressão; OP de NE do ano anterior vem marcada "restos a pagar".
+- [ ] **AN-8** "Ver tabela" em cada gráfico mostra os mesmos números; "Ver gráfico" volta.
+- [ ] **AN-9** Passar o mouse numa barra e navegar com **Tab**: a dica aparece nos dois casos e some ao sair (ou com Esc).
+- [ ] **AN-10** "Atualizar": emitir uma OP em outra aba, voltar e clicar → o número muda e "atualizado às" mostra a hora nova.
+- [ ] **AN-11** Janela estreita ou celular: tudo em uma coluna, sem rolagem para o lado.
+- [ ] **AN-12** O visual está igual ao **protótipo aprovado** (link da B1).
+- [ ] **AN-13** Logado como **Consulta** → vê tudo (não há nada para gravar na aba).
 
 ### Resultado do teste
 
