@@ -42,7 +42,7 @@ export function GraficosAnalises({
 
   return (
     <div className="flex flex-col gap-6">
-      <CartaoGrafico id="ponte" sobretitulo={`Ponte do orçamento · NEs empenhadas no período, posição em ${fim}`} titulo={ponte.titulo} tabela={ponte.tabela} vazio={ponte.vazio} nota="Empenhado − cancelado − líquido pago − retenções e descontos = saldo a pagar. A área âmbar é o que ainda falta pagar.">
+      <CartaoGrafico id="ponte" sobretitulo={`Ponte do orçamento · NEs empenhadas no período, posição em ${fim}`} titulo={ponte.titulo} tabela={ponte.tabela} vazio={ponte.vazio} nota="Empenhado − cancelado − líquido pago − retenções e descontos = saldo a pagar. Em cada etapa, a faixa colorida é o valor dela e a parte clara embaixo é o que ainda resta. A área âmbar é o que falta pagar.">
         <Cascata etapas={ponte.props.etapas} />
       </CartaoGrafico>
 

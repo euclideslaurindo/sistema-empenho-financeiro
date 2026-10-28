@@ -17,5 +17,7 @@ export const paleta = {
   textoSecundario: '#334155',
   textoMudo: '#5b6678',
   grade: '#e2e7ef',
+  /** Ponte do orçamento: o que ainda resta do empenhado embaixo de cada etapa. */
+  restoCascata: '#e6ebf3',
   eixo: '#94a3b8',
 } as const;

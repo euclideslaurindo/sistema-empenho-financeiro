@@ -26,6 +26,21 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 
 // ---------------------------------------------------------------------------
 
+/**
+ * "53% já foi pago". Arredondar 0,1% para "0%" diria que nada foi pago, o
+ * que não é verdade: abaixo de 1% vira "menos de 1%" (e "nada" só se for zero).
+ */
+export function textoPago(p: RespostaAnalises['ponte']): string {
+  const pagoC = toCents(p.liquido) + toCents(p.retencoes);
+  const disponivelC = toCents(p.empenhado) - toCents(p.cancelado);
+  if (pagoC <= 0) return 'nada foi pago ainda';
+  if (disponivelC <= 0) return 'já houve pagamento';
+  const pct = (pagoC / disponivelC) * 100;
+  if (pct < 1) return 'menos de 1% já foi pago';
+  if (pct > 99 && pagoC < disponivelC) return 'mais de 99% já foi pago';
+  return `${Math.round(pct)}% já foi pago`;
+}
+
 export function montarPonte(r: RespostaAnalises): Montado<{ etapas: EtapaCascata[] }> {
   const p = r.ponte;
   const etapas: EtapaCascata[] = [
@@ -37,7 +52,7 @@ export function montarPonte(r: RespostaAnalises): Montado<{ etapas: EtapaCascata
   ];
   const vazio = p.empenhado <= 0;
   return {
-    titulo: vazio ? 'Nenhuma NE empenhada no período' : `Das NEs do período, ${r.pctPagoDoEmpenhado}% já foi pago e ${curto(p.saldo)} falta pagar`,
+    titulo: vazio ? 'Nenhuma NE empenhada no período' : `Das NEs do período, ${textoPago(p)} e ${curto(p.saldo)} falta pagar`,
     vazio,
     legenda: [],
     tabela: {

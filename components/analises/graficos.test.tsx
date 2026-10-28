@@ -96,15 +96,56 @@ describe('Cascata', () => {
     render(<Cascata etapas={etapas()} />);
     const liq = screen.getByTestId('cascata-liq');
     expect(liq.style.bottom).toBe(`${k(20)}%`);
-    expect(liq.style.height).toBe(`${k(50)}%`);
+    expect(liq.style.height).toBe(`max(${k(50)}%, 4px)`);
     expect(screen.getByText('R$ 1 mil')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: 'Líquido pago: R$ 500,00' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Líquido pago: R$ 500,00. Depois desta etapa restam R$ 200,00' })).toBeInTheDocument();
   });
 
   test('saldo negativo (dado sujo): barra com altura 0 e o rótulo com o sinal', () => {
     render(<Cascata etapas={etapas(-50)} />);
     expect(alturaDe(screen.getByTestId('cascata-saldo'))).toBe(0);
     expect(screen.getByText('−R$ 50,00')).toBeInTheDocument();
+  });
+
+  // O caso real do print: R$ 1,42 mi empenhado e pagamentos de algumas centenas.
+  const real: EtapaCascata[] = [
+    { chave: 'emp', rotulo: 'Empenhado', valor: 1420000, tipo: 'total', fundo: paleta.azulClaro },
+    { chave: 'canc', rotulo: 'Cancelado', valor: 38000, tipo: 'menos', fundo: paleta.hachuraCinza },
+    { chave: 'liq', rotulo: 'Líquido pago ao credor', valor: 937, tipo: 'menos', fundo: paleta.azul },
+    { chave: 'ret', rotulo: 'Retenções e descontos', valor: 624, tipo: 'menos', fundo: '#2a78d6' },
+    { chave: 'saldo', rotulo: 'Saldo a pagar', valor: 1380439, tipo: 'saldo', fundo: paleta.ambar },
+  ];
+
+  test('cada etapa "menos" mostra a coluna inteira: a faixa clara do que resta embaixo, a etapa em cima', () => {
+    render(<Cascata etapas={real} />);
+    for (const k of ['canc', 'liq', 'ret']) {
+      const resto = screen.getByTestId(`cascata-resto-${k}`);
+      const barra = screen.getByTestId(`cascata-${k}`);
+      // o resto vai do chão até onde a etapa começa
+      expect(Number(resto.getAttribute('data-altura'))).toBe(Number(barra.getAttribute('data-base')));
+      expect(Number(resto.getAttribute('data-altura'))).toBeGreaterThan(80);
+    }
+    // o total e o saldo já são colunas do chão: sem faixa de resto
+    expect(screen.queryByTestId('cascata-resto-emp')).toBeNull();
+    expect(screen.queryByTestId('cascata-resto-saldo')).toBeNull();
+  });
+
+  test('etapa pequena (R$ 937 em R$ 1,42 mi) não some: tem altura mínima', () => {
+    render(<Cascata etapas={real} />);
+    expect(alturaDe(screen.getByTestId('cascata-liq'))).toBeLessThan(0.1); // a conta continua proporcional
+    const estilo = screen.getByTestId('cascata-liq').getAttribute('style') ?? '';
+    expect(estilo).toMatch(/height:\s*max\(0\.\d+%,\s*4px\)/);
+  });
+
+  test('a dica diz quanto resta depois de cada etapa', () => {
+    render(<Cascata etapas={real} />);
+    expect(screen.getByRole('img', { name: 'Líquido pago ao credor: R$ 937,00. Depois desta etapa restam R$ 1.381.063,00' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Empenhado: R$ 1.420.000,00' })).toBeInTheDocument();
+  });
+
+  test('etapa zerada continua sem barra', () => {
+    render(<Cascata etapas={real.map((e) => (e.chave === 'canc' ? { ...e, valor: 0 } : e))} />);
+    expect(screen.getByTestId('cascata-canc').getAttribute('style')).toMatch(/height:\s*0%/);
   });
 });
 
