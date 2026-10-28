@@ -1,6 +1,6 @@
 'use client';
 import Image from 'next/image';
-import { Search, LogOut, Bell, LayoutDashboard, Users, FileText, Banknote, FileStack, Receipt, Settings, Shield } from 'lucide-react';
+import { Search, LogOut, Bell, LayoutDashboard, BarChart3, Users, FileText, Banknote, FileStack, Receipt, Settings, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -43,6 +43,7 @@ export function Header() {
 
   const navLinks = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/analises', label: 'Análises', icon: BarChart3 },
     { href: '/credores', label: 'Credores', icon: Users },
     { href: '/notas-empenho', label: 'Notas de Empenho', icon: FileText },
     { href: '/ordem-pagamento', label: 'Ordem de Pagamento', icon: Banknote },
