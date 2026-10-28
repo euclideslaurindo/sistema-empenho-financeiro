@@ -558,6 +558,12 @@ Aba nova para **apresentações e prestação de contas** (gestão interna e tri
 - [ ] **AN-18** "Voltar para Análises" → volta com os mesmos filtros.
 - [ ] **AN-19** "Exportar CSV" → o arquivo abre no Excel com acentos e vírgula decimal certos, as 12 seções, e os TOTAIS iguais aos da tela.
 - [ ] **AN-20** **Gestor** e **Consulta** → veem e exportam o relatório e o CSV, mas não veem o cartão de Identificação em Configurações.
+- [ ] **AN-21** Em Análises, "Apresentar" → abre o slide 1 em tela inteira (sem o menu do sistema), com os mesmos números da tela e o órgão no rodapé.
+- [ ] **AN-22** Setas ← →, PageUp/PageDown, espaço, Home e End trocam o slide; no último, avançar **não** volta ao primeiro; o contador mostra "n / 3".
+- [ ] **AN-23** "F" (ou o botão do canto) liga a tela cheia; "F" de novo desliga; Esc (fora da tela cheia) sai da apresentação e volta para Análises com os mesmos filtros.
+- [ ] **AN-24** No projetor/TV ou num monitor de outro tamanho, o slide ocupa a tela, sem rolagem e sem corte.
+- [ ] **AN-25** No celular, deslizar o dedo para o lado troca o slide.
+- [ ] **AN-26** Recarregar a página (F5) no slide 2 continua no slide 2.
 
 ### Resultado do teste
 

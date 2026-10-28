@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { BarChart3, Download, FileText, RefreshCw } from "lucide-react";
+import { BarChart3, Download, FileText, Presentation, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { baixarArquivo } from "@/lib/baixar-arquivo";
@@ -152,6 +152,18 @@ function AnalisesTela() {
             ) : (
               <span aria-disabled="true" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#c8d1de] bg-white px-3 text-xs font-semibold text-slate-400">
                 <FileText aria-hidden="true" className="h-3.5 w-3.5" /> Relatório A4
+              </span>
+            )}
+            {consulta && dados ? (
+              <Link
+                href={`/analises/apresentacao${consulta}`}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-blue-900 px-3 text-xs font-semibold text-white hover:bg-blue-950"
+              >
+                <Presentation aria-hidden="true" className="h-3.5 w-3.5" /> Apresentar
+              </Link>
+            ) : (
+              <span aria-disabled="true" className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-slate-300 px-3 text-xs font-semibold text-white">
+                <Presentation aria-hidden="true" className="h-3.5 w-3.5" /> Apresentar
               </span>
             )}
             <button
