@@ -88,3 +88,27 @@ describe("Header", () => {
     expect(navegou).toBe(true);
   });
 });
+
+// O menu que aparece na tela é este (o components/sidebar.tsx não é usado por
+// nenhuma página): a aba Análises tem de estar aqui para alguém achá-la.
+describe("Header — Análises no menu", () => {
+  test.each(["ADMIN", "GESTOR", "CONSULTA"] as const)("perfil %s vê o link Análises logo depois do Dashboard", (p: "ADMIN" | "GESTOR" | "CONSULTA") => {
+    perfil(p);
+    render(<Header />);
+    const links = screen.getAllByRole("link").map((l: HTMLElement) => l.textContent?.trim());
+    const i = links.indexOf("Dashboard");
+    expect(links[i + 1]).toBe("Análises");
+    expect(screen.getByRole("link", { name: "Análises" })).toHaveAttribute("href", "/analises");
+  });
+
+  test("o link fica ativo em /analises e nas páginas dela", () => {
+    perfil("GESTOR");
+    for (const p of ["/analises", "/analises/relatorio"]) {
+      pathname = p;
+      const { unmount } = render(<Header />);
+      expect(screen.getByRole("link", { name: "Análises" }).className).toContain("text-blue-700");
+      expect(screen.getByRole("link", { name: "Dashboard" }).className).not.toContain("text-blue-700");
+      unmount();
+    }
+  });
+});
