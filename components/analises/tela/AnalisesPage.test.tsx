@@ -263,6 +263,11 @@ describe('Relatório A4, CSV e filtros no endereço (B5)', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: /Relatório A4/ })).toHaveAttribute('href', '/analises/relatorio?periodo=ano&ano=2026&base=exercicio'));
   });
 
+  test('o link "Apresentar" leva os mesmos filtros da tela (B6)', async () => {
+    await abrir();
+    expect(screen.getByRole('link', { name: /Apresentar/ })).toHaveAttribute('href', '/analises/apresentacao?periodo=ano&ano=2026&base=civil');
+  });
+
   test('a tela abre com os filtros que vêm no endereço (volta do relatório)', async () => {
     enderecoTela.busca = 'periodo=s1&ano=2025&base=exercicio&elemento=3.3.90.33';
     await abrir();
