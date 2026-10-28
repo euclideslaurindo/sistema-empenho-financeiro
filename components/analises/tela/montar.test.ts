@@ -12,6 +12,7 @@ import {
   montarPagamentos,
   montarPonte,
   montarRetencoes,
+  textoPago,
 } from './montar';
 
 describe('url', () => {
@@ -69,6 +70,16 @@ describe('títulos que dizem o resultado', () => {
     expect(montarDarf(r).titulo).toBe('R$ 50,00 de DARF ainda a recolher');
     expect(montarNes(r).titulo).toBe('2 de 4 NEs ainda têm saldo a pagar');
     expect(montarMunicipios(r).titulo).toBe('Garanhuns recebeu 81% do transporte');
+  });
+
+  test('ponte: "menos de 1%" em vez de "0%"; "nada foi pago ainda" só quando é zero', () => {
+    const p = { empenhado: 1420000, cancelado: 38000, liquido: 937, retencoes: 624, saldo: 1380439 };
+    expect(textoPago(p)).toBe('menos de 1% já foi pago');
+    expect(montarPonte({ ...r, ponte: p }).titulo).toBe('Das NEs do período, menos de 1% já foi pago e R$ 1,38 mi falta pagar');
+    expect(textoPago({ ...p, liquido: 0, retencoes: 0 })).toBe('nada foi pago ainda');
+    expect(textoPago({ empenhado: 1000, cancelado: 0, liquido: 995, retencoes: 4, saldo: 1 })).toBe('mais de 99% já foi pago');
+    expect(textoPago({ empenhado: 1000, cancelado: 0, liquido: 900, retencoes: 100, saldo: 0 })).toBe('100% já foi pago');
+    expect(textoPago({ empenhado: 1000, cancelado: 0, liquido: 450, retencoes: 80, saldo: 470 })).toBe('53% já foi pago');
   });
 
   test('DARF toda paga e período sem movimento', () => {
