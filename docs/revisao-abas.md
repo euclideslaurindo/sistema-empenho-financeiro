@@ -551,6 +551,13 @@ Aba nova para **apresentações e prestação de contas** (gestão interna e tri
 - [ ] **AN-11** Janela estreita ou celular: tudo em uma coluna, sem rolagem para o lado.
 - [ ] **AN-12** O visual está igual ao **protótipo aprovado** (link da B1).
 - [ ] **AN-13** Logado como **Consulta** → vê tudo (não há nada para gravar na aba).
+- [ ] **AN-14** Rodar a `database/migration_19.sql` no Workbench: a consulta 0 dá 0 antes, e as conferências a–c batem depois.
+- [ ] **AN-15** **Admin**, Configurações → cartão "Identificação nos relatórios": preencher Órgão e Setor, a prévia acompanha, Salvar; recarregar a página → continua preenchido. (Sem a migration_19, o cartão avisa para rodá-la.)
+- [ ] **AN-16** Em Análises, "Relatório A4" → abre o relatório com os mesmos filtros da tela; o cabeçalho tem o brasão, "Estado de Pernambuco", o órgão e o setor; os números batem com a tela.
+- [ ] **AN-17** "Imprimir / Salvar PDF" → saem **2 páginas A4**, sem o menu do sistema, sem nada cortado, com as cores e hachuras; a página 2 tem as 2 linhas de assinatura.
+- [ ] **AN-18** "Voltar para Análises" → volta com os mesmos filtros.
+- [ ] **AN-19** "Exportar CSV" → o arquivo abre no Excel com acentos e vírgula decimal certos, as 12 seções, e os TOTAIS iguais aos da tela.
+- [ ] **AN-20** **Gestor** e **Consulta** → veem e exportam o relatório e o CSV, mas não veem o cartão de Identificação em Configurações.
 
 ### Resultado do teste
 

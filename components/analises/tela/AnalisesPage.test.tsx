@@ -1,13 +1,19 @@
 // B4 — a tela /analises com a API simulada.
 import React from 'react';
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import AnalisesPage from '@/app/analises/page';
 import { respostaExemplo } from '@/tests/fixtures/analises-resposta';
 
 vi.mock('@/lib/api-client', () => ({ apiClient: { get: vi.fn(), post: vi.fn() } }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-vi.mock('next/navigation', () => ({ usePathname: () => '/analises', useRouter: () => ({ push: vi.fn() }) }));
+// O endereço da tela (filtros vindos da URL): por padrão, sem nada.
+const enderecoTela = vi.hoisted(() => ({ busca: '' }));
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/analises',
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(enderecoTela.busca),
+}));
 import { apiClient } from '@/lib/api-client';
 
 const ELEMENTOS = [
@@ -240,6 +246,52 @@ describe('Tela Análises', () => {
     expect(screen.getByTestId('resumo-analises')).toBeInTheDocument();
     expect(screen.queryByLabelText('Carregando as análises')).toBeNull();
     responder(respostaExemplo());
+  });
+});
+
+describe('Relatório A4, CSV e filtros no endereço (B5)', () => {
+  afterEach(() => {
+    enderecoTela.busca = '';
+    vi.unstubAllGlobals();
+  });
+
+  test('o link do relatório leva os filtros da tela, com o ano já resolvido', async () => {
+    await abrir();
+    expect(screen.getByRole('link', { name: /Relatório A4/ })).toHaveAttribute('href', '/analises/relatorio?periodo=ano&ano=2026&base=civil');
+    fireEvent.click(screen.getByRole('button', { name: 'Exercício da NE' }));
+    await screen.findByTestId('resumo-analises');
+    await waitFor(() => expect(screen.getByRole('link', { name: /Relatório A4/ })).toHaveAttribute('href', '/analises/relatorio?periodo=ano&ano=2026&base=exercicio'));
+  });
+
+  test('a tela abre com os filtros que vêm no endereço (volta do relatório)', async () => {
+    enderecoTela.busca = 'periodo=s1&ano=2025&base=exercicio&elemento=3.3.90.33';
+    await abrir();
+    expect(urlsAnalises()[0]).toBe('/api/analises?periodo=s1&ano=2025&base=exercicio&elemento=3.3.90.33');
+  });
+
+  test('filtro inválido no endereço cai no padrão', async () => {
+    enderecoTela.busca = "periodo=trimestre&ano=1800&base=caixa&elemento=1'%20OR";
+    await abrir();
+    expect(urlsAnalises()[0]).toBe('/api/analises?periodo=ano&base=civil');
+  });
+
+  test('Exportar CSV baixa a planilha com os filtros da tela; com erro, avisa e não baixa', async () => {
+    const criar = vi.fn(() => 'blob:x');
+    Object.assign(URL, { createObjectURL: criar, revokeObjectURL: vi.fn() });
+    const clique = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const fetchMock = vi.fn(async () => ({ ok: true, blob: async () => new Blob(['a']) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await abrir();
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }));
+    await waitFor(() => expect(clique).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith('/api/analises/csv?periodo=ano&ano=2026&base=civil');
+
+    const { toast } = await import('sonner');
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({ error: 'Período inválido.' }) })));
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar CSV' }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Período inválido.'));
+    expect(clique).toHaveBeenCalledTimes(1);
+    clique.mockRestore();
   });
 });
 
