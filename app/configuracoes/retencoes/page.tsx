@@ -11,6 +11,7 @@ import { parseFormNumber } from "@/lib/utils";
 import RetencoesCamposTable from "@/components/admin/RetencoesCamposTable";
 import RetencoesMatriz from "@/components/admin/RetencoesMatriz";
 import RetencoesSimulador from "@/components/admin/RetencoesSimulador";
+import RetencoesSubelementos from "@/components/admin/RetencoesSubelementos";
 import TransporteConfig from "@/components/admin/TransporteConfig";
 import {
   AlertDialog,
@@ -140,6 +141,8 @@ export default function RetencoesConfigPage() {
   const [aba, setAba] = useState<"padrao" | "transporte">("padrao");
   const [transporteAberto, setTransporteAberto] = useState(false);
   const [transporteDirty, setTransporteDirty] = useState(false);
+  // B7a: regras próprias por subelemento — salvas linha a linha, fora do form.
+  const [regrasSubelemento, setRegrasSubelemento] = useState<Record<string, string[]>>({});
 
   const methods = useForm<FormValues>({ defaultValues: { campos: [], elementos: [] } });
   const {
@@ -167,6 +170,7 @@ export default function RetencoesConfigPage() {
       reset(dv);
       setDefaultValuesSnapshot(dv);
       setVersaoBase(config.versao);
+      setRegrasSubelemento(config.regrasSubelemento ?? {});
     }
   }, [config, elementos, reset]);
 
@@ -324,7 +328,20 @@ export default function RetencoesConfigPage() {
               <form>
                 <RetencoesCamposTable />
                 <RetencoesMatriz />
-                <RetencoesSimulador />
+                <RetencoesSubelementos
+                  elementos={elementos}
+                  regras={config?.regras ?? {}}
+                  regrasSubelemento={regrasSubelemento}
+                  onSalvo={(codigo, regra) =>
+                    setRegrasSubelemento((atual) => {
+                      const novo = { ...atual };
+                      if (regra === null) delete novo[codigo];
+                      else novo[codigo] = regra;
+                      return novo;
+                    })
+                  }
+                />
+                <RetencoesSimulador elementosApi={elementos} regrasSubelemento={regrasSubelemento} />
               </form>
             </FormProvider>
           )}

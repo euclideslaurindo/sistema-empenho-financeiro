@@ -1,7 +1,7 @@
 // Regras de tela da seção "Retenções e Descontos" da OP (T11). Espelham as
 // regras de lib/retencoes.ts pra tela nunca oferecer edição que o servidor
 // vai ignorar — mas quem decide o valor gravado continua sendo o servidor.
-import { CAMPOS_INFORMATIVOS, CAMPOS_TRIBUTARIOS, type CampoDesconto, type CampoTributario } from "@/lib/retencoes";
+import { CAMPOS_INFORMATIVOS, CAMPOS_TRIBUTARIOS, regraDaOp, type CampoDesconto, type CampoTributario } from "@/lib/retencoes";
 import type { ConfigRetencaoCampoMapeado } from "@/lib/services/config-retencoes.service";
 import { maskCurrency } from "@/lib/utils";
 import { toCents } from "@/lib/money";
@@ -25,6 +25,27 @@ export const CAMPOS_RETENCAO = Object.keys(CAMPO_FORM) as CampoRetencao[];
 
 export function ehCampoRetencao(campo: string): campo is CampoRetencao {
   return campo in CAMPO_FORM;
+}
+
+export interface RegraDaTela {
+  /** Código cuja regra vale (subelemento com regra própria ou elemento). */
+  codigo: string | null;
+  /** Só a regra que vale, no formato que estadoCampo/estadoCampoOp esperam. */
+  regras: Record<string, string[]>;
+  origem: "subelemento" | "elemento";
+}
+
+/**
+ * B7a: a regra de retenções que vale na tela — a mesma do servidor
+ * (regraDaOp): o subelemento com regra própria substitui a do elemento.
+ */
+export function regraDaTela(
+  config: { regras: Record<string, string[]>; regrasSubelemento?: Record<string, string[]> },
+  elementoCodigo: string | null,
+  subelementoCodigo: string | null | undefined
+): RegraDaTela {
+  const r = regraDaOp(elementoCodigo, subelementoCodigo, config.regras, config.regrasSubelemento);
+  return { codigo: r.codigo, regras: r.codigo !== null && r.campos !== undefined ? { [r.codigo]: r.campos } : {}, origem: r.origem };
 }
 
 export interface EstadoCampo {
@@ -147,15 +168,21 @@ export function idNaLinha(basePath: string, id: string): string {
  */
 export function informadosValidosDaLinha(
   camposInformados: string[],
-  config: { campos: ConfigRetencaoCampoMapeado[] | Array<Partial<ConfigRetencaoCampoMapeado>>; regras: Record<string, string[]> },
+  config: {
+    campos: ConfigRetencaoCampoMapeado[] | Array<Partial<ConfigRetencaoCampoMapeado>>;
+    regras: Record<string, string[]>;
+    regrasSubelemento?: Record<string, string[]>;
+  },
   elementoCodigo: string | null,
   perfil: Perfil,
-  mei: { credorMei: boolean; sobrescreverMei: boolean }
+  mei: { credorMei: boolean; sobrescreverMei: boolean },
+  subelementoCodigo: string | null = null
 ): string[] {
   const configPorCampo = new Map((config.campos as ConfigRetencaoCampoMapeado[]).map((c) => [c.campo, c]));
+  const regra = regraDaTela(config, elementoCodigo, subelementoCodigo);
   return camposInformados.filter((campo) => {
     const cfg = configPorCampo.get(campo);
-    return !!cfg && cfg.ativo && estadoCampoOp(cfg, elementoCodigo, config.regras, perfil, mei).editavel;
+    return !!cfg && cfg.ativo && estadoCampoOp(cfg, regra.codigo, regra.regras, perfil, mei).editavel;
   });
 }
 

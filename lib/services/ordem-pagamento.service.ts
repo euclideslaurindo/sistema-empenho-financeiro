@@ -25,7 +25,7 @@ export class OrdemPagamentoService {
     }
     const dados = ordemPagamentoSchema.parse(rawData); // ZodError -> 400
     try {
-      const neRows = await query<any[]>('SELECT elemento, status FROM notas_empenho WHERE numero = ?', [dados.numeroEmpenho]);
+      const neRows = await query<any[]>('SELECT elemento, status, subelemento FROM notas_empenho WHERE numero = ?', [dados.numeroEmpenho]);
       if (!neRows || neRows.length === 0) {
         return { success: false, error: `NE "${dados.numeroEmpenho}" não encontrada.`, status: 404 };
       }
@@ -36,6 +36,7 @@ export class OrdemPagamentoService {
       const { resultado, perfilCalculo } = await calcularRetencoesDaOp(undefined, {
         brutoCents,
         elementoCodigo: extrairCodigoElemento(neRows[0].elemento || ''),
+        subelementoCodigo: extrairCodigoElemento(neRows[0].subelemento || ''),
         credorCpfCnpj: dados.credorCpfCnpj,
         dataPagamento: dados.dataPagamento,
         dataEmissao: dados.dataEmissao,
@@ -278,7 +279,12 @@ export class OrdemPagamentoService {
         const valorMudou = toCents(oldOp.valor_pagamento) !== brutoCents;
         const credorMudou = (oldOp.credor_cpf_cnpj || '') !== (credorCpfCnpj || '');
         const elementoMudou = elementoCodigo !== elementoAnterior;
-        const precisaRecalcular = valorMudou || credorMudou || elementoMudou;
+        // B7a: o subelemento decide a regra quando tem regra própria. Só
+        // compara com snapshot que já o registra (snapshot antigo: como antes).
+        const subelementoCodigo = extrairCodigoElemento(subelementoGravado);
+        const subelementoMudou =
+          !!snapshotAnterior && 'subelemento' in snapshotAnterior && (snapshotAnterior.subelemento ?? null) !== subelementoCodigo;
+        const precisaRecalcular = valorMudou || credorMudou || elementoMudou || subelementoMudou;
 
         let finalIrrf: number, finalIss: number, finalInss: number, finalSestSenat: number, finalPatronal: number;
         let finalOutros: number, finalTaxaBancaria: number, finalTaxaPix: number;
@@ -288,6 +294,7 @@ export class OrdemPagamentoService {
           const { resultado } = await calcularRetencoesDaOp(conn, {
             brutoCents,
             elementoCodigo,
+            subelementoCodigo,
             credorCpfCnpj,
             dataPagamento,
             dataEmissao,

@@ -207,6 +207,7 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
   const { resultado, configCampos } = await calcularRetencoesDaOp(conn, {
     brutoCents,
     elementoCodigo,
+    subelementoCodigo: extrairCodigoElemento(subelementoGravado),
     credorCpfCnpj,
     dataPagamento,
     dataEmissao,

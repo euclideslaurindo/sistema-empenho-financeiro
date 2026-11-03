@@ -14,6 +14,8 @@ import {
 export interface EntradaCalculoOp {
   brutoCents: number;
   elementoCodigo: string | null;
+  /** B7a: código do subelemento da NE; com regra própria, ela substitui a do elemento. */
+  subelementoCodigo?: string | null;
   credorCpfCnpj: string;
   dataPagamento?: string | null;
   dataEmissao?: string | null;
@@ -61,7 +63,7 @@ export async function calcularRetencoesDaOp(
   e: EntradaCalculoOp,
   cache: CacheCalculo = semCache
 ): Promise<ResultadoCalculoOp> {
-  const { campos, regras } = await cache.memo('config', () => obterConfigRetencoes(conn));
+  const { campos, regras, regrasSubelemento } = await cache.memo('config', () => obterConfigRetencoes(conn));
 
   // T33: no 3.3.90.33 a taxa de expediente vem só do Município (Expediente);
   // a `cidade` do endereço não entra no cálculo. Credor inativo é ignorado
@@ -107,8 +109,10 @@ export async function calcularRetencoesDaOp(
   const resultado = calcularRetencoes({
     brutoCents: e.brutoCents,
     elementoCodigo: e.elementoCodigo,
+    subelementoCodigo: e.subelementoCodigo ?? null,
     config: campos,
     regras,
+    regrasSubelemento,
     informados: e.informados,
     perfil: e.perfilUsuario,
     credorMei,

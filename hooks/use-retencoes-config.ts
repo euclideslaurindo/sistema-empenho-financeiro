@@ -18,6 +18,8 @@ export interface ConfigRetencaoCampo {
 export interface ConfigRetencoes {
   campos: ConfigRetencaoCampo[];
   regras: Record<string, string[]>;
+  /** B7a: regras próprias por subelemento; [] = nenhuma retenção. */
+  regrasSubelemento?: Record<string, string[]>;
   versao: string;
 }
 

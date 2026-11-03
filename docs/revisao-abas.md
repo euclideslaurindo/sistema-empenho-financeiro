@@ -407,6 +407,14 @@ Os problemas estão em volta dessas telas.
 - [ ] **CF-11** Tela Configurações como **Admin** → só os cartões Retenções e Descontos, Elementos, Alterar senha e Meu Perfil; como **Gestor** → só Alterar senha e Meu Perfil (CF2 corrigido).
 - [ ] **CF-12** Abrir `/api/setup/optimize` no navegador sem estar logado → "Nao autenticado." (CF1 corrigido); logado → página não encontrada.
 
+**Estagiários sem retenção — regra por subelemento (B7a)**
+- [ ] **CF-13** Rodar a `database/migration_20.sql` no Workbench: a consulta 0 dá 0 antes; depois, as conferências a–d batem (o 3.3.90.36.08 "Estagiários - Pagamento Direto" cadastrado, com a regra vazia).
+- [ ] **CF-14** Configurações → Retenções → **Exceções por subelemento**: aparece "3.3.90.36.08 — Estagiários - Pagamento Direto" com "Regra própria" marcada e "Sem retenções"; os subelementos do transporte (3.3.90.33) **não** aparecem.
+- [ ] **CF-15** **Simulador**: R$ 1.000,00 em 3.3.90.36 com o subelemento 3.3.90.36.08 → líquido R$ 1.000,00; sem subelemento → as retenções de sempre (líquido R$ 800,00).
+- [ ] **CF-16** Cadastrar uma NE de 3.3.90.36 com o subelemento de estagiários e emitir uma OP de R$ 1.000,00: os impostos ficam travados com "Não se aplica a 3.3.90.36.08", o líquido é R$ 1.000,00 e **nenhuma DARF** é gerada. Uma OP de outra NE do 3.3.90.36 continua com as 5 retenções.
+- [ ] **CF-17** Marcar só IRRF no 3.3.90.36.08 e salvar (a confirmação mostra o antes e o depois) → a próxima OP de estagiário retém só o IRRF; a OP já emitida **não muda**. Voltar para "nenhuma" e salvar.
+- [ ] **CF-18** Desmarcar "Regra própria" e salvar → o subelemento volta a seguir o elemento ("Segue o elemento 3.3.90.36: IRRF, ISS…").
+
 ### Resultado do teste
 
 | Item | ✅/❌ | Observação |

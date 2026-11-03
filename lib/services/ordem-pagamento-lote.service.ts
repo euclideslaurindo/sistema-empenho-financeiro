@@ -167,10 +167,11 @@ export class OrdemPagamentoLoteService {
     }
     const { numeroNe, dataEmissao, credores } = entrada;
 
-    const neRows = await query<any[]>('SELECT elemento, status FROM notas_empenho WHERE numero = ?', [numeroNe]);
+    const neRows = await query<any[]>('SELECT elemento, status, subelemento FROM notas_empenho WHERE numero = ?', [numeroNe]);
     if (!neRows || neRows.length === 0) return { success: false, error: `NE "${numeroNe}" não encontrada.`, status: 404 };
     if (neRows[0].status === 'CANCELADO') return { success: false, error: `A NE "${numeroNe}" está CANCELADA.`, status: 409 };
     const elementoCodigo = extrairCodigoElemento(neRows[0].elemento || '');
+    const subelementoCodigo = extrairCodigoElemento(neRows[0].subelemento || '');
 
     const cadastro = await carregarCredores((sql, p) => query<any[]>(sql, p), credores.map((c) => c.credorCpfCnpj));
     const cache = criarCacheCalculo();
@@ -187,6 +188,7 @@ export class OrdemPagamentoLoteService {
           {
             brutoCents: toCents(dados.valorPagamento),
             elementoCodigo,
+            subelementoCodigo,
             credorCpfCnpj: credor.cpf_cnpj,
             dataPagamento: dados.dataPagamento,
             dataEmissao: dados.dataEmissao,

@@ -4,6 +4,8 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { simularRetencoes, CAMPOS_TRIBUTARIOS } from "@/lib/retencoes-simulador";
 import { formatarBRL, toCents } from "@/lib/money";
 import { parseFormNumber } from "@/lib/utils";
+import { regraDaOp } from "@/lib/retencoes";
+import type { ElementoOption } from "@/hooks/use-elementos";
 
 const ROTULOS: Record<string, string> = {
   irrf: "IRRF",
@@ -13,22 +15,35 @@ const ROTULOS: Record<string, string> = {
   sest_senat: "SEST/SENAT",
 };
 
-export default function RetencoesSimulador() {
+export default function RetencoesSimulador({
+  elementosApi = [],
+  regrasSubelemento = {},
+}: {
+  /** B7a: para listar os subelementos do elemento escolhido. */
+  elementosApi?: ElementoOption[];
+  /** B7a: regras próprias salvas; o subelemento com regra própria troca a do elemento. */
+  regrasSubelemento?: Record<string, string[]>;
+} = {}) {
   const { control } = useFormContext<any>();
   const camposWatch = useWatch({ control, name: "campos" });
   const elementosWatch = useWatch({ control, name: "elementos" });
 
   const [elementoCodigo, setElementoCodigo] = useState("");
+  const [subelementoCodigo, setSubelementoCodigo] = useState("");
   const [brutoTexto, setBrutoTexto] = useState("");
   const [taxaBancariaTexto, setTaxaBancariaTexto] = useState("");
   const [taxaPixTexto, setTaxaPixTexto] = useState("");
 
   const elementos = elementosWatch || [];
   const elementoSelecionado = elementos.find((e: any) => e.codigo === elementoCodigo);
+  const subelementos = elementosApi.find((e) => e.codigo === elementoCodigo)?.subelementos ?? [];
   const regrasElemento = useMemo(() => {
     if (!elementoSelecionado) return [];
-    return CAMPOS_TRIBUTARIOS.filter((c) => elementoSelecionado.campos?.[c]);
-  }, [elementoSelecionado]);
+    const doElemento = CAMPOS_TRIBUTARIOS.filter((c) => elementoSelecionado.campos?.[c]);
+    // Mesma escolha do cálculo da OP (lib/retencoes.ts).
+    return regraDaOp(elementoCodigo, subelementoCodigo || null, { [elementoCodigo]: doElemento }, regrasSubelemento).campos ?? [];
+  }, [elementoSelecionado, elementoCodigo, subelementoCodigo, regrasSubelemento]);
+  const regraPropria = !!subelementoCodigo && regrasSubelemento[subelementoCodigo] !== undefined;
 
   const resultado = useMemo(() => {
     const bruto = parseFormNumber(brutoTexto);
@@ -52,7 +67,7 @@ export default function RetencoesSimulador() {
         cálculo da OP — só uma conferência rápida pra você antes de salvar.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div>
           <label htmlFor="sim-elemento" className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
             Elemento
@@ -60,13 +75,35 @@ export default function RetencoesSimulador() {
           <select
             id="sim-elemento"
             value={elementoCodigo}
-            onChange={(e) => setElementoCodigo(e.target.value)}
+            onChange={(e) => {
+              setElementoCodigo(e.target.value);
+              setSubelementoCodigo("");
+            }}
             className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold"
           >
             <option value="">Selecione</option>
             {elementos.map((el: any) => (
               <option key={el.codigo} value={el.codigo}>
                 {el.codigo} — {el.descricao}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="sim-subelemento" className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
+            Subelemento
+          </label>
+          <select
+            id="sim-subelemento"
+            value={subelementoCodigo}
+            onChange={(e) => setSubelementoCodigo(e.target.value)}
+            disabled={subelementos.length === 0}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold disabled:opacity-50"
+          >
+            <option value="">Nenhum (regra do elemento)</option>
+            {subelementos.map((s) => (
+              <option key={s.codigo} value={s.codigo}>
+                {s.codigo} — {s.descricao}
               </option>
             ))}
           </select>
@@ -114,6 +151,11 @@ export default function RetencoesSimulador() {
 
       {resultado && (
         <div className="border-t border-slate-100 pt-6">
+          {regraPropria && (
+            <p role="status" className="mb-4 text-xs font-bold text-emerald-700">
+              Regra própria do subelemento {subelementoCodigo} (salva).
+            </p>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
             {CAMPOS_TRIBUTARIOS.map((campo) => (
               <div key={campo} className="text-center">
