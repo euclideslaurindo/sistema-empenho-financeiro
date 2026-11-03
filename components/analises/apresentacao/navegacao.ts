@@ -2,6 +2,7 @@
 // palco e as frases do slide de abertura.
 import { curto, pct1 } from '../formato';
 import type { RespostaAnalises } from '../tela/tipos';
+import { textoPago } from '../tela/montar';
 
 export const TOTAL_SLIDES = 3;
 export const LARGURA_PALCO = 1280;
@@ -70,6 +71,7 @@ export function frasesDeAbertura(r: RespostaAnalises): { principal: string; apoi
         ? `o mesmo que em ${comp}`
         : `${pct1(Math.abs(k.varPago))} ${k.varPago > 0 ? 'a mais' : 'a menos'} que em ${comp}`;
   const principal = `${curto(k.pago)} pagos a ${credores}, ${variacao}`;
-  const apoio = r.ponte.empenhado > 0 ? `${r.pctPagoDoEmpenhado}% das NEs do período já foi pago. Restam ${curto(k.saldo)} a pagar.` : '';
+  // textoPago: pagamento pequeno vira "menos de 1%", nunca "0%".
+  const apoio = r.ponte.empenhado > 0 ? `Das NEs do período, ${textoPago(r.ponte)}. Restam ${curto(k.saldo)} a pagar.` : '';
   return { principal, apoio };
 }

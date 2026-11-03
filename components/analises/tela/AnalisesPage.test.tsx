@@ -3,6 +3,7 @@ import React from 'react';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import AnalisesPage from '@/app/analises/page';
+import { mesPadrao } from '@/components/analises/tela/url';
 import { respostaExemplo } from '@/tests/fixtures/analises-resposta';
 
 vi.mock('@/lib/api-client', () => ({ apiClient: { get: vi.fn(), post: vi.fn() } }));
@@ -18,7 +19,10 @@ import { apiClient } from '@/lib/api-client';
 
 const ELEMENTOS = [
   { codigo: '3.3.90.33', descricao: 'Transporte', valor: '3.3.90.33 - Transporte', legado: false, ativo: true, retencoes: [], subelementos: [] },
-  { codigo: '3.3.90.36', descricao: 'Serviços PF', valor: '3.3.90.36 - Serviços PF', legado: false, ativo: true, retencoes: [], subelementos: [] },
+  {
+    codigo: '3.3.90.36', descricao: 'Serviços PF', valor: '3.3.90.36 - Serviços PF', legado: false, ativo: true, retencoes: [],
+    subelementos: [{ codigo: '3.3.90.36.08', descricao: 'Estagiários - Pagamento Direto', valor: '3.3.90.36.08 - Estagiários - Pagamento Direto' }],
+  },
   { codigo: '3.3.90.99', descricao: 'Inativo', valor: 'x', legado: true, ativo: false, retencoes: [], subelementos: [] },
 ];
 
@@ -297,6 +301,62 @@ describe('Relatório A4, CSV e filtros no endereço (B5)', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Período inválido.'));
     expect(clique).toHaveBeenCalledTimes(1);
     clique.mockRestore();
+  });
+});
+
+describe('Tela Análises — por tipo de despesa e mês (B7b)', () => {
+  test('"Mês" abre com o mês sugerido e o seletor troca o mês', async () => {
+    await abrir();
+    fireEvent.click(screen.getByRole('button', { name: 'Mês' }));
+    await waitFor(() => expect(urlsAnalises().at(-1)).toBe(`/api/analises?periodo=mes&ano=2026&mes=${mesPadrao(2026)}&base=civil`));
+    fireEvent.change(screen.getByLabelText('Mês'), { target: { value: '2' } });
+    await waitFor(() => expect(urlsAnalises().at(-1)).toBe('/api/analises?periodo=mes&ano=2026&mes=2&base=civil'));
+    fireEvent.click(screen.getByRole('button', { name: 'Ano' }));
+    await waitFor(() => expect(urlsAnalises().at(-1)).toBe('/api/analises?periodo=ano&ano=2026&base=civil'));
+  });
+
+  test('cartão "Por tipo de despesa" com NEs e prestadores; o cartão Empenhado mostra os prestadores', async () => {
+    await abrir();
+    expect(screen.getByRole('heading', { level: 3, name: '3.3.90.33 (sem subelemento) teve o maior pagamento: R$ 184 mil' })).toBeInTheDocument();
+    expect(screen.getByText(/Estagiários - Pagamento Direto · 1 NE · 3 prestadores/)).toBeInTheDocument();
+    expect(screen.getByTestId('cartao-Empenhado')).toHaveTextContent('4 NEs no período · 5 prestadores');
+    expect(screen.getByText('Quantidade de NEs empenhadas')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Fevereiro: 1' })).toBeInTheDocument();
+  });
+
+  test('clicar num tipo filtra (com o elemento pai); "sem subelemento" não filtra; o chip ✕ tira só o tipo', async () => {
+    await abrir();
+    const antes = urlsAnalises().length;
+    fireEvent.click(screen.getByRole('button', { name: /^3\.3\.90\.33 \(sem subelemento\)/ }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(urlsAnalises()).toHaveLength(antes);
+
+    fireEvent.click(screen.getByRole('button', { name: /^3\.3\.90\.36\.08 Estagiários/ }));
+    await waitFor(() => expect(urlsAnalises().at(-1)).toBe('/api/analises?periodo=ano&base=civil&elemento=3.3.90.36&subelemento=3.3.90.36.08'));
+    fireEvent.click(screen.getByRole('button', { name: 'Tirar o filtro do tipo 3.3.90.36.08' }));
+    await waitFor(() => expect(urlsAnalises().at(-1)).toBe('/api/analises?periodo=ano&base=civil&elemento=3.3.90.36'));
+  });
+
+  test('lista de tipos por elemento; trocar para outro elemento tira o tipo', async () => {
+    await abrir();
+    const tipo = screen.getByLabelText('Tipo de despesa') as HTMLSelectElement;
+    await waitFor(() => expect(within(tipo).getByRole('option', { name: '3.3.90.36.08 Estagiários - Pagamento Direto' })).toBeInTheDocument());
+    fireEvent.change(tipo, { target: { value: '3.3.90.36.08' } });
+    await waitFor(() => expect(urlsAnalises().at(-1)).toContain('elemento=3.3.90.36&subelemento=3.3.90.36.08'));
+    fireEvent.change(screen.getByLabelText('Elemento'), { target: { value: '3.3.90.33' } });
+    await waitFor(() => expect(urlsAnalises().at(-1)).toBe('/api/analises?periodo=ano&base=civil&elemento=3.3.90.33'));
+    // o 3.3.90.33 não tem tipos cadastrados: só "Todos os tipos"
+    expect(within(screen.getByLabelText('Tipo de despesa')).getAllByRole('option')).toHaveLength(1);
+  });
+
+  test('o painel de OPs do mês leva o tipo filtrado', async () => {
+    enderecoTela.busca = 'periodo=ano&ano=2026&subelemento=3.3.90.36.08';
+    mockApi({ analises: () => ({ ...respostaExemplo(), elemento: '3.3.90.36', subelemento: '3.3.90.36.08' }) });
+    await abrir();
+    fireEvent.click(screen.getByRole('button', { name: /^Abril: empenhado/ }));
+    await waitFor(() => expect(urlsOps().at(-1)).toContain('elemento=3.3.90.36&subelemento=3.3.90.36.08'));
+    expect(within(await screen.findByRole('dialog')).getByText(/tipo 3\.3\.90\.36\.08/)).toBeInTheDocument();
+    enderecoTela.busca = '';
   });
 });
 

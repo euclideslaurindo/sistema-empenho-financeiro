@@ -565,6 +565,15 @@ Aba nova para **apresentações e prestação de contas** (gestão interna e tri
 - [ ] **AN-25** No celular, deslizar o dedo para o lado troca o slide.
 - [ ] **AN-26** Recarregar a página (F5) no slide 2 continua no slide 2.
 
+**Por tipo de despesa e por mês (B7b)**
+- [ ] **AN-27** Período **Mês** → o seletor abre no mês atual (ou dezembro em ano passado); os números são só do mês, e a comparação diz o mesmo mês do ano anterior (no mês atual, "01/10 a 27/10/2025").
+- [ ] **AN-28** Cartão **Por tipo de despesa**: Estagiários (3.3.90.36.08), Formação (3.3.90.14.03), Diárias… com pago, NEs, prestadores e empenhado. NE sem subelemento aparece como "{elemento} (sem subelemento)". O TOTAL da tabela ("Ver tabela") bate com o cartão "Pago no período".
+- [ ] **AN-29** **Prestadores**: escolher 2 NEs do mesmo tipo e contar os credores (CPF/CNPJ diferentes) das OPs de cada uma; a soma bate com o número do tipo. NE cancelada não conta.
+- [ ] **AN-30** Clicar em "Formação" (ou escolher em **Tipo de despesa**) → a página toda filtra, e o elemento 3.3.90.14 fica escolhido; o chip "Tipo: … ✕" tira só o tipo; trocar o elemento para outro tira o tipo.
+- [ ] **AN-31** A faixa **Quantidade de NEs empenhadas** embaixo da "Execução mês a mês" bate com as NEs cadastradas em cada mês; o cartão Empenhado mostra "N NEs no período · M prestadores".
+- [ ] **AN-32** Com um tipo filtrado: o **Relatório A4** traz "Tipo: …" no cabeçalho e o bloco "3. Por tipo de despesa" (NEs, Prest., Pago); o **CSV** tem a seção "Por tipo de despesa", a coluna NEs na execução e o nome com "-tipo-…"; a **Apresentação** mostra o tipo no rodapé.
+- [ ] **AN-33** Clicar num mês com o tipo filtrado → o painel de OPs mostra só as OPs desse tipo e diz "tipo …" no subtítulo.
+
 ### Resultado do teste
 
 | Item | ✅/❌ | Observação |

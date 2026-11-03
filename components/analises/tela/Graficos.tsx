@@ -16,6 +16,7 @@ import {
   montarPagamentos,
   montarPonte,
   montarRetencoes,
+  montarTipos,
 } from "./montar";
 import type { RespostaAnalises } from "./tipos";
 
@@ -24,13 +25,17 @@ export function GraficosAnalises({
   dados,
   onSelecionarMes,
   onSelecionarElemento,
+  onSelecionarTipo,
 }: {
   dados: RespostaAnalises;
   onSelecionarMes: (mes: string) => void;
   onSelecionarElemento: (codigo: string) => void;
+  /** B7b: clicar num tipo filtra a página (o "sem subelemento" não filtra). */
+  onSelecionarTipo?: (codigo: string) => void;
 }) {
   const ponte = montarPonte(dados);
   const exec = montarExecucao(dados);
+  const tipos = montarTipos(dados);
   const elem = montarElementos(dados);
   const pag = montarPagamentos(dados);
   const cred = montarCredores(dados);
@@ -46,9 +51,23 @@ export function GraficosAnalises({
         <Cascata etapas={ponte.props.etapas} />
       </CartaoGrafico>
 
+      <CartaoGrafico
+        id="tipos"
+        sobretitulo="Por tipo de despesa (subelemento)"
+        titulo={tipos.titulo}
+        tabela={tipos.tabela}
+        vazio={tipos.vazio}
+        nota="Barras: o pago no período. NEs e empenhado: NEs empenhadas no período, sem as canceladas. Prestadores: os credores de cada NE, somados. Clique num tipo para filtrar a página por ele."
+      >
+        <BarrasHorizontais {...tipos.props} larguraRotulo={150} onSelecionar={(c) => !c.startsWith("sem-") && onSelecionarTipo?.(c)} />
+      </CartaoGrafico>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <CartaoGrafico id="exec" sobretitulo="Execução mês a mês" titulo={exec.titulo} legenda={exec.legenda} tabela={exec.tabela} vazio={exec.vazio} nota="Clique num mês para ver as OPs pagas nele.">
-          <BarrasAgrupadas {...exec.props} onSelecionar={onSelecionarMes} />
+          <div className="flex flex-col gap-3">
+            <BarrasAgrupadas categorias={exec.props.categorias} series={exec.props.series} valores={exec.props.valores} destaque={exec.props.destaque} onSelecionar={onSelecionarMes} />
+            <FaixaQuantidade titulo="Quantidade de NEs empenhadas" itens={exec.props.nes} />
+          </div>
         </CartaoGrafico>
 
         <CartaoGrafico id="elem" sobretitulo="Pago por elemento de despesa" titulo={elem.titulo} tabela={elem.tabela} vazio={elem.vazio} nota="Clique num elemento para filtrar a página por ele.">

@@ -8,7 +8,7 @@ import { brl, curto, pct1 } from "../formato";
 import { montarExecucao, montarPonte } from "../tela/montar";
 import type { RespostaAnalises } from "../tela/tipos";
 import { Folha } from "./Folha";
-import { elementosDoRelatorio, linhasDaPonte, retidoPorTipo } from "./montar-relatorio";
+import { linhasDaPonte, retidoPorTipo, tiposDoRelatorio } from "./montar-relatorio";
 
 export interface IdentificacaoRelatorio {
   orgao: string;
@@ -58,7 +58,7 @@ export function Relatorio({ dados, identificacao, emitidoEm }: { dados: Resposta
   const k = dados.kpis;
   const ponte = montarPonte(dados);
   const exec = montarExecucao(dados);
-  const elementos = elementosDoRelatorio(dados.elementos);
+  const tipos = tiposDoRelatorio(dados.tipos);
   const retido = retidoPorTipo(dados.meses);
   const varTxt = (x: number | null) => (x === null ? "sem base de comparação" : `${x > 0 ? "+" : x < 0 ? "−" : ""}${pct1(Math.abs(x))} sobre ${p.rotuloComparacao}`);
   const cartoes = [
@@ -81,6 +81,7 @@ export function Relatorio({ dados, identificacao, emitidoEm }: { dados: Resposta
               Período: {p.rotulo} ({p.inicio.split("-").reverse().join("/")} a {p.fimEfetivo.split("-").reverse().join("/")}) · Base:{" "}
               {dados.base === "civil" ? "ano civil (data do pagamento)" : "exercício da NE"}
               {dados.elemento ? ` · Elemento: ${dados.elemento}` : ""}
+              {dados.subelemento ? ` · Tipo: ${dados.subelemento}` : ""}
               <br />
               Comparação: {p.rotuloComparacao} · Emitido em {emitido}
             </p>
@@ -150,26 +151,41 @@ export function Relatorio({ dados, identificacao, emitidoEm }: { dados: Resposta
               {exec.titulo}
             </p>
             <Legenda itens={exec.legenda} />
-            {!exec.vazio && <BarrasAgrupadas {...exec.props} altura={140} />}
+            {!exec.vazio && (
+              <BarrasAgrupadas categorias={exec.props.categorias} series={exec.props.series} valores={exec.props.valores} destaque={exec.props.destaque} altura={140} />
+            )}
           </Bloco>
 
           <div className="grid grid-cols-2 gap-7">
-            <Bloco titulo="3. Pago por elemento">
-              <table className="w-full border-collapse text-[12px]" data-testid="relatorio-elementos">
-                <caption className="sr-only">Pago por elemento</caption>
+            <Bloco titulo="3. Por tipo de despesa">
+              <table className="w-full border-collapse text-[12px]" data-testid="relatorio-tipos">
+                <caption className="sr-only">Por tipo de despesa: NEs, prestadores e pago</caption>
+                {tipos.length > 0 && (
+                  <thead>
+                    <tr>
+                      <th className={th}>Tipo</th>
+                      <th className={`${th} w-10 text-right`}>NEs</th>
+                      <th className={`${th} w-12 text-right`} title="Credores de cada NE, somados">
+                        Prest.
+                      </th>
+                      <th className={`${th} text-right`}>Pago</th>
+                    </tr>
+                  </thead>
+                )}
                 <tbody>
-                  {elementos.map((e) => (
-                    <tr key={e.nome}>
-                      <td className={`${td} max-w-0 truncate pr-2`} title={e.nome}>
-                        {e.nome}
+                  {tipos.map((x) => (
+                    <tr key={x.nome}>
+                      <td className={`${td} max-w-0 truncate pr-2`} title={x.nome}>
+                        {x.nome}
                       </td>
-                      <td className={`${td} whitespace-nowrap text-right`}>{curto(e.pago)}</td>
-                      <td className={`${td} w-12 text-right`}>{pct1(e.pct)}</td>
+                      <td className={`${td} text-right`}>{x.qtdNes}</td>
+                      <td className={`${td} text-right`}>{x.prestadores}</td>
+                      <td className={`${td} whitespace-nowrap text-right`}>{curto(x.pago)}</td>
                     </tr>
                   ))}
-                  {elementos.length === 0 && (
+                  {tipos.length === 0 && (
                     <tr>
-                      <td className={td}>Sem pagamentos no período.</td>
+                      <td className={td}>Sem NEs ou pagamentos no período.</td>
                     </tr>
                   )}
                 </tbody>

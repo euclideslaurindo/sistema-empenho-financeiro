@@ -52,7 +52,7 @@ describe('montarCsvAnalises', () => {
     r.meses[1].pago = 0;
     r.meses[4].pago = 0;
     const l = linhas(montarCsvAnalises(r));
-    expect(l.find((x) => x.startsWith('TOTAL;') && x.split(';').length === 4)).toBe('TOTAL;2000,20;4,92;12');
+    expect(l.find((x) => x.startsWith('TOTAL;') && x.split(';').length === 5)).toBe('TOTAL;2000,20;4,92;12;4');
     expect(l).toContain('TOTAL;;307181,33;100');
   });
 
