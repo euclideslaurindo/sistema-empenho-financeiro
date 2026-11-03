@@ -70,7 +70,7 @@ describe('frasesDeAbertura', () => {
   test('variação positiva, com a frase de apoio', () => {
     expect(frasesDeAbertura(r)).toEqual({
       principal: 'R$ 307 mil pagos a 2 credores, 25% a mais que em jan–out/2025',
-      apoio: '53% das NEs do período já foi pago. Restam R$ 799,90 a pagar.',
+      apoio: 'Das NEs do período, 53% já foi pago. Restam R$ 799,90 a pagar.',
     });
   });
 

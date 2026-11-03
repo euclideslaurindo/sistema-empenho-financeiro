@@ -21,6 +21,25 @@ export function elementosDoRelatorio(elementos: RespostaAnalises['elementos'], m
   ];
 }
 
+/**
+ * B7b: por tipo de despesa, no mesmo limite de 6 linhas (5 + "Outros"), com
+ * NEs, prestadores e pago somados no "Outros" (o pago em centavos).
+ */
+export function tiposDoRelatorio(tipos: RespostaAnalises['tipos'], max = MAX_ELEMENTOS_RELATORIO) {
+  const linhas = tipos.map((x) => ({ nome: x.codigo ? `${x.codigo} ${x.desc}`.trim() : x.desc, qtdNes: x.qtdNes, prestadores: x.prestadores, pago: x.pago }));
+  if (linhas.length <= max) return linhas;
+  const resto = linhas.slice(max - 1);
+  return [
+    ...linhas.slice(0, max - 1),
+    {
+      nome: `Outros (${resto.length} tipos)`,
+      qtdNes: resto.reduce((t, l) => t + l.qtdNes, 0),
+      prestadores: resto.reduce((t, l) => t + l.prestadores, 0),
+      pago: fromCents(resto.reduce((t, l) => t + toCents(l.pago), 0)),
+    },
+  ];
+}
+
 /** Retido por tipo no período (soma dos meses em centavos); a Patronal fica à parte. */
 export function retidoPorTipo(meses: RespostaAnalises['meses']) {
   const soma = (f: (m: RespostaAnalises['meses'][number]) => number) => fromCents(meses.reduce((t, m) => t + toCents(f(m)), 0));

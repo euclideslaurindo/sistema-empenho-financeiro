@@ -70,7 +70,9 @@ export function montarPonte(r: RespostaAnalises): Montado<{ etapas: EtapaCascata
   };
 }
 
-export function montarExecucao(r: RespostaAnalises): Montado<{ categorias: Categoria[]; series: Serie[]; valores: Valores; destaque?: string }> {
+export function montarExecucao(
+  r: RespostaAnalises
+): Montado<{ categorias: Categoria[]; series: Serie[]; valores: Valores; destaque?: string; nes: Array<{ chave: string; valor: number; rotulo: string }> }> {
   const valores: Valores = Object.fromEntries(r.meses.map((m) => [m.mes, { empenhado: m.empenhado, pago: m.pago }]));
   const algumPago = r.meses.some((m) => m.pago > 0);
   const iMax = indiceDoMaior(r.meses.map((m) => m.pago));
@@ -84,8 +86,8 @@ export function montarExecucao(r: RespostaAnalises): Montado<{ categorias: Categ
     ],
     tabela: {
       legenda: 'Execução mês a mês',
-      colunas: ['Mês', 'Empenhado', 'Pago'],
-      linhas: r.meses.map((m) => [m.longo, brl(m.empenhado), brl(m.pago)]),
+      colunas: ['Mês', 'Empenhado', 'Pago', 'NEs'],
+      linhas: r.meses.map((m) => [m.longo, brl(m.empenhado), brl(m.pago), String(m.nes)]),
     },
     props: {
       categorias: categoriasDe(r),
@@ -95,6 +97,51 @@ export function montarExecucao(r: RespostaAnalises): Montado<{ categorias: Categ
       ],
       valores,
       destaque: algumPago ? r.meses[iMax].mes : undefined,
+      // B7b (T6): NEs empenhadas por mês, na faixa embaixo do gráfico.
+      nes: r.meses.map((m) => ({ chave: m.mes, valor: m.nes, rotulo: m.longo })),
+    },
+  };
+}
+
+/** Chave do tipo no gráfico: o código, ou "sem-<elemento>" (não clicável). */
+export const chaveDoTipo = (t: RespostaAnalises['tipos'][number]) => t.codigo ?? `sem-${t.elementoCodigo ?? 'elemento'}`;
+
+/**
+ * B7b: por tipo de despesa (subelemento), com o empenhado, as NEs e os
+ * prestadores (credores de cada NE, somados). Totais em centavos.
+ */
+export function montarTipos(r: RespostaAnalises): Montado<{ itens: ItemHorizontal[] }> {
+  const tipos = r.tipos;
+  const nome = (t: (typeof tipos)[number]) => (t.codigo ? `${t.codigo} ${t.desc}`.trim() : t.desc);
+  const maior = tipos.find((t) => t.pago > 0);
+  const qtdNes = tipos.reduce((s, t) => s + t.qtdNes, 0);
+  const prestadores = tipos.reduce((s, t) => s + t.prestadores, 0);
+  return {
+    titulo: maior
+      ? `${maior.codigo ? maior.desc : nome(maior)} teve o maior pagamento: ${curto(maior.pago)}`
+      : tipos.length
+        ? `${plural(qtdNes, 'NE empenhada', 'NEs empenhadas')}, sem pagamentos no período`
+        : 'Sem NEs ou pagamentos no período',
+    vazio: tipos.length === 0,
+    legenda: [],
+    tabela: {
+      legenda: 'Por tipo de despesa',
+      colunas: ['Tipo de despesa', 'Empenhado', 'Pago', 'NEs', 'Prestadores'],
+      linhas: [
+        ...tipos.map((t) => [nome(t), brl(t.empenhado), brl(t.pago), String(t.qtdNes), String(t.prestadores)]),
+        ...(tipos.length
+          ? [['TOTAL', brl(somaC(tipos, (t) => t.empenhado)), brl(somaC(tipos, (t) => t.pago)), String(qtdNes), String(prestadores)]]
+          : []),
+      ],
+    },
+    props: {
+      itens: tipos.map((t) => ({
+        chave: chaveDoTipo(t),
+        rotulo: t.codigo ?? t.elementoCodigo ?? 'Sem elemento',
+        sub: `${t.codigo ? `${t.desc} · ` : '(sem subelemento) · '}${plural(t.qtdNes, 'NE', 'NEs')} · ${plural(t.prestadores, 'prestador', 'prestadores')} · empenhado ${brl(t.empenhado)}`,
+        valor: t.pago,
+        pct: t.pct,
+      })),
     },
   };
 }

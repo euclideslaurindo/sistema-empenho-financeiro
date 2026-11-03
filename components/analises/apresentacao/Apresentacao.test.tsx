@@ -44,7 +44,7 @@ describe('Modo apresentação', () => {
     await abrir();
     expect((apiClient.get as any).mock.calls.map((c: any[]) => c[0])).toEqual(['/api/analises?periodo=ano&ano=2026&base=civil', '/api/configuracoes/identificacao']);
     expect(screen.getByTestId('abertura-principal')).toHaveTextContent('R$ 307 mil pagos a 2 credores, 25% a mais que em jan–out/2025');
-    expect(screen.getByTestId('abertura-apoio')).toHaveTextContent('53% das NEs do período já foi pago. Restam R$ 799,90 a pagar.');
+    expect(screen.getByTestId('abertura-apoio')).toHaveTextContent('Das NEs do período, 53% já foi pago. Restam R$ 799,90 a pagar.');
     expect(screen.getByTestId('abertura-rodape')).toHaveTextContent('Secretaria de Educação · Gerência Financeira');
     expect(contador()).toBe('1 / 3');
     expect(screen.getByTestId('palco')).toHaveAttribute('aria-label', 'Slide 1 de 3: Abertura');

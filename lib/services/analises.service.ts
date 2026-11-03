@@ -2,6 +2,7 @@ import { query } from '@/lib/db';
 import { z } from 'zod';
 import { fromCents, toCents, type Centavos } from '@/lib/money';
 import { somenteDigitos } from '@/lib/ne-credores';
+import { codigoDoElementoPai } from '@/lib/elementos';
 import {
   ANO_MAX,
   ANO_MIN,
@@ -10,6 +11,7 @@ import {
   SITUACOES,
   agruparElementos,
   agruparMunicipios,
+  agruparTipos,
   avisosDasNes,
   criterios,
   dataValida,
@@ -35,6 +37,8 @@ const reais = (v: Centavos) => fromCents(v);
 const FROM_OP = 'FROM ordens_pagamento op LEFT JOIN notas_empenho ne ON ne.numero = op.numero_ne';
 /** A data da OP com outro alias (subconsulta da ponte). */
 const DATA_O2 = 'COALESCE(o2.data_pagamento, o2.data_emissao, DATE(o2.created_at))';
+/** Os dígitos do CPF/CNPJ com o alias da subconsulta da ponte. */
+const DIGITOS_O2 = DIGITOS_CPF.replace('op.credor_cpf_cnpj', 'o2.credor_cpf_cnpj');
 
 // ---------------------------------------------------------------------------
 // Entrada
@@ -46,13 +50,31 @@ const elementoSchema = z
   .regex(/^\d(\.\d+)+$/, 'Elemento inválido (ex.: 3.3.90.33).')
   .optional();
 
+/** B7b: tipo de despesa = código do subelemento (ex.: 3.3.90.36.08). */
+const subelementoSchema = z
+  .string()
+  .trim()
+  .regex(/^\d(?:\.\d+){4,}$/, 'Tipo de despesa inválido (ex.: 3.3.90.36.08).')
+  .optional();
+
+/** O tipo fixa o elemento pai; tipo de outro elemento é erro (400). */
+export function elementoDoTipo(elemento: string | undefined, subelemento: string | undefined): string | undefined {
+  if (!subelemento) return elemento;
+  if (elemento && !subelemento.startsWith(`${elemento}.`)) {
+    throw new ErroPeriodo(`O tipo ${subelemento} não é do elemento ${elemento}.`);
+  }
+  return elemento ?? codigoDoElementoPai(subelemento);
+}
+
 export const analisesSchema = z.object({
-  periodo: z.enum(['s1', 's2', 'ano', 'intervalo']).default('ano'),
+  periodo: z.enum(['s1', 's2', 'ano', 'mes', 'intervalo']).default('ano'),
   ano: z.coerce.number().int().min(ANO_MIN).max(ANO_MAX).optional(),
+  mes: z.coerce.number().int().min(1).max(12).optional(),
   inicio: z.string().optional(),
   fim: z.string().optional(),
   base: z.enum(['civil', 'exercicio']).default('civil'),
   elemento: elementoSchema,
+  subelemento: subelementoSchema,
 });
 
 export const opsSchema = z
@@ -62,6 +84,7 @@ export const opsSchema = z
     base: z.enum(['civil', 'exercicio']).default('civil'),
     ano: z.coerce.number().int().min(ANO_MIN).max(ANO_MAX).optional(),
     elemento: elementoSchema,
+    subelemento: subelementoSchema,
     cpf: z
       .string()
       .transform((v) => somenteDigitos(v))
@@ -79,6 +102,15 @@ interface Filtro {
   base: Base;
   ano: number;
   elemento?: string;
+  subelemento?: string;
+}
+
+/**
+ * B7b: o texto gravado é "<código> - <descrição>": igual ao código, ou
+ * começando por "<código> " (assim 3.3.90.14.03 não pega 3.3.90.14.030).
+ */
+function filtroTipo(coluna: string, subelemento: string) {
+  return { sql: `(${coluna} = ? OR ${coluna} LIKE ?)`, params: [subelemento, `${escaparLike(subelemento)} %`] };
 }
 
 function filtroOps(f: Filtro, inicio: string, fim: string, extra?: { elemento?: string }) {
@@ -93,6 +125,11 @@ function filtroOps(f: Filtro, inicio: string, fim: string, extra?: { elemento?: 
     partes.push('op.elemento LIKE ?');
     params.push(`${escaparLike(elemento)}%`);
   }
+  if (f.subelemento) {
+    const t = filtroTipo('op.subelemento', f.subelemento);
+    partes.push(t.sql);
+    params.push(...t.params);
+  }
   return { where: partes.join(' AND '), params };
 }
 
@@ -106,6 +143,11 @@ function filtroNes(f: Filtro, inicio: string, fim: string) {
   if (f.elemento) {
     partes.push('ne.elemento LIKE ?');
     params.push(`${escaparLike(f.elemento)}%`);
+  }
+  if (f.subelemento) {
+    const t = filtroTipo('ne.subelemento', f.subelemento);
+    partes.push(t.sql);
+    params.push(...t.params);
   }
   return { where: partes.join(' AND '), params };
 }
@@ -169,6 +211,18 @@ async function pagoPorElemento(f: Filtro, inicio: string, fim: string) {
   return agruparElementos(rows.map((r) => ({ elemento: r.elemento ?? null, pago: c(r.pago) })));
 }
 
+/** (c2) B7b: pago por elemento e subelemento (texto); o agrupamento por tipo é no código. */
+async function pagoPorTipo(f: Filtro, inicio: string, fim: string) {
+  const w = filtroOps(f, inicio, fim);
+  const rows: any[] =
+    (await query(
+      `SELECT op.elemento AS elemento, op.subelemento AS subelemento, SUM(COALESCE(op.valor_pagamento, 0)) AS pago
+         ${FROM_OP} WHERE ${w.where} GROUP BY op.elemento, op.subelemento`,
+      w.params
+    )) || [];
+  return rows.map((r) => ({ elemento: r.elemento ?? null, subelemento: r.subelemento ?? null, pago: c(r.pago) }));
+}
+
 /** (d) Os 10 maiores credores; o nome do cadastro vem depois da soma (sem multiplicar valores). */
 async function maioresCredores(f: Filtro, inicio: string, fim: string) {
   const w = filtroOps(f, inicio, fim);
@@ -214,16 +268,26 @@ async function transportePorMunicipio(f: Filtro, inicio: string, fim: string) {
   return agruparMunicipios(rows.map((r) => ({ municipio: r.municipio ?? null, pago: c(r.pago) })));
 }
 
-/** (f) NEs do período com o pago e o líquido até o fim efetivo (a posição da ponte). */
+/**
+ * (f) NEs do período com o pago e o líquido até o fim efetivo (a posição da
+ * ponte). B7b: também o elemento, o subelemento e os prestadores — os
+ * credores diferentes das OPs da NE até o fim efetivo (ne_credores está sem
+ * uso desde a T30); NE antiga sem OP e com credor próprio conta 1.
+ */
 async function nesDoPeriodo(f: Filtro, inicio: string, fim: string, fimEfetivo: string) {
   const w = filtroNes(f, inicio, fim);
   const rows: any[] =
     (await query(
       `SELECT ne.numero, ne.valor, ne.status, DATE_FORMAT(${DATA_NE}, '%Y-%m') AS mes,
-              COALESCE(pg.pago, 0) AS pago, COALESCE(pg.liquido, 0) AS liquido
+              ne.elemento, ne.subelemento,
+              COALESCE(pg.pago, 0) AS pago, COALESCE(pg.liquido, 0) AS liquido,
+              CASE WHEN COALESCE(pg.credores, 0) > 0 THEN pg.credores
+                   WHEN TRIM(COALESCE(ne.cpf_cnpj, '')) <> '' THEN 1
+                   ELSE 0 END AS prestadores
          FROM notas_empenho ne
          LEFT JOIN (
-           SELECT o2.numero_ne, SUM(COALESCE(o2.valor_pagamento, 0)) AS pago, SUM(COALESCE(o2.valor_liquido, 0)) AS liquido
+           SELECT o2.numero_ne, SUM(COALESCE(o2.valor_pagamento, 0)) AS pago, SUM(COALESCE(o2.valor_liquido, 0)) AS liquido,
+                  COUNT(DISTINCT NULLIF(${DIGITOS_O2}, '')) AS credores
              FROM ordens_pagamento o2
             WHERE ${DATA_O2} <= ?
             GROUP BY o2.numero_ne
@@ -231,7 +295,10 @@ async function nesDoPeriodo(f: Filtro, inicio: string, fim: string, fimEfetivo: 
         WHERE ${w.where}`,
       [fimEfetivo, ...w.params]
     )) || [];
-  return rows.map((r) => ({ mes: String(r.mes), valor: c(r.valor), status: r.status ?? null, pago: c(r.pago), liquido: c(r.liquido) }));
+  return rows.map((r) => ({
+    mes: String(r.mes), valor: c(r.valor), status: r.status ?? null, pago: c(r.pago), liquido: c(r.liquido),
+    elemento: r.elemento ?? null, subelemento: r.subelemento ?? null, prestadores: Number(r.prestadores) || 0,
+  }));
 }
 
 /** (g) DARF por competência e status. Sem JOIN: segue só a competência. */
@@ -262,24 +329,27 @@ function hojeLocal(agora: Date): string {
 export interface EntradaAnalises {
   periodo?: TipoPeriodo;
   ano?: number;
+  mes?: number;
   inicio?: string;
   fim?: string;
   base?: Base;
   elemento?: string;
+  subelemento?: string;
 }
 
 /** Monta a resposta da aba Análises. ErroPeriodo → 400 na rota. */
 export async function obterAnalises(entrada: unknown, agora: Date = new Date()) {
   const e = analisesSchema.parse(entrada); // ZodError -> 400
+  const elemento = elementoDoTipo(e.elemento, e.subelemento); // tipo de outro elemento -> 400
   const hoje = hojeLocal(agora);
   const anos = await anosComMovimento();
   const anoPedido = e.ano ?? (e.periodo === 'intervalo' && e.inicio ? Number(String(e.inicio).slice(0, 4)) : anos[0] ?? Number(hoje.slice(0, 4)));
-  const periodo: Periodo = resolverPeriodo({ tipo: e.periodo, ano: anoPedido, inicio: e.inicio, fim: e.fim }, hoje);
-  const f: Filtro = { base: e.base, ano: periodo.ano, elemento: e.elemento };
+  const periodo: Periodo = resolverPeriodo({ tipo: e.periodo, ano: anoPedido, mes: e.mes, inicio: e.inicio, fim: e.fim }, hoje);
+  const f: Filtro = { base: e.base, ano: periodo.ano, elemento, subelemento: e.subelemento };
   const fAnt: Filtro = { ...f, ano: periodo.ano - 1 };
 
   const cabecalho = {
-    periodo, base: e.base, elemento: e.elemento ?? null, anos,
+    periodo, base: e.base, elemento: elemento ?? null, subelemento: e.subelemento ?? null, anos,
     criterios: criterios(e.base, periodo), atualizadoEm: agora.toISOString(),
   };
 
@@ -289,10 +359,11 @@ export async function obterAnalises(entrada: unknown, agora: Date = new Date()) 
 
   const { inicio, fimEfetivo } = periodo;
   const ant = periodo.anterior;
-  const [meses, credoresQtd, elementos, credores, municipios, nes, darf, mesesAnt, nesAnt] = await Promise.all([
+  const [meses, credoresQtd, elementos, tiposOps, credores, municipios, nes, darf, mesesAnt, nesAnt] = await Promise.all([
     opsPorMes(f, inicio, fimEfetivo),
     qtdCredores(f, inicio, fimEfetivo),
     pagoPorElemento(f, inicio, fimEfetivo),
+    pagoPorTipo(f, inicio, fimEfetivo),
     maioresCredores(f, inicio, fimEfetivo),
     transportePorMunicipio(f, inicio, fimEfetivo),
     nesDoPeriodo(f, inicio, fimEfetivo, fimEfetivo),
@@ -323,13 +394,22 @@ export async function obterAnalises(entrada: unknown, agora: Date = new Date()) 
 
   // ---- diferenças vindas dos dados: aviso, não erro ----
   const avisos = avisosDasNes(nes as NeDoPeriodo[]);
+  // ---- por tipo de despesa (B7b) ----
+  const tipos = agruparTipos(nes, tiposOps);
+  const qtdPrestadores = soma(tipos, (x) => x.prestadores);
+
   const somaElementos = soma(elementos, (x) => x.pago);
-  if (somaElementos !== pago) avisos.push('Houve lançamento de OP durante a leitura: recarregue para ver os números atualizados.');
+  const somaTipos = soma(tipos, (x) => x.pago);
+  if (somaElementos !== pago || somaTipos !== pago) avisos.push('Houve lançamento de OP durante a leitura: recarregue para ver os números atualizados.');
 
   // ---- meses completos (o gráfico não pula mês) ----
   const porMes = new Map(meses.map((m) => [m.mes, m]));
   const empenhadoPorMes = new Map<string, number>();
-  for (const n of nes) empenhadoPorMes.set(n.mes, (empenhadoPorMes.get(n.mes) ?? 0) + n.valor);
+  const nesPorMes = new Map<string, number>();
+  for (const n of nes) {
+    empenhadoPorMes.set(n.mes, (empenhadoPorMes.get(n.mes) ?? 0) + n.valor);
+    nesPorMes.set(n.mes, (nesPorMes.get(n.mes) ?? 0) + 1);
+  }
   const darfPorMes = new Map<string, { paga: number; pendente: number }>();
   for (const d of darf) {
     const x = darfPorMes.get(d.mes) ?? { paga: 0, pendente: 0 };
@@ -357,6 +437,7 @@ export async function obterAnalises(entrada: unknown, agora: Date = new Date()) 
     qtdOps,
     qtdCredores: credoresQtd,
     qtdNes: nes.length,
+    qtdPrestadores,
     pctTransporte,
     pctPagoDoEmpenhado: ponte.empenhado - ponte.cancelado > 0 ? Math.round(((ponte.liquido + ponte.retencoes) / (ponte.empenhado - ponte.cancelado)) * 100) : 0,
     ponte: { empenhado: reais(ponte.empenhado), cancelado: reais(ponte.cancelado), liquido: reais(ponte.liquido), retencoes: reais(ponte.retencoes), saldo: reais(ponte.saldo) },
@@ -365,11 +446,15 @@ export async function obterAnalises(entrada: unknown, agora: Date = new Date()) 
       return {
         mes, rotulo: rotuloMes(mes), longo: rotuloMesLongo(mes),
         empenhado: reais(empenhadoPorMes.get(mes) ?? 0),
-        pago: reais(m?.bruto ?? 0), ops: m?.ops ?? 0,
+        pago: reais(m?.bruto ?? 0), ops: m?.ops ?? 0, nes: nesPorMes.get(mes) ?? 0,
         irrf: reais(m?.irrf ?? 0), iss: reais(m?.iss ?? 0), inss: reais(m?.inss ?? 0), sest: reais(m?.sest ?? 0), patronal: reais(m?.patronal ?? 0),
       };
     }),
     elementos: elementos.map((x) => ({ codigo: x.codigo, desc: x.desc, pago: reais(x.pago), pct: x.pct })),
+    tipos: tipos.map((x) => ({
+      codigo: x.codigo, elementoCodigo: x.elementoCodigo, desc: x.desc,
+      empenhado: reais(x.empenhado), pago: reais(x.pago), qtdNes: x.qtdNes, prestadores: x.prestadores, pct: x.pct,
+    })),
     credores: credores.map((x) => ({ nome: x.nome, pago: reais(x.pago) })),
     municipios: municipios.map((x) => ({ nome: x.nome, pago: reais(x.pago) })),
     darf: periodo.meses.map((mes) => {
@@ -388,8 +473,8 @@ function montarVazio(periodo: Periodo) {
   const zero = { empenhado: 0, cancelado: 0, liquido: 0, retencoes: 0, saldo: 0 };
   return {
     kpis: { empenhado: 0, pago: 0, saldo: 0, retido: 0, varEmpenhado: null, varPago: null, varSaldo: null, varRetido: null },
-    restos: 0, pagoDasNes: 0, pagoAnteriores: 0, qtdOps: 0, qtdCredores: 0, qtdNes: 0, pctTransporte: 0, pctPagoDoEmpenhado: 0,
-    ponte: zero, meses: [], elementos: [], credores: [], municipios: [], darf: [],
+    restos: 0, pagoDasNes: 0, pagoAnteriores: 0, qtdOps: 0, qtdCredores: 0, qtdNes: 0, qtdPrestadores: 0, pctTransporte: 0, pctPagoDoEmpenhado: 0,
+    ponte: zero, meses: [], elementos: [], tipos: [], credores: [], municipios: [], darf: [],
     nes: SITUACOES.map((nome) => ({ nome, qtd: 0, valor: 0 })),
     resumo: montarResumo({ periodo, pago: 0, saldo: 0, empenhado: 0, restos: 0, qtdCredores: 0, qtdOps: 0, varPago: null, pctTransporte: 0 }),
   };
@@ -404,7 +489,7 @@ export const LIMITE_OPS = 500;
 export async function listarOpsDoRecorte(entrada: unknown) {
   const e = opsSchema.parse(entrada); // ZodError -> 400
   const ano = e.ano ?? Number(e.inicio.slice(0, 4));
-  const f: Filtro = { base: e.base, ano, elemento: e.elemento };
+  const f: Filtro = { base: e.base, ano, elemento: elementoDoTipo(e.elemento, e.subelemento), subelemento: e.subelemento };
   const w = filtroOps(f, e.inicio, e.fim);
   const where = e.cpf ? `${w.where} AND ${DIGITOS_CPF} = ?` : w.where;
   const params = e.cpf ? [...w.params, e.cpf] : w.params;

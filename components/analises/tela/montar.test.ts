@@ -107,9 +107,10 @@ describe('tabelas (os valores cheios, os mesmos do gráfico)', () => {
 
   test('execução: uma linha por mês, valores cheios', () => {
     const t = montarExecucao(r).tabela;
-    expect(t.colunas).toEqual(['Mês', 'Empenhado', 'Pago']);
+    expect(t.colunas).toEqual(['Mês', 'Empenhado', 'Pago', 'NEs']);
     expect(t.linhas).toHaveLength(10);
-    expect(t.linhas[3]).toEqual(['Abril', 'R$ 0,00', 'R$ 306.181,03']);
+    expect(t.linhas[3]).toEqual(['Abril', 'R$ 0,00', 'R$ 306.181,03', '0']);
+    expect(t.linhas[1][3]).toBe('1');
   });
 
   test('ponte: as 5 etapas com sinais', () => {

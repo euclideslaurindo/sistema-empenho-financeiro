@@ -6,7 +6,7 @@ import { extrairCodigoElemento } from '@/lib/elementos';
 import { statusPeloSaldo } from '@/lib/status-ne';
 import { normalizarMunicipio } from '@/lib/perfis-calculo';
 
-export type TipoPeriodo = 's1' | 's2' | 'ano' | 'intervalo';
+export type TipoPeriodo = 's1' | 's2' | 'ano' | 'mes' | 'intervalo';
 export type Base = 'civil' | 'exercicio';
 export type SituacaoNe = 'A pagar' | 'Parcial' | 'Paga' | 'Cancelada';
 
@@ -67,6 +67,8 @@ export const rotuloMesLongo = (mes: string) => MESES_LONGOS[Number(mes.slice(5, 
 export interface Periodo {
   tipo: TipoPeriodo;
   ano: number;
+  /** Só no período 'mes' (1–12). */
+  mes?: number;
   inicio: string;
   fim: string;
   /** O menor entre o fim e hoje (R2). */
@@ -82,7 +84,7 @@ export interface Periodo {
 
 /** R1–R3: limites do período, corte em hoje e o mesmo recorte do ano anterior. */
 export function resolverPeriodo(
-  p: { tipo: TipoPeriodo; ano?: number | null; inicio?: string | null; fim?: string | null },
+  p: { tipo: TipoPeriodo; ano?: number | null; mes?: number | null; inicio?: string | null; fim?: string | null },
   hoje: string
 ): Periodo {
   let ano: number;
@@ -96,6 +98,15 @@ export function resolverPeriodo(
     if (inicio > fim) throw new ErroPeriodo('A data de início é depois da data de fim.');
     if (inicio.slice(0, 4) !== fim.slice(0, 4)) throw new ErroPeriodo('O intervalo precisa ficar dentro de um mesmo ano.');
     ano = Number(inicio.slice(0, 4));
+  } else if (p.tipo === 'mes') {
+    ano = Number(p.ano);
+    if (!Number.isInteger(ano)) throw new ErroPeriodo('Informe o ano.');
+    const mes = Number(p.mes);
+    if (!Number.isInteger(mes) || mes < 1 || mes > 12) throw new ErroPeriodo('Informe o mês (1 a 12).');
+    const mm = String(mes).padStart(2, '0');
+    const ultimo = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+    inicio = `${String(ano).padStart(4, '0')}-${mm}-01`;
+    fim = `${String(ano).padStart(4, '0')}-${mm}-${String(ultimo).padStart(2, '0')}`;
   } else {
     ano = Number(p.ano);
     if (!Number.isInteger(ano)) throw new ErroPeriodo('Informe o ano.');
@@ -109,17 +120,23 @@ export function resolverPeriodo(
   const fimEfetivo = futuro || fim <= hoje ? fim : hoje;
   const parcial = !futuro && fimEfetivo < fim;
 
-  const base = p.tipo === 's1' ? `1º semestre de ${ano}` : p.tipo === 's2' ? `2º semestre de ${ano}` : p.tipo === 'ano' ? String(ano) : `${diaMesBR(inicio)} a ${dataBR(fim)}`;
+  const base =
+    p.tipo === 's1' ? `1º semestre de ${ano}`
+    : p.tipo === 's2' ? `2º semestre de ${ano}`
+    : p.tipo === 'ano' ? String(ano)
+    : p.tipo === 'mes' ? `${rotuloMesLongo(inicio)} de ${ano}`
+    : `${diaMesBR(inicio)} a ${dataBR(fim)}`;
   const rotulo = parcial ? `${base} (até ${diaMesBR(fimEfetivo)})` : base;
 
   const anterior = { inicio: menosUmAno(inicio), fim: menosUmAno(fimEfetivo) };
   let rotuloComparacao: string;
-  if (p.tipo === 'intervalo') rotuloComparacao = `${diaMesBR(anterior.inicio)} a ${dataBR(anterior.fim)}`;
+  if (p.tipo === 'intervalo' || (p.tipo === 'mes' && parcial)) rotuloComparacao = `${diaMesBR(anterior.inicio)} a ${dataBR(anterior.fim)}`;
+  else if (p.tipo === 'mes') rotuloComparacao = `${mesCurto(inicio)}/${ano - 1}`;
   else if (parcial) rotuloComparacao = `${mesCurto(inicio)}–${mesCurto(fimEfetivo)}/${ano - 1}`;
   else rotuloComparacao = p.tipo === 's1' ? `1º sem/${ano - 1}` : p.tipo === 's2' ? `2º sem/${ano - 1}` : String(ano - 1);
 
   return {
-    tipo: p.tipo, ano, inicio, fim, fimEfetivo, parcial, futuro,
+    tipo: p.tipo, ano, ...(p.tipo === 'mes' ? { mes: Number(inicio.slice(5, 7)) } : {}), inicio, fim, fimEfetivo, parcial, futuro,
     meses: futuro ? [] : mesesDoPeriodo(inicio, fimEfetivo),
     anterior, rotulo, rotuloComparacao,
   };
@@ -181,6 +198,72 @@ export function agruparElementos(linhas: Array<{ elemento: string | null; pago: 
     .filter((e) => e.pago !== 0)
     .map((e) => ({ ...e, pct: participacao(e.pago, total) }))
     .sort((a, b) => b.pago - a.pago || String(a.codigo).localeCompare(String(b.codigo)));
+}
+
+export interface TipoDespesa {
+  /** Código do subelemento; null = "(sem subelemento)" do elemento. */
+  codigo: string | null;
+  elementoCodigo: string | null;
+  desc: string;
+  empenhado: Centavos;
+  pago: Centavos;
+  qtdNes: number;
+  prestadores: number;
+  /** Participação no pago (%). */
+  pct: number;
+}
+
+/** Texto gravado → código e descrição ("3.3.90.36.08 - Estagiários" → ['3.3.90.36.08', 'Estagiários']). */
+function codigoEDesc(texto: string | null | undefined): { codigo: string | null; desc: string } {
+  const t = String(texto ?? '').trim();
+  const codigo = extrairCodigoElemento(t);
+  return { codigo, desc: codigo ? t.slice(t.indexOf(codigo) + codigo.length).replace(/^[\s\-–—:]+/, '').trim() : t };
+}
+
+/**
+ * B7b (T1–T3): por tipo de despesa (o subelemento). Sem subelemento com
+ * código (vazio ou texto antigo solto), cai em "{elemento} (sem subelemento)",
+ * para o total fechar. NE cancelada fica fora do empenhado, das NEs e dos
+ * prestadores. Prestadores = credores de cada NE, somados (o mesmo credor em
+ * 2 NEs conta 2).
+ */
+export function agruparTipos(
+  nes: Array<{ elemento: string | null; subelemento: string | null; valor: Centavos; status: string | null; prestadores: number }>,
+  ops: Array<{ elemento: string | null; subelemento: string | null; pago: Centavos }>
+): TipoDespesa[] {
+  const porChave = new Map<string, Omit<TipoDespesa, 'pct'> & { descElemento: string }>();
+  const linha = (elemento: string | null, subelemento: string | null) => {
+    const el = codigoEDesc(elemento);
+    const sub = codigoEDesc(subelemento);
+    // O subelemento só vale se for mesmo do elemento (texto com código de outro elemento: sem subelemento).
+    const valido = sub.codigo && (!el.codigo || sub.codigo.startsWith(`${el.codigo}.`)) ? sub.codigo : null;
+    const chave = valido ?? `${el.codigo ?? ''}#sem`;
+    const atual = porChave.get(chave) ?? {
+      codigo: valido, elementoCodigo: el.codigo, desc: '', descElemento: '', empenhado: 0, pago: 0, qtdNes: 0, prestadores: 0,
+    };
+    if (valido && sub.desc.length > atual.desc.length) atual.desc = sub.desc;
+    if (el.desc.length > atual.descElemento.length) atual.descElemento = el.desc;
+    porChave.set(chave, atual);
+    return atual;
+  };
+  for (const n of nes) {
+    if (n.status === 'CANCELADO') continue;
+    const t = linha(n.elemento, n.subelemento);
+    t.empenhado += n.valor;
+    t.qtdNes += 1;
+    t.prestadores += Math.max(0, Math.trunc(Number(n.prestadores) || 0));
+  }
+  for (const o of ops) linha(o.elemento, o.subelemento).pago += o.pago;
+
+  const total = [...porChave.values()].reduce((t, x) => t + x.pago, 0);
+  return [...porChave.values()]
+    .filter((x) => x.pago !== 0 || x.empenhado !== 0 || x.qtdNes > 0)
+    .map(({ descElemento, ...x }) => ({
+      ...x,
+      desc: x.codigo ? x.desc : `${x.elementoCodigo ? `${x.elementoCodigo} ` : ''}(sem subelemento)`,
+      pct: participacao(x.pago, total),
+    }))
+    .sort((a, b) => b.pago - a.pago || b.empenhado - a.empenhado || String(a.codigo ?? a.elementoCodigo).localeCompare(String(b.codigo ?? b.elementoCodigo)));
 }
 
 /** Junta "Garanhuns", "GARANHUNS " e "Garanhuns/PE"; vazio → "Sem município". */

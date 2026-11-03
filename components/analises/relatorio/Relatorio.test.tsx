@@ -3,6 +3,7 @@ import React from 'react';
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import RelatorioPage from '@/app/analises/relatorio/page';
+import { curto } from '../formato';
 import { respostaExemplo } from '@/tests/fixtures/analises-resposta';
 
 vi.mock('@/lib/api-client', () => ({ apiClient: { get: vi.fn() } }));
@@ -61,15 +62,22 @@ describe('Relatório A4', () => {
     imprimir.mockRestore();
   });
 
-  test('cabe na folha: 9 elementos viram 6 linhas (com "Outros"), avisos impressos', async () => {
+  test('cabe na folha: 9 tipos viram 6 linhas (com "Outros"), avisos impressos', async () => {
     const r = respostaExemplo();
-    r.elementos = Array.from({ length: 9 }, (_, i) => ({ codigo: `3.3.90.${10 + i}`, desc: `Elemento ${i}`, pago: 1000 - i, pct: 11.1 }));
+    r.tipos = Array.from({ length: 9 }, (_, i) => ({
+      codigo: `3.3.90.36.${String(10 + i)}`, elementoCodigo: '3.3.90.36', desc: `Tipo ${i}`, empenhado: 2000, pago: 1000 - i, qtdNes: 2, prestadores: i + 1, pct: 11.1,
+    }));
     r.avisos = ['1 NE(s) com pagamento acima do valor empenhado.'];
     mockApi({ analises: () => r });
     render(<RelatorioPage />);
-    const tabela = await screen.findByTestId('relatorio-elementos');
-    expect(within(tabela).getAllByRole('row')).toHaveLength(6);
-    expect(within(tabela).getByText('Outros (4 elementos)')).toBeInTheDocument();
+    const tabela = await screen.findByTestId('relatorio-tipos');
+    // cabeçalho + 6 linhas
+    expect(within(tabela).getAllByRole('row')).toHaveLength(7);
+    const outros = within(tabela).getByText('Outros (4 tipos)').closest('tr') as HTMLTableRowElement;
+    // NEs 2+2+2+2, prestadores 6+7+8+9 e pago 995+994+993+992
+    const celulas = Array.from(outros.cells, (td) => td.textContent);
+    expect(celulas.slice(0, 3)).toEqual(['Outros (4 tipos)', '8', '30']);
+    expect(celulas[3]).toBe(curto(3974));
     expect(screen.getByTestId('relatorio-avisos')).toHaveTextContent('pagamento acima do valor');
   });
 

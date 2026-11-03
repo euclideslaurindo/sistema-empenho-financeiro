@@ -100,6 +100,7 @@ export function SlideElementos({ dados }: DadosSlides) {
       <span className="text-[15px]" style={{ color: paleta.textoSecundario }}>
         Base: {dados.base === "civil" ? "ano civil (data do pagamento)" : "exercício da NE"}
         {dados.elemento ? ` · elemento ${dados.elemento}` : ""}
+        {dados.subelemento ? ` · tipo ${dados.subelemento}` : ""}
       </span>
     </div>
   );

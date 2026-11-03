@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     const sp = new URL(request.url).searchParams;
     const entrada = Object.fromEntries(
-      ['periodo', 'ano', 'inicio', 'fim', 'base', 'elemento'].flatMap((k) => {
+      ['periodo', 'ano', 'mes', 'inicio', 'fim', 'base', 'elemento', 'subelemento'].flatMap((k) => {
         const valor = sp.get(k);
         return valor === null || valor.trim() === '' ? [] : [[k, valor]];
       })

@@ -22,7 +22,7 @@ export function CartoesAnalises({ dados }: { dados: RespostaAnalises }) {
   const k = dados.kpis;
   const comp = dados.periodo.rotuloComparacao;
   const cartoes = [
-    { rotulo: "Empenhado", valor: k.empenhado, variacao: k.varEmpenhado, nota: `${dados.qtdNes} ${dados.qtdNes === 1 ? "NE" : "NEs"} no período`, cor: paleta.texto },
+    { rotulo: "Empenhado", valor: k.empenhado, variacao: k.varEmpenhado, nota: `${dados.qtdNes} ${dados.qtdNes === 1 ? "NE" : "NEs"} no período · ${dados.qtdPrestadores} ${dados.qtdPrestadores === 1 ? "prestador" : "prestadores"}`, cor: paleta.texto },
     {
       rotulo: "Pago no período",
       valor: k.pago,

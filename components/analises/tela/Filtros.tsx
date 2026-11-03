@@ -1,6 +1,7 @@
 "use client";
 import { X } from "lucide-react";
 import type { ElementoOption } from "@/hooks/use-elementos";
+import { MESES_LONGOS } from "@/lib/analises";
 import type { BaseTela, FiltrosAnalises, PeriodoTela } from "./url";
 
 const rotulo = "text-[11px] font-bold uppercase tracking-[0.12em] text-[#5b6678]";
@@ -10,6 +11,7 @@ const PERIODOS: Array<[PeriodoTela, string]> = [
   ["s1", "1º semestre"],
   ["s2", "2º semestre"],
   ["ano", "Ano"],
+  ["mes", "Mês"],
   ["intervalo", "Intervalo"],
 ];
 const BASES: Array<[BaseTela, string, string]> = [
@@ -61,6 +63,12 @@ export function FiltrosAnalisesBarra({
 }) {
   const listaAnos = [...new Set([...anos, anoExibido])].sort((a, b) => b - a);
   const opcoesElemento = elementos.filter((e) => e.ativo && e.codigo);
+  // B7b: tipos de despesa (subelementos) do elemento escolhido; sem elemento, todos, por elemento.
+  const gruposTipo = opcoesElemento
+    .filter((e) => !filtros.elemento || e.codigo === filtros.elemento)
+    .map((e) => ({ elemento: e, subs: (e.subelementos || []).filter((s) => s.codigo) }))
+    .filter((g) => g.subs.length > 0);
+  const tipoNaLista = gruposTipo.some((g) => g.subs.some((s) => s.codigo === filtros.subelemento));
 
   return (
     <section aria-label="Filtros" className="flex flex-col gap-3 rounded-xl border border-[#dde3ec] bg-white px-6 py-5">
@@ -97,6 +105,21 @@ export function FiltrosAnalisesBarra({
           </div>
         )}
 
+        {filtros.periodo === "mes" && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="f-mes" className={rotulo}>
+              Mês
+            </label>
+            <select id="f-mes" value={filtros.mes ?? ""} onChange={(e) => onChange({ mes: Number(e.target.value) })} className={`${campo} min-w-[130px]`}>
+              {MESES_LONGOS.map((nome, i) => (
+                <option key={nome} value={i + 1}>
+                  {nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <Segmentado id="f-base" titulo="Base" opcoes={BASES} valor={filtros.base} onChange={(base) => onChange({ base })} />
 
         <div className="flex flex-col gap-1.5">
@@ -113,6 +136,25 @@ export function FiltrosAnalisesBarra({
             {filtros.elemento && !opcoesElemento.some((e) => e.codigo === filtros.elemento) && <option value={filtros.elemento}>{filtros.elemento}</option>}
           </select>
         </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="f-tipo" className={rotulo}>
+            Tipo de despesa
+          </label>
+          <select id="f-tipo" value={filtros.subelemento} onChange={(e) => onChange({ subelemento: e.target.value })} className={`${campo} min-w-[220px] max-w-full`}>
+            <option value="">Todos os tipos</option>
+            {gruposTipo.map((g) => (
+              <optgroup key={g.elemento.codigo} label={`${g.elemento.codigo} ${g.elemento.descricao}`}>
+                {g.subs.map((s) => (
+                  <option key={s.codigo} value={s.codigo}>
+                    {s.codigo} {s.descricao}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+            {filtros.subelemento && !tipoNaLista && <option value={filtros.subelemento}>{filtros.subelemento}</option>}
+          </select>
+        </div>
       </div>
 
       {erroIntervalo && (
@@ -121,17 +163,30 @@ export function FiltrosAnalisesBarra({
         </p>
       )}
 
-      {filtros.elemento && (
-        <div>
-          <button
-            type="button"
-            onClick={() => onChange({ elemento: "" })}
-            aria-label={`Tirar o filtro do elemento ${filtros.elemento}`}
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-blue-900 bg-blue-50 px-3 text-xs font-semibold text-blue-900 hover:bg-blue-100"
-          >
-            Elemento: {filtros.elemento}
-            <X aria-hidden="true" className="h-3.5 w-3.5" />
-          </button>
+      {(filtros.elemento || filtros.subelemento) && (
+        <div className="flex flex-wrap gap-2">
+          {filtros.elemento && (
+            <button
+              type="button"
+              onClick={() => onChange({ elemento: "" })}
+              aria-label={`Tirar o filtro do elemento ${filtros.elemento}`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-blue-900 bg-blue-50 px-3 text-xs font-semibold text-blue-900 hover:bg-blue-100"
+            >
+              Elemento: {filtros.elemento}
+              <X aria-hidden="true" className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {filtros.subelemento && (
+            <button
+              type="button"
+              onClick={() => onChange({ subelemento: "" })}
+              aria-label={`Tirar o filtro do tipo ${filtros.subelemento}`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-blue-900 bg-blue-50 px-3 text-xs font-semibold text-blue-900 hover:bg-blue-100"
+            >
+              Tipo: {filtros.subelemento}
+              <X aria-hidden="true" className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       )}
     </section>

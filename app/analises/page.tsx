@@ -13,7 +13,17 @@ import { CartoesAnalises } from "@/components/analises/tela/Cartoes";
 import { ResumoAnalises } from "@/components/analises/tela/Resumo";
 import { GraficosAnalises } from "@/components/analises/tela/Graficos";
 import { PainelDetalhe, type EstadoDetalhe } from "@/components/analises/tela/PainelDetalhe";
-import { consultaDaTela, filtrosDaUrl, montarUrlAnalises, montarUrlOps, recorteDoMes, validarIntervalo, type FiltrosAnalises } from "@/components/analises/tela/url";
+import {
+  ajustarTipo,
+  consultaDaTela,
+  filtrosDaUrl,
+  mesPadrao,
+  montarUrlAnalises,
+  montarUrlOps,
+  recorteDoMes,
+  validarIntervalo,
+  type FiltrosAnalises,
+} from "@/components/analises/tela/url";
 import type { RespostaAnalises, RespostaOps } from "@/components/analises/tela/tipos";
 
 const horaBR = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -87,9 +97,12 @@ function AnalisesTela() {
   const mudarFiltros = (parcial: Partial<FiltrosAnalises>) => {
     setDetalheAberto(null);
     setFiltros((f) => {
-      const novo = { ...f, ...parcial };
+      // B7b: o tipo fixa o elemento; trocar o elemento tira um tipo que não é dele.
+      const novo = { ...f, ...ajustarTipo(f, parcial) };
       // O ano que está na tela fica guardado ao trocar de período.
       if (parcial.periodo && f.ano === null) novo.ano = anoExibido;
+      // "Mês" já abre com um mês: o atual no ano corrente, dezembro nos anteriores.
+      if (novo.periodo === "mes" && novo.mes === null) novo.mes = mesPadrao(novo.ano ?? anoExibido);
       // Intervalo já abre com uma consulta válida: do 1º de janeiro ao fim efetivo.
       if (parcial.periodo === "intervalo" && f.periodo !== "intervalo") {
         const fimEf = resultado?.dados?.periodo.fimEfetivo;
@@ -103,12 +116,13 @@ function AnalisesTela() {
   const abrirMes = (mes: string) => {
     if (!dados) return;
     const r = recorteDoMes(mes, dados.periodo);
-    const urlOps = montarUrlOps({ ...r, base: dados.base, ano: dados.periodo.ano, elemento: dados.elemento });
+    const urlOps = montarUrlOps({ ...r, base: dados.base, ano: dados.periodo.ano, elemento: dados.elemento, subelemento: dados.subelemento });
     const m = dados.meses.find((x) => x.mes === mes);
+    const recorte = dados.subelemento ? ` · tipo ${dados.subelemento}` : dados.elemento ? ` · elemento ${dados.elemento}` : "";
     setDetalheAberto({
       url: urlOps,
       titulo: `${m?.longo ?? mes}/${mes.slice(0, 4)}`,
-      subtitulo: `OPs pagas de ${dataBR(r.inicio)} a ${dataBR(r.fim)} · ${dados.base === "civil" ? "ano civil" : "exercício da NE"}${dados.elemento ? ` · elemento ${dados.elemento}` : ""}`,
+      subtitulo: `OPs pagas de ${dataBR(r.inicio)} a ${dataBR(r.fim)} · ${dados.base === "civil" ? "ano civil" : "exercício da NE"}${recorte}`,
     });
     carregarDetalhe(urlOps);
   };
@@ -212,7 +226,12 @@ function AnalisesTela() {
           <>
             <ResumoAnalises dados={dados} />
             <CartoesAnalises dados={dados} />
-            <GraficosAnalises dados={dados} onSelecionarMes={abrirMes} onSelecionarElemento={(codigo) => mudarFiltros({ elemento: codigo })} />
+            <GraficosAnalises
+              dados={dados}
+              onSelecionarMes={abrirMes}
+              onSelecionarElemento={(codigo) => mudarFiltros({ elemento: codigo })}
+              onSelecionarTipo={(codigo) => mudarFiltros({ subelemento: codigo })}
+            />
             <footer className="flex flex-col gap-1 border-t border-[#c8d1de] pt-4 text-xs leading-relaxed text-[#5b6678]">
               <strong className="text-slate-700">Critérios</strong>
               {dados.criterios.map((c) => (

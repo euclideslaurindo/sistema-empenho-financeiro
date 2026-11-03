@@ -3,7 +3,7 @@ import { getAuthUser, unauthorizedResponse } from '@/lib/auth';
 import { withErrorHandler } from '@/lib/api-handler';
 import { ErroPeriodo, obterAnalises } from '@/lib/services/analises.service';
 
-// GET /api/analises?periodo=s1|s2|ano|intervalo&ano=&inicio=&fim=&base=civil|exercicio&elemento=
+// GET /api/analises?periodo=s1|s2|ano|mes|intervalo&ano=&mes=&inicio=&fim=&base=civil|exercicio&elemento=&subelemento=
 export async function GET(request: NextRequest) {
   return withErrorHandler(async () => {
     const user = await getAuthUser(request);
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     const sp = new URL(request.url).searchParams;
     const entrada = Object.fromEntries(
-      ['periodo', 'ano', 'inicio', 'fim', 'base', 'elemento'].flatMap((k) => {
+      ['periodo', 'ano', 'mes', 'inicio', 'fim', 'base', 'elemento', 'subelemento'].flatMap((k) => {
         const v = sp.get(k);
         return v === null || v.trim() === '' ? [] : [[k, v]];
       })
