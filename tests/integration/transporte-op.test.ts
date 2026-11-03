@@ -49,7 +49,7 @@ function responder(
   if (sql.includes('SELECT id, valor, status, elemento, subelemento FROM notas_empenho')) {
     return [{ id: 'ne-1', valor: '100000.00', status: 'EMITIDO', elemento, subelemento: '' }];
   }
-  if (sql.includes('SELECT elemento, status FROM notas_empenho')) return [{ elemento, status: 'EMITIDO' }];
+  if (sql.includes('SELECT elemento, status, subelemento FROM notas_empenho')) return [{ elemento, status: 'EMITIDO' }];
   if (sql.includes('SELECT COALESCE(SUM(valor_pagamento), 0) as total_pago')) return [{ total_pago: 0 }];
   // T33: o cálculo lê só o Município (Expediente); a `cidade` do endereço não é consultada.
   if (sql.includes('FROM credores')) return [{ municipioExpediente: expediente, is_mei: mei }];

@@ -28,6 +28,7 @@ import {
   informadosValidosDaLinha,
   mascararValorDigitado,
   nomeNaLinha,
+  regraDaTela,
   rotuloCampoDoElemento,
   somarDescontosCents,
   valoresCalculadosDoForm,
@@ -78,6 +79,7 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
   const { n, nomesForm } = useNomesDaLinha(basePath);
   const valorPagamento = useWatch({ control, name: n("valorPagamento") });
   const elemento = useWatch({ control, name: "elemento" });
+  const subelemento = useWatch({ control, name: "subelemento" });
   const camposInformados: string[] = useWatch({ control, name: n("camposInformados") }) || [];
   const credorMei: boolean = !!useWatch({ control, name: n("credorMei") });
   const sobrescreverMei: boolean = !!useWatch({ control, name: n("sobrescreverMei") });
@@ -90,15 +92,25 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
     if (perfilDoElemento(extrairCodigoElemento(elemento)) !== "PADRAO") return;
     const timer = setTimeout(() => {
       const elementoCodigo = extrairCodigoElemento(elemento);
-      const informadosValidos = informadosValidosDaLinha(camposInformados, config, elementoCodigo, perfil, { credorMei, sobrescreverMei });
+      const subelementoCodigo = extrairCodigoElemento(subelemento);
+      const informadosValidos = informadosValidosDaLinha(
+        camposInformados,
+        config,
+        elementoCodigo,
+        perfil,
+        { credorMei, sobrescreverMei },
+        subelementoCodigo
+      );
 
       let resultado;
       try {
         resultado = calcularRetencoes({
           brutoCents: toCents(valorPagamento),
           elementoCodigo,
+          subelementoCodigo,
           config: config.campos,
           regras: config.regras,
+          regrasSubelemento: config.regrasSubelemento,
           informados: informadosEmCentavos((basePath ? getValues(basePath) : getValues()) || {}, informadosValidos),
           perfil,
           credorMei,
@@ -116,7 +128,7 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
     return () => clearTimeout(timer);
     // chaveValores/chaveInformados representam os arrays observados (identidade muda a cada render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [valorPagamento, elemento, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues, n, basePath]);
+  }, [valorPagamento, elemento, subelemento, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues, n, basePath]);
 
   return null;
 }
@@ -390,11 +402,13 @@ function CamposRetencao({ config, perfil, basePath, efeitos }: { config: ConfigR
   const { control } = useFormContext<any>();
   const { n } = useNomesDaLinha(basePath);
   const elemento = useWatch({ control, name: "elemento" });
+  const subelemento = useWatch({ control, name: "subelemento" });
   const previaAvisos: string[] = useWatch({ control, name: n("previaAvisos") }) || [];
   const credorMei: boolean = !!useWatch({ control, name: n("credorMei") });
   const sobrescreverMei: boolean = !!useWatch({ control, name: n("sobrescreverMei") });
   const elementoCodigo = extrairCodigoElemento(elemento);
-  const elementoConhecido = elementoCodigo !== null && config.regras[elementoCodigo] !== undefined;
+  const regra = regraDaTela(config, elementoCodigo, extrairCodigoElemento(subelemento));
+  const elementoConhecido = regra.codigo !== null && regra.regras[regra.codigo] !== undefined;
   const transporte = perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO";
 
   const campos = config.campos
@@ -423,6 +437,15 @@ function CamposRetencao({ config, perfil, basePath, efeitos }: { config: ConfigR
           <AlertTriangle className="w-4 h-4" /> Elemento da NE não cadastrado nas regras de retenção: nenhuma retenção é
           calculada automaticamente.
         </p>
+      ) : regra.origem === "subelemento" && regra.regras[regra.codigo as string].length === 0 ? (
+        <p role="status" className="mb-6 flex items-center gap-2 text-sm font-semibold text-emerald-700">
+          <ShieldCheck className="w-4 h-4" /> Subelemento {regra.codigo}: sem retenções nem descontos tributários, conforme a
+          regra própria do subelemento.
+        </p>
+      ) : regra.origem === "subelemento" ? (
+        <p className="mb-6 text-sm font-semibold text-slate-500">
+          Retenções conforme a regra própria do subelemento {regra.codigo}. A patronal é informativa e não entra no total.
+        </p>
       ) : (
         <p className="mb-6 text-sm font-semibold text-slate-500">
           Retenções conforme a configuração do elemento {elementoCodigo}. A patronal é informativa e não entra no total.
@@ -431,7 +454,7 @@ function CamposRetencao({ config, perfil, basePath, efeitos }: { config: ConfigR
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {campos.map((cfg) => {
-          const estado = estadoCampoOp(cfg, elementoCodigo, config.regras, perfil, { credorMei, sobrescreverMei });
+          const estado = estadoCampoOp(cfg, regra.codigo, regra.regras, perfil, { credorMei, sobrescreverMei });
           return (
             <CampoRetencaoInput
               key={cfg.campo}

@@ -63,6 +63,7 @@ function banco({
   valorNe = '100.00',
   statusNe = 'EMITIDO',
   historicoNe = 'Transporte escolar EJA Campo',
+  subelementoNe = 'Locação',
   opsAntes = [] as Array<Partial<Op>>,
   falharInsert = null as null | ((n: number, params: any[]) => any),
 } = {}) {
@@ -96,7 +97,7 @@ function banco({
         if (sql.includes('INSERT INTO auditoria_financeira')) { auditorias.push(params); return [{ affectedRows: 1 }]; }
         if (sql.startsWith('UPDATE notas_empenho SET status')) { status = params[0]; statusGravados.push(params[0]); return [{ affectedRows: 1 }]; }
         if (sql.includes('unidade_orcamentaria, gestao, historico FROM notas_empenho')) {
-          return [[{ id: 'ne-uuid-1', valor: valorNe, status, elemento: '3.3.90.36 - Serviços PF', subelemento: 'Locação', unidade_orcamentaria: 'Educação', gestao: '140101', historico: historicoNe }]];
+          return [[{ id: 'ne-uuid-1', valor: valorNe, status, elemento: '3.3.90.36 - Serviços PF', subelemento: subelementoNe, unidade_orcamentaria: 'Educação', gestao: '140101', historico: historicoNe }]];
         }
         if (sql.includes('SELECT valor, status FROM notas_empenho')) return [[{ valor: valorNe, status }]];
         if (sql.includes('as total_pago')) return [[{ total_pago: daNe(params[0]).reduce((t, o) => t + o.valor_pagamento, 0) }]];
@@ -294,6 +295,14 @@ describe('POST /api/ordens-pagamento/lote', () => {
     expect(body.ops.map((o: any) => o.sub)).toEqual(['01', '02', '03']);
   });
 
+  test('B7a: cada OP calcula com o subelemento da NE (regra própria dos estagiários)', async () => {
+    banco({ subelementoNe: '3.3.90.36.08 - Estagiários - Pagamento Direto' });
+    expect((await emitir(corpo(TRES))).status).toBe(201);
+    const calls = (calcularRetencoesDaOp as any).mock.calls;
+    expect(calls).toHaveLength(3);
+    for (const c of calls) expect(c[1]).toMatchObject({ elementoCodigo: '3.3.90.36', subelementoCodigo: '3.3.90.36.08' });
+  });
+
   test('NE inexistente 404; cancelada 409', async () => {
     (withTransaction as any).mockImplementation(async (cb: any) => cb({ execute: vi.fn(async () => [[]]) }));
     expect((await emitir(corpo(TRES))).status).toBe(404);
@@ -353,6 +362,19 @@ describe('POST /api/ordens-pagamento/previa-lote', () => {
     const calls = (calcularRetencoesDaOp as any).mock.calls;
     expect(calls[1][1]).toMatchObject({ credorCpfCnpj: '333.333.333-33', dataPagamento: '2026-11-05', elementoCodigo: '3.3.90.33', brutoCents: 2000 });
     expect(calls[0][2]).toBe(calls[1][2]);
+  });
+
+  test('B7a: a prévia do lote repassa o subelemento da NE', async () => {
+    (query as any).mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM notas_empenho')) return [{ elemento: '3.3.90.36 - PF', status: 'EMITIDO', subelemento: '3.3.90.36.08 - Estagiários' }];
+      if (sql.includes('FROM credores')) {
+        const alvo = new Set(params.map((p: string) => String(p).replace(/\D/g, '')));
+        return CADASTRO.filter((c) => alvo.has(c.cpf_cnpj.replace(/\D/g, '')));
+      }
+      return [];
+    });
+    await chamar(postPrevia, corpo([{ indice: 0, ...TRES[0] }]));
+    expect((calcularRetencoesDaOp as any).mock.calls[0][1]).toMatchObject({ elementoCodigo: '3.3.90.36', subelementoCodigo: '3.3.90.36.08' });
   });
 
   test('a prévia bate com o que o lote grava para a mesma linha', async () => {

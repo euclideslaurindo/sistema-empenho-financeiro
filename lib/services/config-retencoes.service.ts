@@ -2,6 +2,10 @@ import { query, withTransaction } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
 import { configRetencoesSchema } from '@/lib/schemas';
 import { ConfigRetencaoDB, ElementoRetencaoDB } from '@/lib/types/db';
+import { z } from 'zod';
+import { CAMPOS_TRIBUTARIOS, type CampoTributario } from '@/lib/retencoes';
+import { codigoDoElementoPai } from '@/lib/elementos';
+import { perfilDoElemento } from '@/lib/perfis-calculo';
 
 export type ServiceResult<T = any> =
   | { success: true; data: T; status?: number }
@@ -56,6 +60,37 @@ async function montarRegras(conn: PoolConnection | undefined): Promise<Record<st
   return regras;
 }
 
+/** A migration_20 ainda não rodou: sem a tabela, todo subelemento segue o elemento. */
+const semTabela = (e: any) => e?.code === 'ER_NO_SUCH_TABLE' || e?.errno === 1146;
+
+/** Transporte (3.3.90.33) tem cálculo próprio: subelemento dele não tem regra própria (R5). */
+export function subelementoAceitaRegraPropria(subelementoCodigo: string): boolean {
+  return perfilDoElemento(codigoDoElementoPai(subelementoCodigo)) !== 'TRANSPORTE_AUTONOMO';
+}
+
+/** "irrf, iss" → ['irrf', 'iss'], na ordem dos tributários; '' → [] (nenhuma retenção). */
+export function camposDoTexto(texto: string | null | undefined): CampoTributario[] {
+  const lidos = new Set(String(texto ?? '').split(',').map((c) => c.trim()));
+  return CAMPOS_TRIBUTARIOS.filter((c) => lidos.has(c));
+}
+
+/** B7a: regras próprias por subelemento (subelemento_retencoes). Tabela inexistente → {}. */
+export async function montarRegrasSubelemento(conn: PoolConnection | undefined): Promise<Record<string, string[]>> {
+  let rows: { subelemento_codigo: string; campos: string | null }[];
+  try {
+    rows = await executar(conn, 'SELECT subelemento_codigo, campos FROM subelemento_retencoes');
+  } catch (e) {
+    if (semTabela(e)) return {};
+    throw e;
+  }
+  const regras: Record<string, string[]> = {};
+  for (const r of Array.isArray(rows) ? rows : []) {
+    if (!subelementoAceitaRegraPropria(r.subelemento_codigo)) continue;
+    regras[r.subelemento_codigo] = camposDoTexto(r.campos);
+  }
+  return regras;
+}
+
 export async function obterConfigRetencoes(conn?: PoolConnection) {
   const camposRows = await executar<ConfigRetencaoDB[]>(conn, 'SELECT * FROM config_retencoes ORDER BY ordem');
   const regras = await montarRegras(conn);
@@ -64,12 +99,89 @@ export async function obterConfigRetencoes(conn?: PoolConnection) {
     'SELECT MAX(updated_at) as versao FROM config_retencoes'
   );
   const versao = versaoRow[0]?.versao ? new Date(versaoRow[0].versao).toISOString() : new Date(0).toISOString();
+  // Por último: a tabela da migration_20 pode não existir (vira {}).
+  const regrasSubelemento = await montarRegrasSubelemento(conn);
 
   return {
     campos: camposRows.map(mapCampo),
     regras,
+    regrasSubelemento,
     versao,
   };
+}
+
+export const regraSubelementoSchema = z.object({
+  subelementoCodigo: z.string().trim().regex(/^\d(?:\.\d+){4,}$/, 'Código de subelemento inválido.'),
+  /** null = sem regra própria (segue o elemento); [] = nenhuma retenção. */
+  campos: z
+    .array(z.enum(CAMPOS_TRIBUTARIOS as [CampoTributario, ...CampoTributario[]]))
+    .max(CAMPOS_TRIBUTARIOS.length)
+    .nullable(),
+});
+
+/**
+ * B7a: grava (ou tira) a regra própria de um subelemento. Só o Admin; o
+ * subelemento tem que existir e não pode ser do transporte. Auditoria com o
+ * antes e o depois (null = seguia/segue o elemento).
+ */
+export async function salvarRegraSubelemento(
+  body: unknown,
+  usuarioId: string,
+  perfil: string
+): Promise<ServiceResult<{ subelementoCodigo: string; campos: string[] | null }>> {
+  if (perfil !== 'ADMIN') {
+    return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+  }
+  const parsed = regraSubelementoSchema.parse(body); // ZodError -> 400
+  const codigo = parsed.subelementoCodigo;
+  const novo = parsed.campos === null ? null : CAMPOS_TRIBUTARIOS.filter((c) => parsed.campos!.includes(c));
+
+  if (!subelementoAceitaRegraPropria(codigo)) {
+    return { success: false, error: 'Subelemento de transporte (3.3.90.33) tem cálculo próprio e não aceita regra por subelemento.', status: 400 };
+  }
+
+  try {
+    await withTransaction(async (conn) => {
+      const sub = await executar<{ codigo: string }[]>(conn, 'SELECT codigo FROM subelementos_despesa WHERE codigo = ?', [codigo]);
+      if (!sub || sub.length === 0) throw { status: 400, error: `Subelemento "${codigo}" não encontrado.` };
+
+      const atual = await executar<{ campos: string | null }[]>(
+        conn,
+        'SELECT campos FROM subelemento_retencoes WHERE subelemento_codigo = ? FOR UPDATE',
+        [codigo]
+      );
+      const antes = atual && atual.length > 0 ? camposDoTexto(atual[0].campos) : null;
+      if (JSON.stringify(antes) === JSON.stringify(novo)) return;
+
+      if (novo === null) {
+        await executar(conn, 'DELETE FROM subelemento_retencoes WHERE subelemento_codigo = ?', [codigo]);
+      } else {
+        await executar(
+          conn,
+          `INSERT INTO subelemento_retencoes (subelemento_codigo, campos, atualizado_por) VALUES (?, ?, ?)
+           ON DUPLICATE KEY UPDATE campos = VALUES(campos), atualizado_por = VALUES(atualizado_por)`,
+          [codigo, novo.join(','), usuarioId]
+        );
+      }
+      await executar(
+        conn,
+        `INSERT INTO auditoria_financeira (id, entidade, entidade_id, acao, dados_anteriores, dados_novos, usuario_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [crypto.randomUUID(), 'subelemento_retencoes', codigo, 'UPDATE', JSON.stringify({ campos: antes }), JSON.stringify({ campos: novo }), usuarioId]
+      );
+    });
+  } catch (error: any) {
+    if (semTabela(error)) {
+      return {
+        success: false,
+        error: 'A tabela de regras por subelemento ainda não existe. Rode a migration_20 no banco para poder salvar.',
+        status: 409,
+      };
+    }
+    if (error.status && error.error) return { success: false, error: error.error, status: error.status };
+    throw error;
+  }
+  return { success: true, data: { subelementoCodigo: codigo, campos: novo } };
 }
 
 export async function salvarConfigRetencoes(body: any, usuarioId: string | null): Promise<ServiceResult<null>> {

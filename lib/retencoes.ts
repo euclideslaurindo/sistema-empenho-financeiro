@@ -24,6 +24,10 @@ export interface EntradaCalculo {
   elementoCodigo: string | null;
   config: ConfigRetencaoCampoMapeado[];
   regras: Record<string, string[]>;
+  /** B7a: código do subelemento da NE (ex.: "3.3.90.36.08"); null/ausente = sem subelemento. */
+  subelementoCodigo?: string | null;
+  /** B7a: regras próprias por subelemento (subelemento_retencoes); [] = nenhuma retenção. */
+  regrasSubelemento?: Record<string, string[]>;
   // Partial de propósito: a AUSÊNCIA de uma chave significa "o operador não
   // tocou nesse campo", diferente de presente-com-zero. O chamador (serviço)
   // só deve incluir uma chave se o valor realmente veio do payload do
@@ -56,6 +60,35 @@ export const avisosMei = (credorMei: boolean, sobrescrever: boolean): string[] =
       ? ["Credor MEI: retenção aplicada manualmente pelo ADMIN."]
       : ["Credor MEI: isento de retenções."];
 
+export interface RegraDaOp {
+  /** Código cuja regra vale: o do subelemento (regra própria) ou o do elemento. */
+  codigo: string | null;
+  /** Campos tributários que se aplicam; undefined = elemento desconhecido. */
+  campos: string[] | undefined;
+  origem: "subelemento" | "elemento";
+}
+
+/**
+ * B7a: qual regra de retenções vale para a OP. O subelemento com regra
+ * própria substitui a do elemento (lista vazia = nenhuma retenção); sem
+ * regra própria, vale a do elemento, como sempre. O subelemento só conta se
+ * for mesmo do elemento da NE ("3.3.90.36.08" é do "3.3.90.36").
+ * Pura: o servidor e a prévia da tela usam a mesma.
+ */
+export function regraDaOp(
+  elementoCodigo: string | null,
+  subelementoCodigo: string | null | undefined,
+  regras: Record<string, string[]>,
+  regrasSubelemento: Record<string, string[]> | undefined
+): RegraDaOp {
+  const propria =
+    elementoCodigo && subelementoCodigo && subelementoCodigo.startsWith(`${elementoCodigo}.`)
+      ? regrasSubelemento?.[subelementoCodigo]
+      : undefined;
+  if (propria !== undefined) return { codigo: subelementoCodigo as string, campos: propria, origem: "subelemento" };
+  return { codigo: elementoCodigo, campos: elementoCodigo !== null ? regras[elementoCodigo] : undefined, origem: "elemento" };
+}
+
 export interface ResultadoCalculo {
   itens: Record<string, number>; // centavos, uma chave por um dos 8 campos
   totalDescontosCents: number;
@@ -83,8 +116,9 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
   const avisos: string[] = [];
   const itens: Record<string, number> = {};
   const configPorCampo = new Map(config.map((c) => [c.campo, c]));
-  const camposAplicaveis = elementoCodigo !== null ? regras[elementoCodigo] : undefined;
-  const elementoDesconhecido = elementoCodigo === null || camposAplicaveis === undefined;
+  const regra = regraDaOp(elementoCodigo, entrada.subelementoCodigo, regras, entrada.regrasSubelemento);
+  const camposAplicaveis = regra.campos;
+  const elementoDesconhecido = camposAplicaveis === undefined;
 
   const sobrescreverMei = !!entrada.credorMei && !!entrada.sobrescreverMei && perfil === "ADMIN";
   if (entrada.credorMei) {
@@ -174,6 +208,9 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
   const tributarios = CAMPOS_TRIBUTARIOS as string[];
   const snapshot = {
     elemento: elementoCodigo,
+    subelemento: entrada.subelementoCodigo ?? null,
+    origemRegra: regra.origem,
+    regraCodigo: regra.codigo,
     ...(entrada.credorMei ? { mei: true } : {}),
     ...(sobrescreverMei ? { mei_sobrescrito: true } : {}),
     campos: Object.fromEntries(
