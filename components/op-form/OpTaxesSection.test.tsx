@@ -44,7 +44,7 @@ function comCampo(campo: string, mudancas: Partial<ConfigRetencaoCampo>): Config
 function renderSecao({
   perfil = 'GESTOR',
   config = CONFIG,
-  elemento = '3.3.90.36 - Serviços de terceiros PF',
+  elemento = '3.3.90.39 - Serviços de terceiros PJ',
   valorPagamento = '1.000,00',
 }: { perfil?: string; config?: ConfigRetencoes | null; elemento?: string; valorPagamento?: string } = {}) {
   const ref: { methods?: UseFormReturn<any> } = {};
@@ -73,7 +73,7 @@ const liquido = () => screen.getByTestId('resumo-liquido').textContent;
 const descontos = () => screen.getByTestId('resumo-descontos').textContent;
 
 describe('OpTaxesSection — casos do README (paridade com o servidor)', () => {
-  test('Caso A: 1.000,00 no .36 -> líquido 800,00 (patronal informativa)', async () => {
+  test('Caso A: 1.000,00 no .39 -> líquido 800,00 (patronal informativa)', async () => {
     renderSecao();
     await waitFor(() => expect(liquido()).toBe('R$ 800,00'));
     expect(input('IRRF (1,5%)').value).toBe('15,00');
@@ -84,7 +84,7 @@ describe('OpTaxesSection — casos do README (paridade com o servidor)', () => {
     expect(descontos()).toBe('- R$ 200,00');
   });
 
-  test('Caso B: 665,00 no .36 -> arredondamento do 3º decimal, líquido 531,99', async () => {
+  test('Caso B: 665,00 no .39 -> arredondamento do 3º decimal, líquido 531,99', async () => {
     renderSecao({ valorPagamento: '665,00' });
     await waitFor(() => expect(liquido()).toBe('R$ 531,99'));
     expect(input('IRRF (1,5%)').value).toBe('9,98');
@@ -122,7 +122,7 @@ describe('OpTaxesSection — casos do README (paridade com o servidor)', () => {
     expect(descontos()).toBe('- R$ 141,51');
   });
 
-  test('Caso F: 11,00 no .36 -> IRRF 0,17', async () => {
+  test('Caso F: 11,00 no .39 -> IRRF 0,17', async () => {
     renderSecao({ valorPagamento: '11,00' });
     await waitFor(() => expect(input('IRRF (1,5%)').value).toBe('0,17'));
   });
@@ -295,7 +295,7 @@ describe('OpTaxesSection — transporte autônomo (3.3.90.33, T25)', () => {
   });
 
   test('elemento padrão não chama a prévia (continua calculando no navegador)', async () => {
-    renderTransporte({ elemento: '3.3.90.36 - Outros', valorPagamento: '1.000,00' });
+    renderTransporte({ elemento: '3.3.90.39 - Outros', valorPagamento: '1.000,00' });
     await waitFor(() => expect(liquido()).toBe('R$ 800,00'));
     expect(apiClient.post).not.toHaveBeenCalled();
   });
@@ -308,7 +308,7 @@ describe('OpTaxesSection — credor MEI (T26)', () => {
       const methods = useForm<any>({
         defaultValues: {
           valorPagamento: '1.000,00',
-          elemento: '3.3.90.36 - Serviços',
+          elemento: '3.3.90.39 - Serviços',
           irrf: '', iss: '', inss: '', patronal: '', sestSenat: '', outrosDescontos: '', taxaBancaria: '', taxaPix: '',
           camposInformados: [],
           credorMei: true,

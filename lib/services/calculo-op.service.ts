@@ -2,6 +2,7 @@ import { query } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
 import { calcularRetencoes, type CampoDesconto, type CampoTributario, type ResultadoCalculo } from '@/lib/retencoes';
 import { calcularTransporteAutonomo } from '@/lib/retencoes-transporte';
+import type { DadosPessoaFisica, ParametrosPessoaFisica } from '@/lib/irrf-pessoa-fisica';
 import { normalizarMunicipio, perfilDoElemento, type PerfilCalculo } from '@/lib/perfis-calculo';
 import { obterConfigRetencoes, type ConfigRetencaoCampoMapeado } from '@/lib/services/config-retencoes.service';
 import {
@@ -55,8 +56,8 @@ export interface ResultadoCalculoOp {
 
 /**
  * Um só caminho para salvar a OP e para a prévia do formulário: lê a config,
- * o credor (município e MEI) e, no 3.3.90.33, os parâmetros do transporte
- * pela vigência da OP. Com `conn`, roda dentro da transação da OP.
+ * o credor (município e MEI) e, no 3.3.90.33 (transporte) e no 3.3.90.36
+ * (pessoa física, B8), os parâmetros e a tabela do IRRF pela vigência da OP. Com `conn`, roda dentro da transação da OP.
  */
 export async function calcularRetencoesDaOp(
   conn: PoolConnection | undefined,
@@ -106,6 +107,19 @@ export async function calcularRetencoesDaOp(
     return { resultado, configCampos: campos, perfilCalculo };
   }
 
+  // B8: 3.3.90.36 — INSS com teto e IRRF progressivo, pela vigência da OP.
+  let pessoaFisica: DadosPessoaFisica | undefined;
+  if (perfilCalculo === 'PESSOA_FISICA') {
+    const data = dataReferenciaDaOp(e.dataPagamento, e.dataEmissao);
+    const [{ parametros, vigencia }, { faixas, vigencia: vigenciaIrrf }] = await Promise.all([
+      cache.memo(`parametros|${perfilCalculo}|${data}`, () =>
+        obterParametrosVigentes<ParametrosPessoaFisica>(conn, perfilCalculo, data)
+      ),
+      cache.memo(`irrf|${data}`, () => obterFaixasIrrfVigentes(conn, data)),
+    ]);
+    pessoaFisica = { parametros, faixas, vigencia, vigenciaIrrf };
+  }
+
   const resultado = calcularRetencoes({
     brutoCents: e.brutoCents,
     elementoCodigo: e.elementoCodigo,
@@ -117,6 +131,7 @@ export async function calcularRetencoesDaOp(
     perfil: e.perfilUsuario,
     credorMei,
     sobrescreverMei: e.sobrescreverMei,
+    pessoaFisica,
   });
   return { resultado, configCampos: campos, perfilCalculo };
 }

@@ -52,9 +52,10 @@ function entrada(brutoReais: number, municipio: string | null, over: Partial<Ent
 const reais = (r: ReturnType<typeof calcularTransporteAutonomo>, campo: string) => (r.itens[campo] ?? 0) / 100;
 
 describe('perfil e município', () => {
-  test('só o 3.3.90.33 é transporte', () => {
+  test('só o 3.3.90.33 é transporte; o 3.3.90.36 é pessoa física (B8)', () => {
     expect(perfilDoElemento('3.3.90.33')).toBe('TRANSPORTE_AUTONOMO');
-    expect(perfilDoElemento('3.3.90.36')).toBe('PADRAO');
+    expect(perfilDoElemento('3.3.90.36')).toBe('PESSOA_FISICA');
+    expect(perfilDoElemento('3.3.90.39')).toBe('PADRAO');
     expect(perfilDoElemento(null)).toBe('PADRAO');
   });
   test('normalizarMunicipio', () => {

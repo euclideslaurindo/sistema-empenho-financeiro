@@ -186,7 +186,7 @@ describe('POST /api/ordens-pagamento/previa', () => {
   });
 
   test('elemento padrão também funciona (perfil PADRAO)', async () => {
-    (query as any).mockImplementation(async (sql: string) => responder(sql, { elemento: '3.3.90.36 - Outros' }));
+    (query as any).mockImplementation(async (sql: string) => responder(sql, { elemento: '3.3.90.39 - Outros' }));
     const { status, body } = await chamar({ numeroEmpenho: 'NE-1', credorCpfCnpj: '111', valorPagamento: 1000 });
     expect(status).toBe(200);
     expect(body.perfil).toBe('PADRAO');
@@ -248,9 +248,9 @@ describe('Município (Expediente) define a taxa de expediente do 3.3.90.33 (T33)
     expect(r.avisos.join(' ')).toContain('Município de expediente sem cadastro de ISS');
   });
 
-  test('em outro elemento (.36) o expediente não muda nada', async () => {
-    const com = await calcular('Canhotinho', '3.3.90.36');
-    const sem = await calcular(null, '3.3.90.36');
+  test('em outro elemento (.39) o expediente não muda nada', async () => {
+    const com = await calcular('Canhotinho', '3.3.90.39');
+    const sem = await calcular(null, '3.3.90.39');
     expect(com.itens).toEqual(sem.itens);
     expect(com.totalDescontosCents).toBe(sem.totalDescontosCents);
   });

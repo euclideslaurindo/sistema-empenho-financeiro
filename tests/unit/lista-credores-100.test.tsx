@@ -15,7 +15,7 @@ vi.mock('@/lib/api-client', () => ({ apiClient: { get: vi.fn(async () => ({ cred
 
 const CONFIG: ConfigRetencoes = {
   campos: [{ campo: 'irrf', rotulo: 'IRRF', tipo: 'PERCENTUAL', aliquota: 1.5, calculoAutomatico: true, editavelOperador: false, entraDarf: false, ativo: true, ordem: 10 }],
-  regras: { '3.3.90.36': ['irrf'] },
+  regras: { '3.3.90.39': ['irrf'] },
   versao: 'x',
 };
 
@@ -25,7 +25,7 @@ const CEM: CredorLinha[] = Array.from({ length: 100 }, (_, i) => ({
 }));
 
 function Tela() {
-  const methods = useForm<any>({ defaultValues: { neCarregada: 'NE-1', elemento: '3.3.90.36 - Serviços', dataEmissao: '2026-10-19', credores: CEM } });
+  const methods = useForm<any>({ defaultValues: { neCarregada: 'NE-1', elemento: '3.3.90.39 - Serviços', dataEmissao: '2026-10-19', credores: CEM } });
   const { fields, remove } = useFieldArray({ control: methods.control, name: 'credores' });
   return (
     <FormProvider {...methods}>

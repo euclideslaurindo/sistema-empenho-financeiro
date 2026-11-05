@@ -17,7 +17,7 @@ const CONFIG: ConfigRetencoes = {
     campo, rotulo: campo.toUpperCase(), tipo: 'PERCENTUAL' as const, aliquota: 1, calculoAutomatico: true,
     editavelOperador: false, entraDarf: false, ativo: true, ordem: i,
   })),
-  regras: { '3.3.90.33': ['irrf', 'iss', 'inss', 'patronal', 'sest_senat'], '3.3.90.36': ['irrf'] },
+  regras: { '3.3.90.33': ['irrf', 'iss', 'inss', 'patronal', 'sest_senat'], '3.3.90.39': ['irrf'] },
   versao: 'x',
 };
 
@@ -76,7 +76,7 @@ describe('PreviaLoteEffect', () => {
   });
 
   test('outro elemento: não chama o servidor (cálculo local)', async () => {
-    renderLista([linha('111', '100,00')], '3.3.90.36 - Serviços');
+    renderLista([linha('111', '100,00')], '3.3.90.39 - Serviços');
     await new Promise((r) => setTimeout(r, 40));
     expect(apiClient.post).not.toHaveBeenCalled();
   });

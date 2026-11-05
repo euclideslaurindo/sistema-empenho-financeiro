@@ -144,9 +144,14 @@ export function somarDescontosCents(valores: Record<string, unknown>, excluir: C
  */
 export const camposInformativos = (_elementoCodigo?: string | null): CampoRetencao[] => [...CAMPOS_INFORMATIVOS];
 
-/** No transporte os percentuais incidem sobre bases diferentes: rótulo sem "%". */
+/**
+ * No transporte os percentuais incidem sobre bases diferentes: rótulo sem "%".
+ * Na pessoa física (B8) o IRRF é pela tabela progressiva, não um percentual.
+ */
 export function rotuloCampoDoElemento(cfg: ConfigRetencaoCampoMapeado, elementoCodigo: string | null): string {
-  if (perfilDoElemento(elementoCodigo) !== "TRANSPORTE_AUTONOMO") return rotuloCampo(cfg);
+  const perfil = perfilDoElemento(elementoCodigo);
+  if (perfil === "PESSOA_FISICA" && cfg.campo === "irrf") return `${cfg.rotulo} (tabela progressiva)`;
+  if (perfil !== "TRANSPORTE_AUTONOMO") return rotuloCampo(cfg);
   return cfg.campo === "patronal" ? `${cfg.rotulo} (informativa)` : cfg.rotulo;
 }
 

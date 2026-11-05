@@ -13,7 +13,7 @@ vi.mock('@/hooks/use-retencoes-config', () => ({
         { campo: 'irrf', rotulo: 'IRRF', tipo: 'PERCENTUAL', aliquota: 1.5, calculoAutomatico: true, editavelOperador: false, entraDarf: false, ativo: true, ordem: 10 },
         { campo: 'taxa_bancaria', rotulo: 'Taxa bancária (expediente)', tipo: 'VALOR_DIGITADO', aliquota: null, calculoAutomatico: false, editavelOperador: true, entraDarf: false, ativo: true, ordem: 70 },
       ],
-      regras: { '3.3.90.36': ['irrf'] },
+      regras: { '3.3.90.39': ['irrf'] },
       versao: 'x',
     },
     elementos: [],
@@ -29,7 +29,7 @@ import OrdemPagamento from '@/app/ordem-pagamento/page';
 
 const NE = {
   id: 'ne-1', numero: '2026NE000001', valor: '100.00', status: 'EMITIDO', historico: 'Transporte escolar',
-  unidadeOrcamentaria: 'Educação', gestao: '140101', elemento: '3.3.90.36 - Serviços PF', subelemento: 'Locação',
+  unidadeOrcamentaria: 'Educação', gestao: '140101', elemento: '3.3.90.39 - Serviços PJ', subelemento: 'Locação',
   saldo: { valor: 100, gasto: 10, restante: 90, percentualGasto: 10, qtdOps: 1 },
 };
 const OUTRA_NE = { ...NE, id: 'ne-2', numero: '2026NE000002' };

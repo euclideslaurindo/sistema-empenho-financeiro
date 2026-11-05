@@ -3,8 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Save } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
-import { CHAVES_TRANSPORTE } from "@/lib/retencoes-transporte";
-import { ROTULOS_PARAMETROS, diffParametros, validarParametrosTransporte, valorDoParametro } from "@/lib/transporte-admin";
+import {
+  definicaoDoPerfil,
+  diffParametros,
+  validarParametrosTransporte,
+  valorDoParametro,
+  type PerfilParametros,
+} from "@/lib/transporte-admin";
 import ConfirmarDiffDialog from "@/components/admin/ConfirmarDiffDialog";
 import { formatarData, motivoSoLeitura, paraCampo, type ListaParametros } from "@/components/admin/transporte-tipos";
 
@@ -12,14 +17,22 @@ interface Props {
   dados: ListaParametros;
   onSalvo: () => void;
   onDirtyChange: (dirty: boolean) => void;
+  /** B8: o mesmo editor serve aos parâmetros da pessoa física (3.3.90.36). */
+  perfil?: PerfilParametros;
 }
 
-const NOVA = "__nova__";
-const valoresDe = (p: Record<string, string> | undefined) =>
-  Object.fromEntries(CHAVES_TRANSPORTE.map((c) => [c, paraCampo(p?.[c])])) as Record<string, string>;
+const DO_PERFIL: Record<PerfilParametros, { endpoint: string; salvo: string; prefixo: string }> = {
+  TRANSPORTE_AUTONOMO: { endpoint: "/api/configuracoes/calculo-transporte", salvo: "Parâmetros do transporte salvos.", prefixo: "param" },
+  PESSOA_FISICA: { endpoint: "/api/configuracoes/calculo-pessoa-fisica", salvo: "Parâmetros da pessoa física salvos.", prefixo: "pf-param" },
+};
 
+const NOVA = "__nova__";
 /** Quem usa remonta o componente (key) quando os dados são recarregados. */
-export default function TransporteParametros({ dados, onSalvo, onDirtyChange }: Props) {
+export default function TransporteParametros({ dados, onSalvo, onDirtyChange, perfil = "TRANSPORTE_AUTONOMO" }: Props) {
+  const { chaves, rotulos } = definicaoDoPerfil(perfil);
+  const { endpoint, salvo, prefixo } = DO_PERFIL[perfil];
+  const valoresDe = (p: Record<string, string> | undefined) =>
+    Object.fromEntries(chaves.map((c) => [c, paraCampo(p?.[c])])) as Record<string, string>;
   const inicial = dados.atual ?? dados.vigencias.at(-1)?.vigenteDe ?? NOVA;
   const valoresDaVigencia = (vigenteDe: string) =>
     valoresDe(
@@ -47,8 +60,8 @@ export default function TransporteParametros({ dados, onSalvo, onDirtyChange }: 
   const vigencia = dados.vigencias.find((v) => v.vigenteDe === selecionada);
   const editavel = nova || !!vigencia?.editavel;
   const somenteLeitura = !nova && vigencia ? motivoSoLeitura(vigencia, dados.hoje) : null;
-  const erros = useMemo(() => (editavel ? validarParametrosTransporte(valores) : []), [editavel, valores]);
-  const mudancas = useMemo(() => diffParametros(original, valores), [original, valores]);
+  const erros = useMemo(() => (editavel ? validarParametrosTransporte(valores, perfil) : []), [editavel, valores, perfil]);
+  const mudancas = useMemo(() => diffParametros(original, valores, perfil), [original, valores, perfil]);
   const dirty = editavel && (nova || mudancas.length > 0);
 
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
@@ -72,11 +85,11 @@ export default function TransporteParametros({ dados, onSalvo, onDirtyChange }: 
   const confirmar = async () => {
     setSalvando(true);
     try {
-      await apiClient.put("/api/configuracoes/calculo-transporte", {
+      await apiClient.put(endpoint, {
         vigenteDe: nova ? novaData : selecionada,
-        parametros: Object.fromEntries(CHAVES_TRANSPORTE.map((c) => [c, valorDoParametro(c, valores[c])])),
+        parametros: Object.fromEntries(chaves.map((c) => [c, valorDoParametro(c, valores[c])])),
       });
-      toast.success("Parâmetros do transporte salvos.");
+      toast.success(salvo);
       setDiff(null);
       onSalvo();
     } catch (err: any) {
@@ -91,11 +104,11 @@ export default function TransporteParametros({ dados, onSalvo, onDirtyChange }: 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
         <h2 className="text-lg font-bold text-slate-800">Parâmetros do cálculo</h2>
         <div className="flex items-center gap-2">
-          <label htmlFor="param-vigencia" className="text-xs font-black text-slate-500 uppercase tracking-widest">
+          <label htmlFor={`${prefixo}-vigencia`} className="text-xs font-black text-slate-500 uppercase tracking-widest">
             Vigência
           </label>
           <select
-            id="param-vigencia"
+            id={`${prefixo}-vigencia`}
             value={selecionada}
             onChange={(e) => abrir(e.target.value)}
             className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold"
@@ -122,11 +135,11 @@ export default function TransporteParametros({ dados, onSalvo, onDirtyChange }: 
 
       {nova && (
         <div className="mb-6 max-w-xs">
-          <label htmlFor="param-nova-data" className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
+          <label htmlFor={`${prefixo}-nova-data`} className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
             Vale a partir de
           </label>
           <input
-            id="param-nova-data"
+            id={`${prefixo}-nova-data`}
             type="date"
             min={dados.hoje}
             value={novaData}
@@ -139,13 +152,13 @@ export default function TransporteParametros({ dados, onSalvo, onDirtyChange }: 
       {somenteLeitura && <p className="mb-6 text-sm font-bold text-amber-700">{somenteLeitura}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {CHAVES_TRANSPORTE.map((chave) => (
+        {chaves.map((chave) => (
           <div key={chave}>
-            <label htmlFor={`param-${chave}`} className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
-              {ROTULOS_PARAMETROS[chave].rotulo}
+            <label htmlFor={`${prefixo}-${chave}`} className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
+              {rotulos[chave].rotulo}
             </label>
             <input
-              id={`param-${chave}`}
+              id={`${prefixo}-${chave}`}
               type="text"
               inputMode="decimal"
               value={valores[chave] ?? ""}
