@@ -15,7 +15,7 @@ import { maskCurrency } from "@/lib/utils";
 import { toCents, formatarBRL } from "@/lib/money";
 import { extrairCodigoElemento } from "@/lib/elementos";
 import { calcularRetencoes, CAMPOS_TRIBUTARIOS } from "@/lib/retencoes";
-import { perfilDoElemento } from "@/lib/perfis-calculo";
+import { calculoNoServidor, perfilDoElemento } from "@/lib/perfis-calculo";
 import { apiClient } from "@/lib/api-client";
 import {
   CAMPO_FORM,
@@ -88,7 +88,7 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
   const chaveInformados = camposInformados.join("|");
 
   useEffect(() => {
-    // Transporte (.33) é calculado pelo servidor (PreviaTransporteEffect).
+    // Transporte (.33) e pessoa física (.36, B8) são calculados pelo servidor (PreviaServidorEffect).
     if (perfilDoElemento(extrairCodigoElemento(elemento)) !== "PADRAO") return;
     const timer = setTimeout(() => {
       const elementoCodigo = extrairCodigoElemento(elemento);
@@ -133,15 +133,28 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
   return null;
 }
 
+/** Textos da prévia pelo servidor: os do transporte ficam como sempre. */
+export function textosDaPrevia(elementoCodigo: string | null) {
+  const transporte = perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO";
+  const alvo = transporte ? "o transporte" : "as retenções";
+  return {
+    semCredor: `Escolha o credor para calcular ${alvo}.`,
+    semValor: `Informe o valor a pagar para calcular ${alvo}.`,
+    falhou: transporte ? "Não foi possível calcular a prévia do transporte." : "Não foi possível calcular a prévia das retenções.",
+  };
+}
+
 /**
- * Transporte autônomo (3.3.90.33, T25): depende de tabela do IRRF, município
- * do credor e vigência, que só o servidor tem — pede a prévia (mesmo cálculo
+ * Transporte autônomo (3.3.90.33, T25) e pessoa física (3.3.90.36, B8):
+ * dependem de tabela do IRRF e parâmetros por vigência (e, no transporte, do
+ * município do credor), que só o servidor tem — pede a prévia (mesmo cálculo
  * do salvar, sem gravar). Descarta resposta atrasada de um estado anterior.
  */
-function PreviaTransporteEffect({ config, perfil, basePath }: { config: ConfigRetencoes; perfil: Perfil; basePath: string }) {
+function PreviaServidorEffect({ config, perfil, basePath }: { config: ConfigRetencoes; perfil: Perfil; basePath: string }) {
   const { control, setValue, getValues } = useFormContext<any>();
   const { n, nomesForm } = useNomesDaLinha(basePath);
   const elemento = useWatch({ control, name: "elemento" });
+  const subelemento = useWatch({ control, name: "subelemento" });
   const empenho = useWatch({ control, name: "empenho" });
   const cpfCnpj = useWatch({ control, name: n("cpfCnpj") });
   const valorPagamento = useWatch({ control, name: n("valorPagamento") });
@@ -156,22 +169,29 @@ function PreviaTransporteEffect({ config, perfil, basePath }: { config: ConfigRe
 
   useEffect(() => {
     const elementoCodigo = extrairCodigoElemento(elemento);
-    if (perfilDoElemento(elementoCodigo) !== "TRANSPORTE_AUTONOMO") return;
+    if (!calculoNoServidor(perfilDoElemento(elementoCodigo))) return;
+    const subelementoCodigo = extrairCodigoElemento(subelemento);
+    const textos = textosDaPrevia(elementoCodigo);
     let cancelado = false;
 
     const limparCalculados = (informadosValidos: string[]) =>
       aplicarCalculadosNaLinha(getValues, setValue, basePath, valoresCalculadosDoForm({}, informadosValidos));
 
     const timer = setTimeout(async () => {
-      const informadosValidos = informadosValidosDaLinha(camposInformados, config, elementoCodigo, perfil, { credorMei, sobrescreverMei });
+      const informadosValidos = informadosValidosDaLinha(
+        camposInformados,
+        config,
+        elementoCodigo,
+        perfil,
+        { credorMei, sobrescreverMei },
+        subelementoCodigo
+      );
       if (!mesmaLista(informadosValidos, camposInformados)) setValue(n("camposInformados"), informadosValidos);
 
       const bruto = toCents(valorPagamento);
       if (!cpfCnpj || !empenho || bruto <= 0) {
         limparCalculados(informadosValidos);
-        setValue(n("previaAvisos"), [
-          !cpfCnpj ? "Escolha o credor para calcular o transporte." : "Informe o valor a pagar para calcular o transporte.",
-        ]);
+        setValue(n("previaAvisos"), [!cpfCnpj ? textos.semCredor : textos.semValor]);
         return;
       }
 
@@ -200,7 +220,7 @@ function PreviaTransporteEffect({ config, perfil, basePath }: { config: ConfigRe
       } catch (e: any) {
         if (cancelado) return;
         limparCalculados(informadosValidos);
-        setValue(n("previaAvisos"), [e?.message || "Não foi possível calcular a prévia do transporte."]);
+        setValue(n("previaAvisos"), [e?.message || textos.falhou]);
       }
     }, 350);
 
@@ -210,7 +230,7 @@ function PreviaTransporteEffect({ config, perfil, basePath }: { config: ConfigRe
     };
     // chaveValores/chaveInformados representam os arrays observados (identidade muda a cada render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elemento, empenho, cpfCnpj, valorPagamento, dataPagamento, dataEmissao, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues, n, basePath]);
+  }, [elemento, subelemento, empenho, cpfCnpj, valorPagamento, dataPagamento, dataEmissao, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues, n, basePath]);
 
   return null;
 }
@@ -222,8 +242,8 @@ export function itensDaPreviaEmCentavos(itens: Record<string, number> | undefine
 
 /**
  * Efeitos de uma linha (sem DOM): cálculo local e, no modo "individual", a
- * prévia do .33. Na lista (T35-B) ficam SEMPRE montados por linha, mesmo com
- * o painel fechado, e a prévia do .33 vem do PreviaLoteEffect ("externa").
+ * prévia do servidor (.33 e .36). Na lista (T35-B) ficam SEMPRE montados por
+ * linha, mesmo com o painel fechado, e a prévia vem do PreviaLoteEffect ("externa").
  */
 export function EfeitosRetencaoLinha({
   config,
@@ -239,7 +259,7 @@ export function EfeitosRetencaoLinha({
   return (
     <>
       <AutoCalcEffect config={config} perfil={perfil} basePath={basePath} />
-      {previa === "individual" && <PreviaTransporteEffect config={config} perfil={perfil} basePath={basePath} />}
+      {previa === "individual" && <PreviaServidorEffect config={config} perfil={perfil} basePath={basePath} />}
     </>
   );
 }
@@ -410,6 +430,7 @@ function CamposRetencao({ config, perfil, basePath, efeitos }: { config: ConfigR
   const regra = regraDaTela(config, elementoCodigo, extrairCodigoElemento(subelemento));
   const elementoConhecido = regra.codigo !== null && regra.regras[regra.codigo] !== undefined;
   const transporte = perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO";
+  const pessoaFisica = perfilDoElemento(elementoCodigo) === "PESSOA_FISICA";
 
   const campos = config.campos
     .filter((c) => c.ativo && ehCampoRetencao(c.campo))
@@ -450,6 +471,19 @@ function CamposRetencao({ config, perfil, basePath, efeitos }: { config: ConfigR
         <p className="mb-6 text-sm font-semibold text-slate-500">
           Retenções conforme a configuração do elemento {elementoCodigo}. A patronal é informativa e não entra no total.
         </p>
+      )}
+      {pessoaFisica && (
+        <div className="-mt-4 mb-6 space-y-1" role="status" aria-label="Cálculo da pessoa física">
+          <p className="text-sm font-semibold text-slate-500">
+            Pessoa física ({elementoCodigo}): IRRF pela tabela progressiva vigente (com faixa de isenção e redutor) e INSS com teto,
+            calculados pelo servidor.
+          </p>
+          {previaAvisos.map((aviso) => (
+            <p key={aviso} className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+              <AlertTriangle className="w-4 h-4" /> {aviso}
+            </p>
+          ))}
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

@@ -13,6 +13,7 @@ import RetencoesMatriz from "@/components/admin/RetencoesMatriz";
 import RetencoesSimulador from "@/components/admin/RetencoesSimulador";
 import RetencoesSubelementos from "@/components/admin/RetencoesSubelementos";
 import TransporteConfig from "@/components/admin/TransporteConfig";
+import PessoaFisicaConfig from "@/components/admin/PessoaFisicaConfig";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -118,6 +119,8 @@ function gerarDiffMatriz(original: ElementoFormValue[], atual: ElementoFormValue
   return diffs;
 }
 
+type Aba = "padrao" | "transporte" | "pessoa-fisica";
+
 function TelaCarregando() {
   return (
     <div className="p-8 max-w-[1400px] mx-auto w-full space-y-4">
@@ -138,9 +141,11 @@ export default function RetencoesConfigPage() {
   const [versaoBase, setVersaoBase] = useState<string | null>(null);
   const [diffPendente, setDiffPendente] = useState<string[] | null>(null);
   const [salvando, setSalvando] = useState(false);
-  const [aba, setAba] = useState<"padrao" | "transporte">("padrao");
+  const [aba, setAba] = useState<Aba>("padrao");
   const [transporteAberto, setTransporteAberto] = useState(false);
   const [transporteDirty, setTransporteDirty] = useState(false);
+  const [pfAberto, setPfAberto] = useState(false);
+  const [pfDirty, setPfDirty] = useState(false);
   // B7a: regras próprias por subelemento — salvas linha a linha, fora do form.
   const [regrasSubelemento, setRegrasSubelemento] = useState<Record<string, string[]>>({});
 
@@ -176,7 +181,7 @@ export default function RetencoesConfigPage() {
 
   // Bloqueio de navegação: avisa o Sidebar (onNavigate) enquanto houver
   // alteração não salva.
-  const pendente = isDirty || transporteDirty;
+  const pendente = isDirty || transporteDirty || pfDirty;
   useEffect(() => {
     setNavigationBlocked(pendente);
     return () => setNavigationBlocked(false);
@@ -195,9 +200,10 @@ export default function RetencoesConfigPage() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [pendente]);
 
-  const abrirAba = (nova: "padrao" | "transporte") => {
+  const abrirAba = (nova: Aba) => {
     setAba(nova);
     if (nova === "transporte") setTransporteAberto(true);
+    if (nova === "pessoa-fisica") setPfAberto(true);
   };
 
   const onSubmit = (data: FormValues) => {
@@ -288,6 +294,7 @@ export default function RetencoesConfigPage() {
             [
               ["padrao", "Retenções padrão"],
               ["transporte", "Transporte (3.3.90.33)"],
+              ["pessoa-fisica", "Pessoa Física (3.3.90.36)"],
             ] as const
           ).map(([id, rotulo]) => (
             <button
@@ -319,7 +326,7 @@ export default function RetencoesConfigPage() {
           </div>
         )}
 
-        {/* Os dois painéis ficam montados (só escondidos) para não perder edições ao trocar de aba. */}
+        {/* Os painéis ficam montados (só escondidos) para não perder edições ao trocar de aba. */}
         <div role="tabpanel" id="painel-padrao" aria-labelledby="aba-padrao" hidden={aba !== "padrao"}>
           {loading ? (
             <TelaCarregando />
@@ -349,6 +356,11 @@ export default function RetencoesConfigPage() {
         {transporteAberto && (
           <div role="tabpanel" id="painel-transporte" aria-labelledby="aba-transporte" hidden={aba !== "transporte"}>
             <TransporteConfig config={config?.campos ?? []} onDirtyChange={setTransporteDirty} />
+          </div>
+        )}
+        {pfAberto && (
+          <div role="tabpanel" id="painel-pessoa-fisica" aria-labelledby="aba-pessoa-fisica" hidden={aba !== "pessoa-fisica"}>
+            <PessoaFisicaConfig config={config?.campos ?? []} regras={config?.regras ?? {}} onDirtyChange={setPfDirty} />
           </div>
         )}
       </div>

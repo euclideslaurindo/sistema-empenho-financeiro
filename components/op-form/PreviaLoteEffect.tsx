@@ -4,10 +4,10 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { apiClient } from "@/lib/api-client";
 import { toCents } from "@/lib/money";
 import { extrairCodigoElemento } from "@/lib/elementos";
-import { perfilDoElemento } from "@/lib/perfis-calculo";
+import { calculoNoServidor, perfilDoElemento } from "@/lib/perfis-calculo";
 import { CAMPO_FORM, ehCampoRetencao, informadosValidosDaLinha, valoresCalculadosDoForm, type Perfil } from "@/lib/retencoes-form";
 import { montarPayloadLote, type CredorLinha } from "@/lib/op-emissao";
-import { aplicarCalculadosNaLinha, itensDaPreviaEmCentavos } from "@/components/op-form/OpTaxesSection";
+import { aplicarCalculadosNaLinha, itensDaPreviaEmCentavos, textosDaPrevia } from "@/components/op-form/OpTaxesSection";
 import type { ConfigRetencoes } from "@/hooks/use-retencoes-config";
 
 interface LinhaPrevia {
@@ -39,7 +39,8 @@ export function assinaturaDaLinha(c: Partial<CredorLinha>, dataEmissao: unknown)
 }
 
 /**
- * Prévia do transporte (3.3.90.33) da lista de credores (T35-B, D43): pede a
+ * Prévia do transporte (3.3.90.33) e da pessoa física (3.3.90.36, B8) da
+ * lista de credores (T35-B, D43): pede a
  * `previa-lote` só das linhas que mudaram, com debounce. O resultado é aplicado
  * na linha pela `chave` (estável ao remover/reordenar), e só se ela não mudou
  * de novo depois do envio. Nos demais elementos não faz nada (cálculo local).
@@ -47,12 +48,15 @@ export function assinaturaDaLinha(c: Partial<CredorLinha>, dataEmissao: unknown)
 export function PreviaLoteEffect({ config, perfil, atraso = 400 }: { config: ConfigRetencoes; perfil: Perfil; atraso?: number }) {
   const { control, getValues, setValue } = useFormContext<any>();
   const elemento = useWatch({ control, name: "elemento" });
+  const subelemento = useWatch({ control, name: "subelemento" });
   const neCarregada: string = useWatch({ control, name: "neCarregada" }) || "";
   const dataEmissao = useWatch({ control, name: "dataEmissao" });
   const credores: CredorLinha[] = useWatch({ control, name: "credores" }) || [];
 
   const elementoCodigo = extrairCodigoElemento(elemento);
-  const ativo = perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO" && !!neCarregada;
+  const subelementoCodigo = extrairCodigoElemento(subelemento);
+  const ativo = calculoNoServidor(perfilDoElemento(elementoCodigo)) && !!neCarregada;
+  const textos = textosDaPrevia(elementoCodigo);
   // chave -> assinatura cujo resultado já está na linha
   const aplicadas = useRef(new Map<string, string>());
   // chave -> assinatura já enviada e ainda sem resposta (não manda duas vezes)
@@ -83,7 +87,7 @@ export function PreviaLoteEffect({ config, perfil, atraso = 400 }: { config: Con
       linhas.forEach((c, i) => {
         const mei = { credorMei: !!c.credorMei, sobrescreverMei: !!c.sobrescreverMei };
         const informados = c.camposInformados || [];
-        const validos = informadosValidosDaLinha(informados, config, elementoCodigo, perfil, mei);
+        const validos = informadosValidosDaLinha(informados, config, elementoCodigo, perfil, mei, subelementoCodigo);
         // assinatura já com a lista corrigida: é a que a linha terá quando a resposta chegar
         const assinatura = assinaturaDaLinha({ ...c, camposInformados: validos }, dataEmissao);
         if (aplicadas.current.get(c.chave) === assinatura || emVoo.current.get(c.chave) === assinatura) return;
@@ -91,9 +95,7 @@ export function PreviaLoteEffect({ config, perfil, atraso = 400 }: { config: Con
 
         if (!c.cpfCnpj || toCents(c.valorPagamento) <= 0) {
           aplicarCalculadosNaLinha(getValues, setValue, basePath(i), valoresCalculadosDoForm({}, validos));
-          setValue(`${basePath(i)}.previaAvisos`, [
-            !c.cpfCnpj ? "Escolha o credor para calcular o transporte." : "Informe o valor a pagar para calcular o transporte.",
-          ]);
+          setValue(`${basePath(i)}.previaAvisos`, [!c.cpfCnpj ? textos.semCredor : textos.semValor]);
           aplicadas.current.set(c.chave, assinatura);
           return;
         }
@@ -144,13 +146,15 @@ export function PreviaLoteEffect({ config, perfil, atraso = 400 }: { config: Con
           const i = atuais.findIndex((c) => c.chave === pronta.chave);
           if (i < 0) continue;
           aplicarCalculadosNaLinha(getValues, setValue, basePath(i), valoresCalculadosDoForm({}, atuais[i].camposInformados || []));
-          setValue(`${basePath(i)}.previaAvisos`, [e?.message || "Não foi possível calcular a prévia do transporte."]);
+          setValue(`${basePath(i)}.previaAvisos`, [e?.message || textos.falhou]);
         }
       }
     }, atraso);
     return () => clearTimeout(timer);
     // chaveDasLinhas representa `credores` (a identidade do array muda a cada render)
-  }, [ativo, neCarregada, elementoCodigo, dataEmissao, chaveDasLinhas, config, perfil, atraso, getValues, setValue]);
+    // textos deriva de elementoCodigo
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ativo, neCarregada, elementoCodigo, subelementoCodigo, dataEmissao, chaveDasLinhas, config, perfil, atraso, getValues, setValue]);
 
   return null;
 }

@@ -1,6 +1,7 @@
 // Regras da tela do admin do transporte (T27) — puras, usadas na tela
 // (validação imediata e diff) e no servidor (validação definitiva).
 import { CHAVES_TRANSPORTE } from "@/lib/retencoes-transporte";
+import { CHAVES_PESSOA_FISICA, type ChavePessoaFisica } from "@/lib/irrf-pessoa-fisica";
 import { lerValorMonetario } from "@/lib/money";
 
 export type ChaveTransporte = (typeof CHAVES_TRANSPORTE)[number];
@@ -16,6 +17,28 @@ export const ROTULOS_PARAMETROS: Record<ChaveTransporte, { rotulo: string; perce
   redutor_constante: { rotulo: "Redutor — constante (R$)", percentual: false },
   redutor_coeficiente: { rotulo: "Redutor — coeficiente (× bruto)", percentual: false },
 };
+
+/** B8: parâmetros do IRRF progressivo da pessoa física (3.3.90.36). */
+export const ROTULOS_PESSOA_FISICA: Record<ChavePessoaFisica, { rotulo: string; percentual: boolean }> = {
+  inss_teto: { rotulo: "Teto do INSS retido (R$)", percentual: false },
+  desconto_simplificado: { rotulo: "Desconto simplificado (R$)", percentual: false },
+  isencao_ate: { rotulo: "Isento de IRRF até o bruto de (R$)", percentual: false },
+  redutor_ate: { rotulo: "Redutor vale até o bruto de (R$)", percentual: false },
+  redutor_constante: { rotulo: "Redutor — constante (R$)", percentual: false },
+  redutor_coeficiente: { rotulo: "Redutor — coeficiente (× bruto)", percentual: false },
+};
+
+export type PerfilParametros = "TRANSPORTE_AUTONOMO" | "PESSOA_FISICA";
+
+/** Chaves e rótulos dos parâmetros de cada perfil de cálculo. */
+export function definicaoDoPerfil(perfil: PerfilParametros): {
+  chaves: readonly string[];
+  rotulos: Record<string, { rotulo: string; percentual: boolean }>;
+} {
+  return perfil === "PESSOA_FISICA"
+    ? { chaves: CHAVES_PESSOA_FISICA, rotulos: ROTULOS_PESSOA_FISICA }
+    : { chaves: CHAVES_TRANSPORTE, rotulos: ROTULOS_PARAMETROS };
+}
 
 export interface FaixaEdicao {
   limiteAte: number | string | null; // null/'' = última faixa
@@ -54,20 +77,35 @@ export function reais(v: unknown): number {
 const fmtReais = (v: unknown) => (vazio(v) ? "—" : String(reais(v)).replace(".", ","));
 
 /** Parâmetros do transporte que são valores em reais (os demais são % ou coeficiente). */
-export const PARAMETROS_EM_REAIS: ReadonlySet<string> = new Set(["desconto_simplificado", "redutor_constante"]);
+export const PARAMETROS_EM_REAIS: ReadonlySet<string> = new Set([
+  "desconto_simplificado",
+  "redutor_constante",
+  "inss_teto",
+  "isencao_ate",
+  "redutor_ate",
+]);
 export const valorDoParametro = (chave: string, v: unknown) => (PARAMETROS_EM_REAIS.has(chave) ? reais(v) : numero(v));
 const fmtParametro = (chave: string, v: unknown) => (PARAMETROS_EM_REAIS.has(chave) ? fmtReais(v) : fmt(v));
 
 export const vigenciaEditavel = (vigenteDe: string, hoje: string) => vigenteDe >= hoje;
 
-export function validarParametrosTransporte(p: Partial<Record<string, unknown>>): string[] {
+export function validarParametrosTransporte(
+  p: Partial<Record<string, unknown>>,
+  perfil: PerfilParametros = "TRANSPORTE_AUTONOMO"
+): string[] {
   const erros: string[] = [];
-  for (const chave of CHAVES_TRANSPORTE) {
-    const { rotulo, percentual } = ROTULOS_PARAMETROS[chave];
+  const { chaves, rotulos } = definicaoDoPerfil(perfil);
+  for (const chave of chaves) {
+    const { rotulo, percentual } = rotulos[chave];
     const v = valorDoParametro(chave, p[chave]);
     if (!Number.isFinite(v)) erros.push(`${rotulo}: informe um número.`);
     else if (v < 0) erros.push(`${rotulo}: não pode ser negativo.`);
     else if (percentual && v > 100) erros.push(`${rotulo}: não pode passar de 100%.`);
+  }
+  if (perfil === "PESSOA_FISICA" && erros.length === 0) {
+    if (valorDoParametro("isencao_ate", p.isencao_ate) >= valorDoParametro("redutor_ate", p.redutor_ate)) {
+      erros.push("O limite do redutor deve ser maior que o limite da isenção.");
+    }
   }
   return erros;
 }
@@ -110,9 +148,14 @@ export function validarMunicipio(m: Partial<MunicipioEdicao>): string[] {
 // ---------------------------------------------------------------------------
 // Diffs para a confirmação antes de salvar
 // ---------------------------------------------------------------------------
-export function diffParametros(antes: Partial<Record<string, unknown>>, depois: Partial<Record<string, unknown>>): string[] {
-  return CHAVES_TRANSPORTE.filter((c) => valorDoParametro(c, antes[c]) !== valorDoParametro(c, depois[c])).map(
-    (c) => `${ROTULOS_PARAMETROS[c].rotulo}: ${fmtParametro(c, antes[c])} → ${fmtParametro(c, depois[c])}`
+export function diffParametros(
+  antes: Partial<Record<string, unknown>>,
+  depois: Partial<Record<string, unknown>>,
+  perfil: PerfilParametros = "TRANSPORTE_AUTONOMO"
+): string[] {
+  const { chaves, rotulos } = definicaoDoPerfil(perfil);
+  return chaves.filter((c) => valorDoParametro(c, antes[c]) !== valorDoParametro(c, depois[c])).map(
+    (c) => `${rotulos[c].rotulo}: ${fmtParametro(c, antes[c])} → ${fmtParametro(c, depois[c])}`
   );
 }
 

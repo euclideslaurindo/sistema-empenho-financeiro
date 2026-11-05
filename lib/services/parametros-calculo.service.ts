@@ -1,8 +1,18 @@
 import { query, withTransaction } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
-import { CHAVES_TRANSPORTE, type FaixaIrrf, type IssMunicipio, type ParametrosTransporte } from '@/lib/retencoes-transporte';
+import { type FaixaIrrf, type IssMunicipio, type ParametrosTransporte } from '@/lib/retencoes-transporte';
 import { encontrarIssMunicipio, normalizarMunicipio, type PerfilCalculo } from '@/lib/perfis-calculo';
-import { numero, reais, validarFaixasIrrf, validarMunicipio, validarParametrosTransporte, valorDoParametro, type FaixaEdicao } from '@/lib/transporte-admin';
+import {
+  definicaoDoPerfil,
+  numero,
+  reais,
+  validarFaixasIrrf,
+  validarMunicipio,
+  validarParametrosTransporte,
+  valorDoParametro,
+  type FaixaEdicao,
+  type PerfilParametros,
+} from '@/lib/transporte-admin';
 
 async function executar<T>(conn: PoolConnection | undefined, sql: string, values: any[]): Promise<T> {
   if (conn) {
@@ -13,6 +23,8 @@ async function executar<T>(conn: PoolConnection | undefined, sql: string, values
 }
 
 const ERRO_VIGENCIA = 'Parâmetros de cálculo do transporte não cadastrados para a data';
+const ERRO_VIGENCIA_PF = 'Parâmetros do IRRF de pessoa física (3.3.90.36) não cadastrados para a data';
+const erroVigenciaDo = (perfil: PerfilCalculo) => (perfil === 'PESSOA_FISICA' ? ERRO_VIGENCIA_PF : ERRO_VIGENCIA);
 
 const hojeLocal = (agora: Date) => new Date(agora.getTime() - agora.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
@@ -28,12 +40,12 @@ export function dataReferenciaDaOp(
   return hojeLocal(agora);
 }
 
-/** Para cada chave, a linha de maior vigente_de <= data. Faltando alguma → 422. */
-export async function obterParametrosVigentes(
+/** Para cada chave do perfil, a linha de maior vigente_de <= data. Faltando alguma → 422. */
+export async function obterParametrosVigentes<P = ParametrosTransporte>(
   conn: PoolConnection | undefined,
   perfil: PerfilCalculo,
   data: string
-): Promise<{ parametros: ParametrosTransporte; vigencia: string }> {
+): Promise<{ parametros: P; vigencia: string }> {
   const rows = await executar<Array<{ chave: string; valor: string | number; vigente_de: string }>>(
     conn,
     `SELECT chave, valor, DATE_FORMAT(vigente_de, '%Y-%m-%d') as vigente_de
@@ -49,11 +61,15 @@ export async function obterParametrosVigentes(
     parametros[r.chave] = r.valor;
     if (r.vigente_de > vigencia) vigencia = r.vigente_de;
   }
-  const faltando = CHAVES_TRANSPORTE.filter((c) => parametros[c] === undefined);
+  const { chaves } = definicaoDoPerfil(perfil === 'PESSOA_FISICA' ? 'PESSOA_FISICA' : 'TRANSPORTE_AUTONOMO');
+  const faltando = chaves.filter((c) => parametros[c] === undefined);
   if (faltando.length > 0) {
-    throw { status: 422, error: `${ERRO_VIGENCIA} ${data.split('-').reverse().join('/')} (faltando: ${faltando.join(', ')}).` };
+    throw {
+      status: 422,
+      error: `${erroVigenciaDo(perfil)} ${data.split('-').reverse().join('/')} (faltando: ${faltando.join(', ')}).${perfil === 'PESSOA_FISICA' ? ' Rode a migration_21.sql ou cadastre em Configurações > Retenções.' : ''}`,
+    };
   }
-  return { parametros: parametros as ParametrosTransporte, vigencia };
+  return { parametros: parametros as P, vigencia };
 }
 
 /** Faixas da tabela do IRRF de maior vigente_de <= data. Nenhuma → 422. */
@@ -108,6 +124,8 @@ export type ServiceResult<T = any> =
   | { success: false; error: string; status: number };
 
 const PERFIL_TRANSPORTE = 'TRANSPORTE_AUTONOMO';
+const PERFIS_COM_IRRF = [PERFIL_TRANSPORTE, 'PESSOA_FISICA'] as const;
+const perfilValido = (p: unknown): PerfilParametros => (p === 'PESSOA_FISICA' ? 'PESSOA_FISICA' : PERFIL_TRANSPORTE);
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 const negado = { success: false as const, error: 'Acesso negado. Somente o administrador altera estes parâmetros.', status: 403 };
 
@@ -129,14 +147,22 @@ async function auditar(
   );
 }
 
-/** Vigências já usadas por alguma OP (gravadas no snapshot do cálculo). */
-async function vigenciasEmUso(campo: 'vigencia' | 'vigencia_irrf', conn?: PoolConnection): Promise<Set<string>> {
+/**
+ * Vigências já usadas por alguma OP (gravadas no snapshot do cálculo).
+ * Parâmetros: só as OPs do perfil. Tabela do IRRF: transporte E pessoa
+ * física (B8) — as duas usam a mesma irrf_faixas.
+ */
+async function vigenciasEmUso(
+  campo: 'vigencia' | 'vigencia_irrf',
+  perfis: readonly string[],
+  conn?: PoolConnection
+): Promise<Set<string>> {
   const rows = await executar<Array<{ v: string | null }>>(
     conn,
     `SELECT DISTINCT JSON_UNQUOTE(JSON_EXTRACT(retencoes_snapshot, '$.${campo}')) as v
        FROM ordens_pagamento
-      WHERE JSON_UNQUOTE(JSON_EXTRACT(retencoes_snapshot, '$.perfil')) = ?`,
-    [PERFIL_TRANSPORTE]
+      WHERE JSON_UNQUOTE(JSON_EXTRACT(retencoes_snapshot, '$.perfil')) IN (${perfis.map(() => '?').join(', ')})`,
+    [...perfis]
   );
   return new Set(rows.map((r) => r.v).filter((v): v is string => !!v && v !== 'null'));
 }
@@ -153,18 +179,19 @@ function validarVigencia(vigenteDe: string): string | null {
 }
 
 // ---------------------------------------------------------------- parâmetros
-export async function listarVigenciasParametros() {
+export async function listarVigenciasParametros(perfilCalculo: PerfilParametros = PERFIL_TRANSPORTE) {
+  const perfilParam = perfilValido(perfilCalculo);
   const rows = await query<Array<{ chave: string; valor: string; vigente_de: string }>>(
     `SELECT chave, valor, DATE_FORMAT(vigente_de, '%Y-%m-%d') as vigente_de
        FROM calculo_parametros WHERE perfil = ? ORDER BY vigente_de, chave`,
-    [PERFIL_TRANSPORTE]
+    [perfilParam]
   );
   const porVigencia = new Map<string, Record<string, string>>();
   for (const r of rows) {
     if (!porVigencia.has(r.vigente_de)) porVigencia.set(r.vigente_de, {});
     porVigencia.get(r.vigente_de)![r.chave] = r.valor;
   }
-  const emUso = await vigenciasEmUso('vigencia');
+  const emUso = await vigenciasEmUso('vigencia', [perfilParam]);
   const dia = hoje();
   const datas = [...porVigencia.keys()];
   return {
@@ -179,35 +206,42 @@ export async function listarVigenciasParametros() {
   };
 }
 
-export async function salvarVigenciaParametros(body: any, usuarioId: string, perfil: string): Promise<ServiceResult<null>> {
+export async function salvarVigenciaParametros(
+  body: any,
+  usuarioId: string,
+  perfil: string,
+  perfilCalculo: PerfilParametros = PERFIL_TRANSPORTE
+): Promise<ServiceResult<null>> {
   if (perfil !== 'ADMIN') return negado;
+  const perfilParam = perfilValido(perfilCalculo);
+  const { chaves } = definicaoDoPerfil(perfilParam);
   const vigenteDe = String(body?.vigenteDe ?? '');
   const parametros = body?.parametros ?? {};
   const erroVigencia = validarVigencia(vigenteDe);
   if (erroVigencia) return { success: false, error: erroVigencia, status: 400 };
-  const erros = validarParametrosTransporte(parametros);
+  const erros = validarParametrosTransporte(parametros, perfilParam);
   if (erros.length > 0) return { success: false, error: erros.join(' '), status: 400 };
 
   try {
     await withTransaction(async (conn) => {
-      if ((await vigenciasEmUso('vigencia', conn)).has(vigenteDe)) {
+      if ((await vigenciasEmUso('vigencia', [perfilParam], conn)).has(vigenteDe)) {
         throw { status: 409, error: 'Vigência já usada por OP: crie uma nova vigência.' };
       }
       const [antesRows]: any = await conn.execute(
         'SELECT chave, valor FROM calculo_parametros WHERE perfil = ? AND vigente_de = ? FOR UPDATE',
-        [PERFIL_TRANSPORTE, vigenteDe]
+        [perfilParam, vigenteDe]
       );
       const existia = (antesRows || []).length > 0;
-      for (const chave of CHAVES_TRANSPORTE) {
+      for (const chave of chaves) {
         await conn.execute(
           `INSERT INTO calculo_parametros (perfil, chave, valor, vigente_de, updated_by) VALUES (?, ?, ?, ?, ?)
            ON DUPLICATE KEY UPDATE valor = VALUES(valor), updated_by = VALUES(updated_by)`,
-          [PERFIL_TRANSPORTE, chave, valorDoParametro(chave, parametros[chave]), vigenteDe, usuarioId]
+          [perfilParam, chave, valorDoParametro(chave, parametros[chave]), vigenteDe, usuarioId]
         );
       }
       const antes = existia ? Object.fromEntries(antesRows.map((r: any) => [r.chave, r.valor])) : null;
-      const depois = Object.fromEntries(CHAVES_TRANSPORTE.map((c) => [c, valorDoParametro(c, parametros[c])]));
-      await auditar(conn, 'calculo_parametros', `${PERFIL_TRANSPORTE}@${vigenteDe}`, existia ? 'UPDATE' : 'CREATE', antes, depois, usuarioId);
+      const depois = Object.fromEntries(chaves.map((c) => [c, valorDoParametro(c, parametros[c])]));
+      await auditar(conn, 'calculo_parametros', `${perfilParam}@${vigenteDe}`, existia ? 'UPDATE' : 'CREATE', antes, depois, usuarioId);
     });
   } catch (e: any) {
     const r = erroDe(e);
@@ -236,7 +270,7 @@ export async function listarVigenciasIrrf() {
       parcelaDeduzir: r.parcela_deduzir,
     });
   }
-  const emUso = await vigenciasEmUso('vigencia_irrf');
+  const emUso = await vigenciasEmUso('vigencia_irrf', PERFIS_COM_IRRF);
   const dia = hoje();
   const datas = [...porVigencia.keys()];
   return {
@@ -262,7 +296,7 @@ export async function salvarFaixasIrrf(body: any, usuarioId: string, perfil: str
 
   try {
     await withTransaction(async (conn) => {
-      if ((await vigenciasEmUso('vigencia_irrf', conn)).has(vigenteDe)) {
+      if ((await vigenciasEmUso('vigencia_irrf', PERFIS_COM_IRRF, conn)).has(vigenteDe)) {
         throw { status: 409, error: 'Tabela do IRRF já usada por OP: crie uma nova vigência.' };
       }
       const [antes]: any = await conn.execute(

@@ -17,6 +17,7 @@ import { POST as postPrevia } from '@/app/api/ordens-pagamento/previa/route';
 import { GET as getConfig } from '@/app/api/configuracoes/retencoes/route';
 import { PUT as putSub } from '@/app/api/configuracoes/retencoes/subelementos/route';
 import { obterConfigRetencoes, salvarRegraSubelemento } from '@/lib/services/config-retencoes.service';
+import { responderPessoaFisica } from '../fixtures/pessoa-fisica-2026';
 
 const CONFIG_ROWS = [
   ['irrf', 'IRRF', 'PERCENTUAL', '1.5000', 0], ['iss', 'ISS', 'PERCENTUAL', '5.0000', 0],
@@ -38,7 +39,14 @@ interface Cenario {
 }
 
 /** Responde as consultas do cálculo (mesmo formato para query() e conn.execute). */
-function responder(sql: string, { subelemento = ESTAGIARIOS, regrasSub = [{ subelemento_codigo: '3.3.90.36.08', campos: '' }] }: Cenario = {}): any[] {
+function responder(
+  sql: string,
+  { subelemento = ESTAGIARIOS, regrasSub = [{ subelemento_codigo: '3.3.90.36.08', campos: '' }] }: Cenario = {},
+  params: any[] = []
+): any[] {
+  // B8: 3.3.90.36 é pessoa física — parâmetros e tabela do IRRF de 2026.
+  const pf = responderPessoaFisica(sql, params);
+  if (pf) return pf;
   if (sql.includes('FROM notas_empenho')) {
     return [{ id: 'ne-1', valor: '100000.00', status: 'EMITIDO', elemento: '3.3.90.36 - Outros Serviços PF', subelemento }];
   }
@@ -64,14 +72,14 @@ function mockTransacao(cenario: Cenario = {}) {
       execute: vi.fn(async (sql: string, params: any[] = []) => {
         chamadas.push([sql, params]);
         if (/^\s*(INSERT|UPDATE|DELETE)/.test(sql)) return [{ affectedRows: 1 }];
-        return [responder(sql, cenario)];
+        return [responder(sql, cenario, params)];
       }),
     })
   );
   return chamadas;
 }
 
-const emitir = (valorPagamento = 1000) =>
+const emitir = (valorPagamento: number = 1000) =>
   OrdemPagamentoService.criar(
     { numeroEmpenho: 'NE-1', credorCpfCnpj: '111.111.111-11', valorPagamento, dataPagamento: '2026-10-15' },
     'u1',
@@ -103,35 +111,37 @@ describe('OP de estagiário (3.3.90.36.08)', () => {
     const chamadas = mockTransacao({ subelemento: '' });
     await emitir();
     const p = gravada(chamadas);
-    expect(p.slice(18, 23)).toEqual([15, 50, 110, 25, 200]);
-    expect(p[27]).toBe(800);
+    // B8: R$ 1.000,00 é isento de IRRF (até R$ 5.000,00); as outras 4 seguem.
+    expect(p.slice(18, 23)).toEqual([0, 50, 110, 25, 200]);
+    expect(p[27]).toBe(815);
     expect(geraDarf(chamadas)).toBe(true);
     expect(JSON.parse(p[28])).toMatchObject({ origemRegra: 'elemento', regraCodigo: '3.3.90.36', subelemento: null });
   });
 
   test('regra própria parcial (só IRRF) vale só para o subelemento', async () => {
     const chamadas = mockTransacao({ regrasSub: [{ subelemento_codigo: '3.3.90.36.08', campos: 'irrf' }] });
-    await emitir();
+    await emitir(5200);
     const p = gravada(chamadas);
-    expect(p.slice(18, 23)).toEqual([15, 0, 0, 0, 0]);
-    expect(p[27]).toBe(985);
+    // B8: sem INSS retido, a dedução do IR é o desconto simplificado (607,20) → IRRF 71,63.
+    expect(p.slice(18, 23)).toEqual([71.63, 0, 0, 0, 0]);
+    expect(p[27]).toBe(5128.37);
   });
 
   test('outro subelemento do 3.3.90.36, sem regra própria, segue o elemento', async () => {
     const chamadas = mockTransacao({ subelemento: '3.3.90.36.01 - Outro' });
     await emitir();
-    expect(gravada(chamadas)[27]).toBe(800);
+    expect(gravada(chamadas)[27]).toBe(815);
   });
 
   test('migration_20 não rodada: tudo como antes (retém pelo elemento), sem erro', async () => {
     const chamadas = mockTransacao({ regrasSub: null });
     expect((await emitir()).success).toBe(true);
-    expect(gravada(chamadas)[27]).toBe(800);
+    expect(gravada(chamadas)[27]).toBe(815);
   });
 
   test('a prévia dá o mesmo valor da emissão, sem gravar nada', async () => {
     (getAuthUser as any).mockResolvedValue({ id: 'u1', perfil: 'GESTOR' });
-    (query as any).mockImplementation(async (sql: string) => responder(sql));
+    (query as any).mockImplementation(async (sql: string, params: any[]) => responder(sql, {}, params));
     const res: any = await postPrevia(
       new NextRequest('http://localhost:3000/api/ordens-pagamento/previa', {
         method: 'POST',
@@ -165,7 +175,7 @@ describe('edição da OP (D12) com subelemento', () => {
             return [[{ valor: '100000.00', status: 'EMITIDO', elemento: oldOp.elemento, subelemento: ESTAGIARIOS, saldoDisponivel: '99000.00' }]];
           }
           if (/^\s*(INSERT|UPDATE|DELETE)/.test(sql)) return [{ affectedRows: 1 }];
-          return [responder(sql, cenario)];
+          return [responder(sql, cenario, params)];
         }),
       })
     );

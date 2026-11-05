@@ -5,6 +5,7 @@ import { simularRetencoes, CAMPOS_TRIBUTARIOS } from "@/lib/retencoes-simulador"
 import { formatarBRL, toCents } from "@/lib/money";
 import { parseFormNumber } from "@/lib/utils";
 import { regraDaOp } from "@/lib/retencoes";
+import { perfilDoElemento } from "@/lib/perfis-calculo";
 import type { ElementoOption } from "@/hooks/use-elementos";
 
 const ROTULOS: Record<string, string> = {
@@ -151,6 +152,17 @@ export default function RetencoesSimulador({
 
       {resultado && (
         <div className="border-t border-slate-100 pt-6">
+          {perfilDoElemento(elementoCodigo) === "PESSOA_FISICA" && (
+            <p role="note" className="mb-4 text-xs font-bold text-amber-700">
+              No {elementoCodigo}, o IRRF é pela tabela progressiva e o INSS tem teto: o IRRF e o INSS abaixo são só o
+              percentual. Use o simulador da aba Pessoa Física (3.3.90.36).
+            </p>
+          )}
+          {perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO" && (
+            <p role="note" className="mb-4 text-xs font-bold text-amber-700">
+              O {elementoCodigo} tem cálculo próprio: use o simulador da aba Transporte (3.3.90.33).
+            </p>
+          )}
           {regraPropria && (
             <p role="status" className="mb-4 text-xs font-bold text-emerald-700">
               Regra própria do subelemento {subelementoCodigo} (salva).

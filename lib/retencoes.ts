@@ -3,6 +3,7 @@
 // quem busca config/regras do banco e chama calcularRetencoes com os dados
 // já em mãos — isso é o que torna o resultado testável sem mock de SQL.
 import { calcPercentCents } from "@/lib/money";
+import { inssPessoaFisica, irrfPessoaFisica, type DadosPessoaFisica, type ResultadoIrrfPessoaFisica } from "@/lib/irrf-pessoa-fisica";
 import type { ConfigRetencaoCampoMapeado } from "@/lib/services/config-retencoes.service";
 
 export type CampoTributario = "irrf" | "iss" | "inss" | "patronal" | "sest_senat";
@@ -39,6 +40,12 @@ export interface EntradaCalculo {
   credorMei?: boolean;
   /** T26: ADMIN confirmou reter mesmo sendo MEI — aceita só valores digitados, nada automático. */
   sobrescreverMei?: boolean;
+  /**
+   * B8: perfil PESSOA_FISICA (3.3.90.36) — INSS com teto e IRRF pela tabela
+   * progressiva 2026, com parâmetros e faixas da vigência da OP. Ausente =
+   * cálculo por percentual, como sempre.
+   */
+  pessoaFisica?: DadosPessoaFisica;
 }
 
 /** MEI: 0, ou o valor digitado se o ADMIN confirmou a sobrescrita (T26). */
@@ -119,6 +126,10 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
   const regra = regraDaOp(elementoCodigo, entrada.subelementoCodigo, regras, entrada.regrasSubelemento);
   const camposAplicaveis = regra.campos;
   const elementoDesconhecido = camposAplicaveis === undefined;
+  const pf = entrada.pessoaFisica;
+  // B8: o IRRF da PF deduz o INSS final da OP, então é calculado depois do laço.
+  let irrfPfPendente = false;
+  let detalheIrrfPf: ResultadoIrrfPessoaFisica | null = null;
 
   const sobrescreverMei = !!entrada.credorMei && !!entrada.sobrescreverMei && perfil === "ADMIN";
   if (entrada.credorMei) {
@@ -161,7 +172,11 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
 
     let valor: number;
     if (cfg.calculoAutomatico && cfg.tipo === "PERCENTUAL" && cfg.aliquota != null) {
-      valor = calcPercentCents(brutoCents, cfg.aliquota);
+      if (pf && campo === "inss") valor = inssPessoaFisica(brutoCents, cfg.aliquota, pf.parametros);
+      else if (pf && campo === "irrf") {
+        valor = 0;
+        irrfPfPendente = true;
+      } else valor = calcPercentCents(brutoCents, cfg.aliquota);
       // Regra 3: só sobrescreve um cálculo automático se o campo for
       // editável pelo operador ou o perfil for ADMIN — nunca por um cliente
       // simplesmente mandar um número (é o bug que esta task corrige).
@@ -169,6 +184,7 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
       const informado = informados[campo];
       if (podeSobrescrever && informado !== undefined) {
         valor = validarInformado(campo, informado, brutoCents);
+        if (campo === "irrf") irrfPfPendente = false;
       }
     } else {
       // Não automático (ex.: ISS digitado, D1): qualquer perfil digita —
@@ -183,6 +199,13 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
     }
 
     itens[campo] = valor;
+  }
+
+  if (pf && irrfPfPendente) {
+    // Dedução = máx(INSS retido na OP; desconto simplificado). INSS que não
+    // se aplica (ou MEI/inativo) entra como 0.
+    detalheIrrfPf = irrfPessoaFisica(brutoCents, itens.inss ?? 0, pf.parametros, pf.faixas);
+    itens.irrf = detalheIrrfPf.irrfCents;
   }
 
   for (const campo of CAMPOS_DESCONTO) {
@@ -207,6 +230,22 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
   // como ela foi calculada, sem consultar a config atual.
   const tributarios = CAMPOS_TRIBUTARIOS as string[];
   const snapshot = {
+    ...(pf
+      ? {
+          perfil: "PESSOA_FISICA",
+          vigencia: pf.vigencia,
+          vigencia_irrf: pf.vigenciaIrrf ?? null,
+          ...(detalheIrrfPf
+            ? {
+                base_irrf: detalheIrrfPf.base,
+                deducao_irrf: detalheIrrfPf.deducao,
+                irrf_tabela: detalheIrrfPf.irrfTabela,
+                redutor: detalheIrrfPf.redutor,
+                isento_irrf: detalheIrrfPf.isento,
+              }
+            : {}),
+        }
+      : {}),
     elemento: elementoCodigo,
     subelemento: entrada.subelementoCodigo ?? null,
     origemRegra: regra.origem,
@@ -218,7 +257,8 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
         cfg.campo,
         {
           rotulo: cfg.rotulo,
-          aliquota: cfg.aliquota,
+          // B8: na PF o IRRF é pela tabela progressiva, não um percentual fixo.
+          aliquota: pf && cfg.campo === "irrf" ? null : cfg.aliquota,
           automatico: cfg.calculoAutomatico,
           ativo: cfg.ativo,
           aplica:
@@ -229,7 +269,7 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
       ])
     ),
     calculadoEm: new Date().toISOString(),
-    regra: "v1",
+    regra: pf ? "pf-2026-v1" : "v1",
   };
 
   return {

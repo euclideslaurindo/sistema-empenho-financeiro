@@ -410,10 +410,18 @@ Os problemas estão em volta dessas telas.
 **Estagiários sem retenção — regra por subelemento (B7a)**
 - [ ] **CF-13** Rodar a `database/migration_20.sql` no Workbench: a consulta 0 dá 0 antes; depois, as conferências a–d batem (o 3.3.90.36.08 "Estagiários - Pagamento Direto" cadastrado, com a regra vazia).
 - [ ] **CF-14** Configurações → Retenções → **Exceções por subelemento**: aparece "3.3.90.36.08 — Estagiários - Pagamento Direto" com "Regra própria" marcada e "Sem retenções"; os subelementos do transporte (3.3.90.33) **não** aparecem.
-- [ ] **CF-15** **Simulador**: R$ 1.000,00 em 3.3.90.36 com o subelemento 3.3.90.36.08 → líquido R$ 1.000,00; sem subelemento → as retenções de sempre (líquido R$ 800,00).
+- [ ] **CF-15** **Simulador**: R$ 1.000,00 em 3.3.90.36 com o subelemento 3.3.90.36.08 → líquido R$ 1.000,00; sem subelemento → as retenções por percentual (líquido R$ 800,00), com o aviso de que no 3.3.90.36 o IRRF é pela tabela progressiva (B8: o valor real da OP sai do simulador da aba Pessoa Física — R$ 815,00).
 - [ ] **CF-16** Cadastrar uma NE de 3.3.90.36 com o subelemento de estagiários e emitir uma OP de R$ 1.000,00: os impostos ficam travados com "Não se aplica a 3.3.90.36.08", o líquido é R$ 1.000,00 e **nenhuma DARF** é gerada. Uma OP de outra NE do 3.3.90.36 continua com as 5 retenções.
-- [ ] **CF-17** Marcar só IRRF no 3.3.90.36.08 e salvar (a confirmação mostra o antes e o depois) → a próxima OP de estagiário retém só o IRRF; a OP já emitida **não muda**. Voltar para "nenhuma" e salvar.
+- [ ] **CF-17** Marcar só IRRF no 3.3.90.36.08 e salvar (a confirmação mostra o antes e o depois) → a próxima OP de estagiário retém só o IRRF (pela tabela progressiva: R$ 1.000,00 dá 0, isento; R$ 5.200,00 dá R$ 71,63); a OP já emitida **não muda**. Voltar para "nenhuma" e salvar.
 - [ ] **CF-18** Desmarcar "Regra própria" e salvar → o subelemento volta a seguir o elemento ("Segue o elemento 3.3.90.36: IRRF, ISS…").
+
+**IRRF progressivo 2026 da pessoa física — 3.3.90.36 (B8)**
+- [ ] **PF-01** Rodar a `database/migration_21.sql` no Workbench: a conferência (a) mostra 6 linhas `PESSOA_FISICA` (redutor_constante 978.61), (b) 5 faixas do IRRF e (c) a versão 21.
+- [ ] **PF-02** Configurações → Retenções → aba **Pessoa Física (3.3.90.36)**: a vigência 01/01/2026 com teto do INSS 932,31, desconto simplificado 607,2, isento até 5000, redutor até 7350, constante 978,61 e coeficiente 0,133145.
+- [ ] **PF-03** **Simulador da pessoa física**: R$ 5.200,00 → INSS 572,00, dedução 607,20, base 4.592,80, tabela 357,89, redutor 286,26, **IRRF 71,63**, líquido 4.166,37 (com ISS 260 e SEST/SENAT 130). R$ 4.000,00 → "IRRF (isento)" 0,00 e INSS 440,00. R$ 10.000,00 → INSS 932,31 (teto) e IRRF 1.584,88.
+- [ ] **PF-04** Emitir uma OP de R$ 5.200,00 numa NE de 3.3.90.36 (sem subelemento): os campos mostram "IRRF (tabela progressiva)" 71,63 e INSS 572,00, com a linha "Pessoa física (3.3.90.36): IRRF pela tabela progressiva…"; salvar e conferir que a OP gravada tem os mesmos valores e a DARF de INSS 572,00 (+ patronal e SEST/SENAT).
+- [ ] **PF-05** OP de R$ 4.000,00 no 3.3.90.36 → IRRF 0,00 e INSS 440,00. OP de estagiário (3.3.90.36.08) → continua sem retenção.
+- [ ] **PF-06** Uma OP de 3.3.90.39 (ou outro elemento) continua com IRRF de 1,5%; uma OP de transporte (3.3.90.33) dá os mesmos valores de antes.
 
 ### Resultado do teste
 

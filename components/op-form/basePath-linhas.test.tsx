@@ -27,7 +27,7 @@ const CAMPOS: ConfigRetencaoCampo[] = [
 const TODOS = ['irrf', 'iss', 'inss', 'patronal', 'sest_senat'];
 const CONFIG: ConfigRetencoes = {
   campos: CAMPOS,
-  regras: { '3.3.90.36': TODOS, '3.3.90.33': TODOS },
+  regras: { '3.3.90.39': TODOS, '3.3.90.33': TODOS },
   versao: '2026-01-01T00:00:00.000Z',
 };
 
@@ -72,7 +72,7 @@ describe('OpTaxesSection com basePath (T35-A)', () => {
 
   test('cálculo local por linha: cada credor com o seu valor, sem tocar na raiz', async () => {
     const form = renderLinhas({
-      elemento: '3.3.90.36 - Serviços',
+      elemento: '3.3.90.39 - Serviços',
       credores: [linhaVazia({ valorPagamento: '1.000,00' }), linhaVazia({ valorPagamento: '200,00' })],
     });
     await waitFor(() => expect(liquido(0)).toBe('R$ 800,00'));
@@ -86,7 +86,7 @@ describe('OpTaxesSection com basePath (T35-A)', () => {
 
   test('ids únicos por linha e campo digitado marca camposInformados só daquela linha', async () => {
     const form = renderLinhas({
-      elemento: '3.3.90.36 - Serviços',
+      elemento: '3.3.90.39 - Serviços',
       credores: [linhaVazia({ valorPagamento: '665,00' }), linhaVazia({ valorPagamento: '665,00' })],
     });
     await waitFor(() => expect(liquido(1)).toBe('R$ 531,99'));
@@ -131,7 +131,7 @@ describe('OpTaxesSection com basePath (T35-A)', () => {
 
   test('MEI por linha: banner e isenção só no credor MEI', async () => {
     renderLinhas({
-      elemento: '3.3.90.36 - Serviços',
+      elemento: '3.3.90.39 - Serviços',
       credores: [linhaVazia({ valorPagamento: '1.000,00', credorMei: true }), linhaVazia({ valorPagamento: '1.000,00' })],
     });
     expect(linha(0).getByText('Credor MEI — isento de retenções')).toBeInTheDocument();

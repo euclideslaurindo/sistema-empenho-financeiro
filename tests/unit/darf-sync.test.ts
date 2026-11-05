@@ -133,7 +133,7 @@ describe('sincronizarDarfDaOp', () => {
 // Integração com o OrdemPagamentoService (mesma transação)
 // ---------------------------------------------------------------------------
 
-function connOp({ elemento = '3.3.90.36', darf = null as any, oldOp = null as any, falharDarf = false } = {}) {
+function connOp({ elemento = '3.3.90.39', darf = null as any, oldOp = null as any, falharDarf = false } = {}) {
   const chamadas: Array<[string, any[]]> = [];
   const conn = {
     execute: vi.fn(async (sql: string, params: any[] = []) => {
@@ -145,9 +145,9 @@ function connOp({ elemento = '3.3.90.36', darf = null as any, oldOp = null as an
       }
       if (sql.includes('SELECT COALESCE(SUM(valor_pagamento), 0) as total_pago')) return [[{ total_pago: 0 }]];
       if (sql.includes('SELECT * FROM config_retencoes ORDER BY ordem')) return [CONFIG_ROWS];
-      if (sql.includes('SELECT codigo FROM elementos_despesa')) return [[{ codigo: '3.3.90.36' }, { codigo: '3.3.90.14' }]];
+      if (sql.includes('SELECT codigo FROM elementos_despesa')) return [[{ codigo: '3.3.90.39' }, { codigo: '3.3.90.14' }]];
       if (sql.includes('SELECT elemento_codigo, campo FROM elemento_retencoes')) {
-        return [['irrf', 'iss', 'inss', 'patronal', 'sest_senat'].map((campo) => ({ elemento_codigo: '3.3.90.36', campo }))];
+        return [['irrf', 'iss', 'inss', 'patronal', 'sest_senat'].map((campo) => ({ elemento_codigo: '3.3.90.39', campo }))];
       }
       if (sql.includes('FROM darf_acompanhamento WHERE ordem_pagamento_id')) return [darf ? [darf] : []];
       if (sql.includes('SELECT * FROM ordens_pagamento WHERE id')) return [[oldOp]];
@@ -171,10 +171,10 @@ const criarOp = (over: object = {}) =>
 
 const OLD_OP = {
   id: 'op-1', numero_ne: 'NE-1', numero_empenho: '2026.OP.0001', sub: '01', valor_pagamento: '1000.00',
-  credor_cpf_cnpj: '1', elemento: '3.3.90.36 - X', subelemento: '',
+  credor_cpf_cnpj: '1', elemento: '3.3.90.39 - X', subelemento: '',
   irrf: '15.00', iss: '50.00', inss: '110.00', patronal: '200.00', sest_senat: '25.00',
   outros_descontos: '0.00', taxa_bancaria: '0.00', taxa_pix: '0.00', total_descontos: '400.00', valor_liquido: '600.00',
-  retencoes_snapshot: { elemento: '3.3.90.36' }, data_pagamento: '2026-10-15',
+  retencoes_snapshot: { elemento: '3.3.90.39' }, data_pagamento: '2026-10-15',
 };
 
 describe('OP x DARF', () => {

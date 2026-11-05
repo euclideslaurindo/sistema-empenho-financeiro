@@ -50,4 +50,11 @@ describe('RetencoesSimulador com subelemento', () => {
     fireEvent.change(screen.getByLabelText('Elemento'), { target: { value: '' } });
     expect((screen.getByLabelText('Subelemento') as HTMLSelectElement).value).toBe('');
   });
+
+  test('B8: no 3.3.90.36 avisa que o IRRF é pela tabela progressiva (simulador da aba Pessoa Física)', () => {
+    render(<Tela />);
+    fireEvent.change(screen.getByLabelText('Elemento'), { target: { value: '3.3.90.36' } });
+    fireEvent.change(screen.getByLabelText('Valor Bruto'), { target: { value: '1.000,00' } });
+    expect(screen.getByRole('note')).toHaveTextContent('Use o simulador da aba Pessoa Física (3.3.90.36)');
+  });
 });
