@@ -25,6 +25,8 @@ export interface SimuladorEntrada {
   camposConfig: SimuladorCampoConfig[];
   taxaBancariaReais?: number;
   taxaPixReais?: number;
+  /** B9: alíquota do IRRF pela natureza do subelemento escolhido (troca a do IRRF). */
+  aliquotaIrrf?: number;
 }
 
 export interface SimuladorResultado {
@@ -47,7 +49,10 @@ export function simularRetencoes(entrada: SimuladorEntrada): SimuladorResultado 
     const aplicaAoElemento = c.ativo && entrada.regrasElemento.includes(c.campo);
     const valor =
       aplicaAoElemento && c.calculoAutomatico && c.tipo === "PERCENTUAL"
-        ? calcPercentCents(brutoCents, parseFormNumber(c.aliquota))
+        ? calcPercentCents(
+            brutoCents,
+            c.campo === "irrf" && entrada.aliquotaIrrf !== undefined ? entrada.aliquotaIrrf : parseFormNumber(c.aliquota)
+          )
         : 0;
 
     itensCents[c.campo] = valor;

@@ -79,6 +79,9 @@ export function CredorBusca({ onEscolher, desabilitado }: { onEscolher: (credor:
               <div className="font-bold text-slate-800 text-sm">
                 {c.nome}
                 {Number(c.isMei ?? c.is_mei) ? <span className="text-emerald-600 ml-1 font-black text-xs uppercase bg-emerald-100 px-1 rounded">MEI</span> : null}
+                {!Number(c.isMei ?? c.is_mei) && Number(c.isSimples ?? c.is_simples) ? (
+                  <span className="text-sky-800 ml-1 font-black text-xs uppercase bg-sky-100 px-1 rounded">Simples</span>
+                ) : null}
               </div>
               <div className="text-xs text-slate-500">
                 {c.cpfCnpj || c.cpf_cnpj}

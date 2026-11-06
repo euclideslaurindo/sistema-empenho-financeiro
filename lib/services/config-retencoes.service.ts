@@ -91,6 +91,28 @@ export async function montarRegrasSubelemento(conn: PoolConnection | undefined):
   return regras;
 }
 
+/**
+ * B9: alíquota do IRRF por subelemento (natureza; tabela subelemento_irrf,
+ * migration_22). Tabela inexistente → {} (todos seguem a alíquota padrão).
+ * Transporte tem cálculo próprio e não entra.
+ */
+export async function montarIrrfSubelemento(conn: PoolConnection | undefined): Promise<Record<string, number>> {
+  let rows: { subelemento_codigo: string; aliquota: string | number }[];
+  try {
+    rows = await executar(conn, 'SELECT subelemento_codigo, aliquota FROM subelemento_irrf');
+  } catch (e) {
+    if (semTabela(e)) return {};
+    throw e;
+  }
+  const mapa: Record<string, number> = {};
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const v = Number(r.aliquota);
+    if (!subelementoAceitaRegraPropria(r.subelemento_codigo) || !Number.isFinite(v)) continue;
+    mapa[r.subelemento_codigo] = v;
+  }
+  return mapa;
+}
+
 export async function obterConfigRetencoes(conn?: PoolConnection) {
   const camposRows = await executar<ConfigRetencaoDB[]>(conn, 'SELECT * FROM config_retencoes ORDER BY ordem');
   const regras = await montarRegras(conn);
@@ -101,11 +123,14 @@ export async function obterConfigRetencoes(conn?: PoolConnection) {
   const versao = versaoRow[0]?.versao ? new Date(versaoRow[0].versao).toISOString() : new Date(0).toISOString();
   // Por último: a tabela da migration_20 pode não existir (vira {}).
   const regrasSubelemento = await montarRegrasSubelemento(conn);
+  // B9: idem, a tabela da migration_22 pode não existir.
+  const irrfSubelemento = await montarIrrfSubelemento(conn);
 
   return {
     campos: camposRows.map(mapCampo),
     regras,
     regrasSubelemento,
+    irrfSubelemento,
     versao,
   };
 }
@@ -182,6 +207,77 @@ export async function salvarRegraSubelemento(
     throw error;
   }
   return { success: true, data: { subelementoCodigo: codigo, campos: novo } };
+}
+
+export const aliquotaIrrfSubelementoSchema = z.object({
+  subelementoCodigo: z.string().trim().regex(/^\d(?:\.\d+){4,}$/, 'Código de subelemento inválido.'),
+  /** null = sem alíquota própria (vale a alíquota padrão do IRRF). */
+  aliquota: z.number().min(0, 'Alíquota entre 0 e 100.').max(100, 'Alíquota entre 0 e 100.').nullable(),
+});
+
+/**
+ * B9: grava (ou tira) a alíquota do IRRF pela natureza de um subelemento.
+ * Só o Admin; o subelemento tem que existir e não pode ser do transporte.
+ * Auditoria com o antes e o depois (null = alíquota padrão).
+ */
+export async function salvarAliquotaIrrfSubelemento(
+  body: unknown,
+  usuarioId: string,
+  perfil: string
+): Promise<ServiceResult<{ subelementoCodigo: string; aliquota: number | null }>> {
+  if (perfil !== 'ADMIN') {
+    return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+  }
+  const parsed = aliquotaIrrfSubelementoSchema.parse(body); // ZodError -> 400
+  const codigo = parsed.subelementoCodigo;
+  const novo = parsed.aliquota === null ? null : Math.round(parsed.aliquota * 10000) / 10000;
+
+  if (!subelementoAceitaRegraPropria(codigo)) {
+    return { success: false, error: 'Subelemento de transporte (3.3.90.33) tem cálculo próprio e não aceita alíquota por natureza.', status: 400 };
+  }
+
+  try {
+    await withTransaction(async (conn) => {
+      const sub = await executar<{ codigo: string }[]>(conn, 'SELECT codigo FROM subelementos_despesa WHERE codigo = ?', [codigo]);
+      if (!sub || sub.length === 0) throw { status: 400, error: `Subelemento "${codigo}" não encontrado.` };
+
+      const atual = await executar<{ aliquota: string | number }[]>(
+        conn,
+        'SELECT aliquota FROM subelemento_irrf WHERE subelemento_codigo = ? FOR UPDATE',
+        [codigo]
+      );
+      const antes = atual && atual.length > 0 ? Number(atual[0].aliquota) : null;
+      if (antes === novo) return;
+
+      if (novo === null) {
+        await executar(conn, 'DELETE FROM subelemento_irrf WHERE subelemento_codigo = ?', [codigo]);
+      } else {
+        await executar(
+          conn,
+          `INSERT INTO subelemento_irrf (subelemento_codigo, aliquota, atualizado_por) VALUES (?, ?, ?)
+           ON DUPLICATE KEY UPDATE aliquota = VALUES(aliquota), atualizado_por = VALUES(atualizado_por)`,
+          [codigo, novo, usuarioId]
+        );
+      }
+      await executar(
+        conn,
+        `INSERT INTO auditoria_financeira (id, entidade, entidade_id, acao, dados_anteriores, dados_novos, usuario_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [crypto.randomUUID(), 'subelemento_irrf', codigo, 'UPDATE', JSON.stringify({ aliquota: antes }), JSON.stringify({ aliquota: novo }), usuarioId]
+      );
+    });
+  } catch (error: any) {
+    if (semTabela(error)) {
+      return {
+        success: false,
+        error: 'A tabela de alíquotas por natureza ainda não existe. Rode a migration_22 no banco para poder salvar.',
+        status: 409,
+      };
+    }
+    if (error.status && error.error) return { success: false, error: error.error, status: error.status };
+    throw error;
+  }
+  return { success: true, data: { subelementoCodigo: codigo, aliquota: novo } };
 }
 
 export async function salvarConfigRetencoes(body: any, usuarioId: string | null): Promise<ServiceResult<null>> {

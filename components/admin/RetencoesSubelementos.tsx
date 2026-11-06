@@ -3,6 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { perfilDoElemento } from "@/lib/perfis-calculo";
+import { numero } from "@/lib/transporte-admin";
 import type { ElementoOption } from "@/hooks/use-elementos";
 import {
   AlertDialog,
@@ -17,6 +18,8 @@ import {
 // B7a: exceções por subelemento. Um subelemento com "regra própria" troca a
 // regra do elemento no cálculo da OP (lista vazia = nenhuma retenção, como os
 // estagiários do 3.3.90.36.08). Cada linha salva sozinha, com confirmação.
+// B9: cada subelemento pode ter a alíquota do IRRF pela natureza (IN RFB
+// 1.234/2012, ex.: 3.3.90.39.22 Limpeza = 4,80%); vazio = alíquota padrão.
 
 const CAMPOS_TRIBUTARIOS = ["irrf", "iss", "inss", "patronal", "sest_senat"] as const;
 const ROTULOS: Record<string, string> = {
@@ -49,6 +52,22 @@ export const nomesDosCampos = (campos: string[]) =>
 const mesmaRegra = (a: Regra, b: Regra) =>
   a === null || b === null ? a === b : a.length === b.length && a.every((c) => b.includes(c));
 
+/** "4.8" -> "4,8"; null -> "" (alíquota padrão). */
+export const textoAliquota = (v: number | null | undefined) =>
+  v === null || v === undefined ? "" : v.toLocaleString("pt-BR", { maximumFractionDigits: 4 });
+
+/** Texto digitado -> alíquota (null = vazio) ou "invalida". */
+export function lerAliquota(texto: string): number | null | "invalida" {
+  if (!texto.trim()) return null;
+  const v = numero(texto);
+  return Number.isFinite(v) && v >= 0 && v <= 100 ? Math.round(v * 10000) / 10000 : "invalida";
+}
+
+export function descreverMudancaAliquota(codigo: string, antes: number | null, depois: number | null): string {
+  const texto = (v: number | null) => (v === null ? "alíquota padrão do IRRF" : `IRRF de ${textoAliquota(v)}%`);
+  return `${codigo}: ${texto(antes)} → ${texto(depois)}`;
+}
+
 /** Texto da confirmação: o que valia e o que passa a valer. */
 export function descreverMudanca(codigo: string, antes: Regra, depois: Regra, regraElemento: string[]): string {
   const texto = (r: Regra) => (r === null ? `segue o elemento (${nomesDosCampos(regraElemento)})` : `regra própria: ${nomesDosCampos(r)}`);
@@ -60,17 +79,26 @@ function LinhaSubelemento({
   salva,
   regraElemento,
   onSalvo,
+  aliquotaSalva,
+  onSalvoAliquota,
 }: {
   sub: SubelementoDaLista;
   salva: Regra;
   regraElemento: string[];
   onSalvo: (codigo: string, regra: Regra) => void;
+  aliquotaSalva: number | null;
+  onSalvoAliquota: (codigo: string, aliquota: number | null) => void;
 }) {
   const [regra, setRegra] = useState<Regra>(salva);
+  const [aliquotaTexto, setAliquotaTexto] = useState(textoAliquota(aliquotaSalva));
   const [confirmando, setConfirmando] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
-  const alterada = !mesmaRegra(regra, salva);
+  const aliquota = lerAliquota(aliquotaTexto);
+  const aliquotaInvalida = aliquota === "invalida";
+  const aliquotaAlterada = !aliquotaInvalida && aliquota !== aliquotaSalva;
+  const regraAlterada = !mesmaRegra(regra, salva);
+  const alterada = (regraAlterada || aliquotaAlterada) && !aliquotaInvalida;
   const propria = regra !== null;
   const marcados = regra ?? [];
 
@@ -80,10 +108,16 @@ function LinhaSubelemento({
   const salvar = async () => {
     setSalvando(true);
     try {
-      await apiClient.put("/api/configuracoes/retencoes/subelementos", { subelementoCodigo: sub.codigo, campos: regra });
+      if (regraAlterada) {
+        await apiClient.put("/api/configuracoes/retencoes/subelementos", { subelementoCodigo: sub.codigo, campos: regra });
+      }
+      if (aliquotaAlterada) {
+        await apiClient.put("/api/configuracoes/retencoes/subelementos/irrf", { subelementoCodigo: sub.codigo, aliquota });
+      }
       toast.success(`Regra do subelemento ${sub.codigo} salva.`);
       setConfirmando(false);
-      onSalvo(sub.codigo, regra === null ? null : CAMPOS_TRIBUTARIOS.filter((c) => regra.includes(c)));
+      if (aliquotaAlterada) onSalvoAliquota(sub.codigo, aliquota as number | null);
+      if (regraAlterada) onSalvo(sub.codigo, regra === null ? null : CAMPOS_TRIBUTARIOS.filter((c) => regra.includes(c)));
     } catch (err: any) {
       toast.error(err?.message || "Erro ao salvar a regra do subelemento.");
     } finally {
@@ -125,6 +159,19 @@ function LinhaSubelemento({
           Segue o elemento {sub.elementoCodigo}: {nomesDosCampos(regraElemento)}
         </td>
       )}
+      <td className="py-3 px-2 whitespace-nowrap">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={aliquotaTexto}
+          onChange={(e) => setAliquotaTexto(e.target.value)}
+          placeholder="padrão"
+          aria-label={`${sub.codigo} alíquota do IR pela natureza (%)`}
+          aria-invalid={aliquotaInvalida}
+          className={`w-20 px-2 py-1 rounded-lg border text-xs font-bold text-right ${aliquotaInvalida ? "border-red-400 bg-red-50" : "border-slate-200 bg-slate-50"}`}
+        />
+        {aliquotaInvalida && <span className="ml-1 text-xs font-bold text-red-700">0 a 100</span>}
+      </td>
       <td className="py-3 pl-2 text-right whitespace-nowrap">
         {propria && marcados.length === 0 && (
           <span className="mr-3 text-xs font-bold text-emerald-700">Sem retenções</span>
@@ -142,7 +189,14 @@ function LinhaSubelemento({
             <AlertDialogTitle>Confirmar regra do subelemento</AlertDialogTitle>
             <AlertDialogDescription>
               <span className="block mb-3 font-bold text-amber-700">Vale para todas as OPs novas. OPs já emitidas não mudam.</span>
-              <span className="block text-slate-700">{descreverMudanca(sub.codigo, salva, regra, regraElemento)}</span>
+              {regraAlterada && (
+                <span className="block text-slate-700">{descreverMudanca(sub.codigo, salva, regra, regraElemento)}</span>
+              )}
+              {aliquotaAlterada && (
+                <span className="block text-slate-700">
+                  {descreverMudancaAliquota(sub.codigo, aliquotaSalva, aliquota as number | null)}
+                </span>
+              )}
             </AlertDialogDescription>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -162,12 +216,17 @@ export default function RetencoesSubelementos({
   regras,
   regrasSubelemento,
   onSalvo,
+  irrfSubelemento = {},
+  onSalvoAliquota = () => {},
 }: {
   elementos: ElementoOption[];
   /** Regras salvas por elemento (o que o subelemento sem regra própria segue). */
   regras: Record<string, string[]>;
   regrasSubelemento: Record<string, string[]>;
   onSalvo: (codigo: string, regra: Regra) => void;
+  /** B9: alíquotas do IRRF pela natureza, salvas. */
+  irrfSubelemento?: Record<string, number>;
+  onSalvoAliquota?: (codigo: string, aliquota: number | null) => void;
 }) {
   const lista = subelementosComRegra(elementos);
 
@@ -179,7 +238,8 @@ export default function RetencoesSubelementos({
       <p className="text-xs text-slate-500 mb-6">
         Um subelemento com <strong>regra própria</strong> usa só os impostos marcados aqui, no lugar da regra do elemento. Sem
         nada marcado, a OP sai sem retenções (ex.: estagiários). O transporte (3.3.90.33) tem cálculo próprio e não aparece aqui.
-        Cada linha é salva separadamente.
+        Cada linha é salva separadamente. A <strong>alíquota do IR pela natureza</strong> (ex.: 4,8 para Limpeza) troca a
+        alíquota padrão do IRRF nas OPs desse subelemento; vazio = alíquota padrão.
       </p>
       {lista.length === 0 ? (
         <p className="text-sm text-slate-500">Nenhum subelemento cadastrado. Cadastre em Configurações &gt; Elementos.</p>
@@ -196,6 +256,7 @@ export default function RetencoesSubelementos({
                     {ROTULOS[campo]}
                   </th>
                 ))}
+                <th scope="col" className="pb-2 px-2 text-xs font-black text-slate-500 uppercase tracking-widest">IR natureza (%)</th>
                 <th scope="col" className="pb-2"></th>
               </tr>
             </thead>
@@ -203,11 +264,13 @@ export default function RetencoesSubelementos({
               {lista.map((sub) => (
                 <LinhaSubelemento
                   // A chave muda quando a regra salva muda: a linha recomeça do salvo.
-                  key={`${sub.codigo}|${JSON.stringify(regrasSubelemento[sub.codigo] ?? null)}`}
+                  key={`${sub.codigo}|${JSON.stringify(regrasSubelemento[sub.codigo] ?? null)}|${irrfSubelemento[sub.codigo] ?? ""}`}
                   sub={sub}
                   salva={regrasSubelemento[sub.codigo] ?? null}
                   regraElemento={regras[sub.elementoCodigo] ?? []}
                   onSalvo={onSalvo}
+                  aliquotaSalva={irrfSubelemento[sub.codigo] ?? null}
+                  onSalvoAliquota={onSalvoAliquota}
                 />
               ))}
             </tbody>

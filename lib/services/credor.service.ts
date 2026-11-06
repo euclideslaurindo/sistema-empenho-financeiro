@@ -44,7 +44,7 @@ export class CredorService {
       SELECT id, cpf_cnpj as cpfCnpj, nome, rg, orgao_emissor as orgaoEmissor,
              endereco, cep, logradouro, numero, bairro,
              pis, data_expedicao as dataExpedicao,
-             cidade, uf, municipioExpediente, telefone, banco, agencia, conta_corrente as contaCorrente, pix, is_mei as isMei
+             cidade, uf, municipioExpediente, telefone, banco, agencia, conta_corrente as contaCorrente, pix, is_mei as isMei, is_simples as isSimples
       FROM credores
       WHERE ativo = 1`;
     const sqlParams: any[] = [];
@@ -96,7 +96,7 @@ export class CredorService {
       return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
     }
 
-    const { cpfCnpj, nome, rg, orgaoEmissor, pis, dataExpedicao, cep, logradouro, numero, bairro, cidade, uf, telefone, banco, agencia, contaCorrente, pix, isMei } = body;
+    const { cpfCnpj, nome, rg, orgaoEmissor, pis, dataExpedicao, cep, logradouro, numero, bairro, cidade, uf, telefone, banco, agencia, contaCorrente, pix, isMei, isSimples } = body;
 
     if (!cpfCnpj || !nome) {
       return { success: false, error: 'CPF/CNPJ e Nome são obrigatórios.', status: 400 };
@@ -138,6 +138,8 @@ export class CredorService {
       conta_corrente: contaCorrente?.trim() || null,
       pix: pix?.trim() || null,
       is_mei: isMei ? 1 : 0,
+      // B9: optante pelo Simples Nacional (não sofre retenção de IR).
+      is_simples: isSimples ? 1 : 0,
       usuario_id: usuarioId,
       municipioExpediente: expediente.valor,
     };
@@ -177,7 +179,7 @@ export class CredorService {
       return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
     }
 
-    const { nome, cpfCnpj, pis, rg, orgaoEmissor, dataExpedicao, banco, agencia, contaCorrente, telefone, cidade, uf, cep, logradouro, numero, bairro, pix, isMei } = body;
+    const { nome, cpfCnpj, pis, rg, orgaoEmissor, dataExpedicao, banco, agencia, contaCorrente, telefone, cidade, uf, cep, logradouro, numero, bairro, pix, isMei, isSimples } = body;
 
     if (!nome || !cpfCnpj) {
       return { success: false, error: 'Nome e CPF/CNPJ são obrigatórios.', status: 400 };
@@ -261,6 +263,8 @@ export class CredorService {
           bairro: bairro?.trim() || null,
           pix: pix?.trim() || null,
           is_mei: isMei ? 1 : 0,
+          // B9: optante pelo Simples Nacional (não sofre retenção de IR).
+          is_simples: isSimples ? 1 : 0,
           usuario_id: usuarioId,
           ...(veioExpediente ? { municipioExpediente: expediente.valor } : {}),
         };

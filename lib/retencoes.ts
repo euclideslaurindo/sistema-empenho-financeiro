@@ -46,7 +46,31 @@ export interface EntradaCalculo {
    * cálculo por percentual, como sempre.
    */
   pessoaFisica?: DadosPessoaFisica;
+  /**
+   * B9: alíquota do IRRF por subelemento (natureza da IN RFB 1.234/2012,
+   * tabela subelemento_irrf). Vale só se o subelemento da NE for do elemento.
+   */
+  aliquotasIrrfSubelemento?: Record<string, number>;
+  /** B9: credor optante pelo Simples Nacional — não sofre retenção de IR. */
+  credorSimples?: boolean;
 }
+
+/**
+ * B9: alíquota do IRRF pela natureza (subelemento) da NE, ou undefined
+ * (vale a alíquota padrão). Mesma checagem do regraDaOp: o subelemento tem
+ * que ser do elemento ("3.3.90.39.22" é do "3.3.90.39").
+ */
+export function aliquotaIrrfDaNatureza(
+  elementoCodigo: string | null,
+  subelementoCodigo: string | null | undefined,
+  aliquotas: Record<string, number> | undefined
+): number | undefined {
+  if (!elementoCodigo || !subelementoCodigo || !subelementoCodigo.startsWith(`${elementoCodigo}.`)) return undefined;
+  const v = aliquotas?.[subelementoCodigo];
+  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
+}
+
+export const AVISO_SIMPLES = "Credor do Simples Nacional: sem retenção de IR.";
 
 /** MEI: 0, ou o valor digitado se o ADMIN confirmou a sobrescrita (T26). */
 export function valorTributarioMei(
@@ -130,6 +154,9 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
   // B8: o IRRF da PF deduz o INSS final da OP, então é calculado depois do laço.
   let irrfPfPendente = false;
   let detalheIrrfPf: ResultadoIrrfPessoaFisica | null = null;
+  const aliquotaNatureza = aliquotaIrrfDaNatureza(elementoCodigo, entrada.subelementoCodigo, entrada.aliquotasIrrfSubelemento);
+  // B9: o MEI já zera tudo; o Simples zera só o IRRF.
+  const simples = !!entrada.credorSimples && !entrada.credorMei;
 
   const sobrescreverMei = !!entrada.credorMei && !!entrada.sobrescreverMei && perfil === "ADMIN";
   if (entrada.credorMei) {
@@ -137,6 +164,7 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
   } else if (elementoDesconhecido) {
     avisos.push("Elemento desconhecido: nenhuma retenção foi calculada automaticamente.");
   }
+  if (simples) avisos.push(AVISO_SIMPLES);
 
   for (const campo of CAMPOS_TRIBUTARIOS) {
     const cfg = configPorCampo.get(campo);
@@ -172,11 +200,13 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
 
     let valor: number;
     if (cfg.calculoAutomatico && cfg.tipo === "PERCENTUAL" && cfg.aliquota != null) {
-      if (pf && campo === "inss") valor = inssPessoaFisica(brutoCents, cfg.aliquota, pf.parametros);
+      if (simples && campo === "irrf") valor = 0;
+      else if (pf && campo === "inss") valor = inssPessoaFisica(brutoCents, cfg.aliquota, pf.parametros);
       else if (pf && campo === "irrf") {
         valor = 0;
         irrfPfPendente = true;
-      } else valor = calcPercentCents(brutoCents, cfg.aliquota);
+      } else if (campo === "irrf" && aliquotaNatureza !== undefined) valor = calcPercentCents(brutoCents, aliquotaNatureza);
+      else valor = calcPercentCents(brutoCents, cfg.aliquota);
       // Regra 3: só sobrescreve um cálculo automático se o campo for
       // editável pelo operador ou o perfil for ADMIN — nunca por um cliente
       // simplesmente mandar um número (é o bug que esta task corrige).
@@ -252,13 +282,19 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
     regraCodigo: regra.codigo,
     ...(entrada.credorMei ? { mei: true } : {}),
     ...(sobrescreverMei ? { mei_sobrescrito: true } : {}),
+    ...(simples ? { simples: true } : {}),
+    ...(aliquotaNatureza !== undefined && !pf
+      ? { irrf_natureza: { subelemento: entrada.subelementoCodigo, aliquota: aliquotaNatureza } }
+      : {}),
     campos: Object.fromEntries(
       config.map((cfg) => [
         cfg.campo,
         {
           rotulo: cfg.rotulo,
           // B8: na PF o IRRF é pela tabela progressiva, não um percentual fixo.
-          aliquota: pf && cfg.campo === "irrf" ? null : cfg.aliquota,
+          // B9: no IRRF, a alíquota da natureza do subelemento, se houver.
+          aliquota:
+            cfg.campo !== "irrf" ? cfg.aliquota : pf ? null : aliquotaNatureza !== undefined ? aliquotaNatureza : cfg.aliquota,
           automatico: cfg.calculoAutomatico,
           ativo: cfg.ativo,
           aplica:

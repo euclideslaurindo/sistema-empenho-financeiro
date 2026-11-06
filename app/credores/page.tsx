@@ -47,6 +47,8 @@ interface Credor {
   contaCorrente?: string;
   pix?: string;
   isMei?: boolean;
+  /** B9: optante pelo Simples Nacional (sem retenção de IR). */
+  isSimples?: boolean;
   /** T33: prefeitura que cobra a taxa de expediente (só no 3.3.90.33). */
   municipioExpediente?: string | null;
 }
@@ -433,6 +435,29 @@ function CredoresContent() {
               )}
             </div>
 
+            <div className="col-span-12 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+              <label htmlFor="credor-is-simples" className="flex items-center gap-2 cursor-pointer">
+                <input
+                  id="credor-is-simples"
+                  type="checkbox"
+                  checked={!!Number(formData.isSimples) || false}
+                  onChange={(e) => setFormData({ ...formData, isSimples: e.target.checked })}
+                  aria-describedby="credor-is-simples-ajuda"
+                  className="w-5 h-5 rounded border-slate-300 text-sky-700 focus:ring-sky-700"
+                />
+                <span className="text-sm font-black text-sky-900">Optante pelo Simples Nacional</span>
+              </label>
+              <p id="credor-is-simples-ajuda" className="mt-1 ml-7 text-xs font-semibold text-sky-800">
+                Não sofre retenção de IR. ISS e as demais retenções seguem a regra do elemento. Confira antes de salvar: isso muda o
+                valor pago.
+              </p>
+              {!!Number(formData.isSimples) && (formData.cpfCnpj || "").replace(/\D/g, "").length === 11 && (
+                <p role="alert" className="mt-1 ml-7 text-xs font-bold text-amber-700">
+                  Simples Nacional é de empresa (CNPJ) — o documento informado é um CPF. Confira o cadastro.
+                </p>
+              )}
+            </div>
+
             {/* Row 2: RG, Órgão, Data Emissão, PIS */}
             <div className="col-span-12 md:col-span-3">
               <label htmlFor="credor-pis" className="block text-sm font-black text-slate-500 uppercase tracking-widest mb-2">PIS</label>
@@ -642,6 +667,11 @@ function CredoresContent() {
                         {!!Number(c.isMei) && (
                           <span className="ml-2 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-violet-700">
                             MEI
+                          </span>
+                        )}
+                        {!Number(c.isMei) && !!Number(c.isSimples) && (
+                          <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-sky-800">
+                            Simples
                           </span>
                         )}
                       </td>

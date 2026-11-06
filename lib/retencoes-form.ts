@@ -1,7 +1,14 @@
 // Regras de tela da seção "Retenções e Descontos" da OP (T11). Espelham as
 // regras de lib/retencoes.ts pra tela nunca oferecer edição que o servidor
 // vai ignorar — mas quem decide o valor gravado continua sendo o servidor.
-import { CAMPOS_INFORMATIVOS, CAMPOS_TRIBUTARIOS, regraDaOp, type CampoDesconto, type CampoTributario } from "@/lib/retencoes";
+import {
+  aliquotaIrrfDaNatureza,
+  CAMPOS_INFORMATIVOS,
+  CAMPOS_TRIBUTARIOS,
+  regraDaOp,
+  type CampoDesconto,
+  type CampoTributario,
+} from "@/lib/retencoes";
 import type { ConfigRetencaoCampoMapeado } from "@/lib/services/config-retencoes.service";
 import { maskCurrency } from "@/lib/utils";
 import { toCents } from "@/lib/money";
@@ -89,13 +96,18 @@ export function estadoCampoOp(
   elementoCodigo: string | null,
   regras: Record<string, string[]>,
   perfil: Perfil,
-  mei: { credorMei: boolean; sobrescreverMei: boolean } = { credorMei: false, sobrescreverMei: false }
+  mei: { credorMei: boolean; sobrescreverMei: boolean; credorSimples?: boolean } = { credorMei: false, sobrescreverMei: false }
 ): EstadoCampo {
   if (mei.credorMei && (CAMPOS_TRIBUTARIOS as string[]).includes(cfg.campo)) {
     const manual = mei.sobrescreverMei && perfil === "ADMIN";
     return { editavel: manual, obrigatorio: false, dica: manual ? "Valor manual (ADMIN, credor MEI)" : "Isento (MEI)" };
   }
-  return estadoCampo(cfg, elementoCodigo, regras, perfil);
+  const estado = estadoCampo(cfg, elementoCodigo, regras, perfil);
+  // B9: Simples Nacional não sofre retenção de IR (o motor zera o automático).
+  if (mei.credorSimples && cfg.campo === "irrf" && !estado.dica) {
+    return { ...estado, obrigatorio: false, dica: "Isento de IR (Simples Nacional)" };
+  }
+  return estado;
 }
 
 export function rotuloCampo(cfg: ConfigRetencaoCampoMapeado): string {
@@ -147,11 +159,20 @@ export const camposInformativos = (_elementoCodigo?: string | null): CampoRetenc
 /**
  * No transporte os percentuais incidem sobre bases diferentes: rótulo sem "%".
  * Na pessoa física (B8) o IRRF é pela tabela progressiva, não um percentual.
+ * Com natureza no subelemento (B9), o IRRF mostra a alíquota dela.
  */
-export function rotuloCampoDoElemento(cfg: ConfigRetencaoCampoMapeado, elementoCodigo: string | null): string {
+export function rotuloCampoDoElemento(
+  cfg: ConfigRetencaoCampoMapeado,
+  elementoCodigo: string | null,
+  subelementoCodigo: string | null = null,
+  irrfSubelemento?: Record<string, number>
+): string {
   const perfil = perfilDoElemento(elementoCodigo);
   if (perfil === "PESSOA_FISICA" && cfg.campo === "irrf") return `${cfg.rotulo} (tabela progressiva)`;
-  if (perfil !== "TRANSPORTE_AUTONOMO") return rotuloCampo(cfg);
+  if (perfil !== "TRANSPORTE_AUTONOMO") {
+    const natureza = cfg.campo === "irrf" ? aliquotaIrrfDaNatureza(elementoCodigo, subelementoCodigo, irrfSubelemento) : undefined;
+    return rotuloCampo(natureza !== undefined ? { ...cfg, aliquota: natureza } : cfg);
+  }
   return cfg.campo === "patronal" ? `${cfg.rotulo} (informativa)` : cfg.rotulo;
 }
 

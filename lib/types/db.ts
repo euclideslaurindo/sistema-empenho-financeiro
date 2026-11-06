@@ -30,6 +30,8 @@ export interface CredorDB {
   conta_corrente: string | null;
   pix: string | null;
   is_mei: number;
+  /** B9: optante pelo Simples Nacional (migration_22). */
+  is_simples: number;
   /** Município (Expediente): define a taxa de expediente no 3.3.90.33 (T33). camelCase de propósito (D41). */
   municipioExpediente: string | null;
   usuario_id: string | null;

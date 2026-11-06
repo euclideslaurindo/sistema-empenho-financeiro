@@ -99,6 +99,9 @@ export function CredorOpLinha({
             {linha.credorMei && (
               <span className="ml-2 text-emerald-700 font-black text-xs uppercase bg-emerald-100 px-1.5 py-0.5 rounded">MEI</span>
             )}
+            {linha.credorSimples && !linha.credorMei && (
+              <span className="ml-2 text-sky-800 font-black text-xs uppercase bg-sky-100 px-1.5 py-0.5 rounded">Simples</span>
+            )}
           </p>
           <p className="text-xs font-semibold text-slate-500">
             {linha.cpfCnpj}

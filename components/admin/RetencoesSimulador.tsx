@@ -4,7 +4,7 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { simularRetencoes, CAMPOS_TRIBUTARIOS } from "@/lib/retencoes-simulador";
 import { formatarBRL, toCents } from "@/lib/money";
 import { parseFormNumber } from "@/lib/utils";
-import { regraDaOp } from "@/lib/retencoes";
+import { aliquotaIrrfDaNatureza, regraDaOp } from "@/lib/retencoes";
 import { perfilDoElemento } from "@/lib/perfis-calculo";
 import type { ElementoOption } from "@/hooks/use-elementos";
 
@@ -19,11 +19,14 @@ const ROTULOS: Record<string, string> = {
 export default function RetencoesSimulador({
   elementosApi = [],
   regrasSubelemento = {},
+  irrfSubelemento = {},
 }: {
   /** B7a: para listar os subelementos do elemento escolhido. */
   elementosApi?: ElementoOption[];
   /** B7a: regras próprias salvas; o subelemento com regra própria troca a do elemento. */
   regrasSubelemento?: Record<string, string[]>;
+  /** B9: alíquotas do IRRF pela natureza, salvas. */
+  irrfSubelemento?: Record<string, number>;
 } = {}) {
   const { control } = useFormContext<any>();
   const camposWatch = useWatch({ control, name: "campos" });
@@ -45,6 +48,7 @@ export default function RetencoesSimulador({
     return regraDaOp(elementoCodigo, subelementoCodigo || null, { [elementoCodigo]: doElemento }, regrasSubelemento).campos ?? [];
   }, [elementoSelecionado, elementoCodigo, subelementoCodigo, regrasSubelemento]);
   const regraPropria = !!subelementoCodigo && regrasSubelemento[subelementoCodigo] !== undefined;
+  const aliquotaNatureza = aliquotaIrrfDaNatureza(elementoCodigo, subelementoCodigo || null, irrfSubelemento);
 
   const resultado = useMemo(() => {
     const bruto = parseFormNumber(brutoTexto);
@@ -55,8 +59,9 @@ export default function RetencoesSimulador({
       camposConfig: camposWatch || [],
       taxaBancariaReais: parseFormNumber(taxaBancariaTexto),
       taxaPixReais: parseFormNumber(taxaPixTexto),
+      aliquotaIrrf: aliquotaNatureza,
     });
-  }, [brutoTexto, elementoCodigo, regrasElemento, camposWatch, taxaBancariaTexto, taxaPixTexto]);
+  }, [brutoTexto, elementoCodigo, regrasElemento, camposWatch, taxaBancariaTexto, taxaPixTexto, aliquotaNatureza]);
 
   return (
     <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
@@ -161,6 +166,11 @@ export default function RetencoesSimulador({
           {perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO" && (
             <p role="note" className="mb-4 text-xs font-bold text-amber-700">
               O {elementoCodigo} tem cálculo próprio: use o simulador da aba Transporte (3.3.90.33).
+            </p>
+          )}
+          {aliquotaNatureza !== undefined && (
+            <p role="status" className="mb-4 text-xs font-bold text-sky-800">
+              IR pela natureza do subelemento {subelementoCodigo}: {aliquotaNatureza.toLocaleString("pt-BR", { maximumFractionDigits: 4 })}% (salva).
             </p>
           )}
           {regraPropria && (
