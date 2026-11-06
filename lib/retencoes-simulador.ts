@@ -25,6 +25,8 @@ export interface SimuladorEntrada {
   camposConfig: SimuladorCampoConfig[];
   taxaBancariaReais?: number;
   taxaPixReais?: number;
+  /** B10: 2º ISS, valor livre. */
+  issBsReais?: number;
   /** B9: alíquota do IRRF pela natureza do subelemento escolhido (troca a do IRRF). */
   aliquotaIrrf?: number;
 }
@@ -33,6 +35,7 @@ export interface SimuladorResultado {
   itensCents: Record<string, number>;
   taxaBancariaCents: number;
   taxaPixCents: number;
+  issBsCents: number;
   totalDescontosCents: number;
   liquidoCents: number;
   brutoCents: number;
@@ -64,12 +67,14 @@ export function simularRetencoes(entrada: SimuladorEntrada): SimuladorResultado 
 
   const taxaBancariaCents = toCents(entrada.taxaBancariaReais || 0);
   const taxaPixCents = toCents(entrada.taxaPixReais || 0);
-  totalDescontosCents = somarCents(totalDescontosCents, taxaBancariaCents, taxaPixCents);
+  const issBsCents = toCents(entrada.issBsReais || 0);
+  totalDescontosCents = somarCents(totalDescontosCents, taxaBancariaCents, taxaPixCents, issBsCents);
 
   return {
     itensCents,
     taxaBancariaCents,
     taxaPixCents,
+    issBsCents,
     totalDescontosCents,
     liquidoCents: brutoCents - totalDescontosCents,
     brutoCents,

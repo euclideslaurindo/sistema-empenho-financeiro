@@ -81,11 +81,12 @@ const CAMPOS_RETENCAO_VALIDOS = [
   'outros',
   'taxa_bancaria',
   'taxa_pix',
+  'iss_bs',
 ] as const;
 
 const CAMPOS_TRIBUTARIOS = ['irrf', 'iss', 'inss', 'patronal', 'sest_senat'] as const;
 
-const CAMPOS_SEM_PERCENTUAL = ['taxa_bancaria', 'taxa_pix'];
+const CAMPOS_SEM_PERCENTUAL = ['taxa_bancaria', 'taxa_pix', 'iss_bs'];
 
 /** Conta casas decimais por string, evitando ruído de ponto flutuante (ex.: 0.1234 * 10000). */
 function temNoMaximoCasasDecimais(valor: number, max: number): boolean {

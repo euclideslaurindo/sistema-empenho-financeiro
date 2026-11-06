@@ -11,6 +11,7 @@ export interface LinhaDesconto {
 const CAMPOS: Array<{ campo: string; chave: string; rotuloPadrao: string; rotuloHistorico: string }> = [
   { campo: "irrf", chave: "irrf", rotuloPadrao: "IRRF", rotuloHistorico: "IRRF (1,5%)" },
   { campo: "iss", chave: "iss", rotuloPadrao: "ISS", rotuloHistorico: "ISS (5%)" },
+  { campo: "iss_bs", chave: "issBs", rotuloPadrao: "ISS-BS", rotuloHistorico: "ISS-BS" },
   { campo: "inss", chave: "inss", rotuloPadrao: "INSS", rotuloHistorico: "INSS (11%)" },
   { campo: "patronal", chave: "patronal", rotuloPadrao: "PATRONAL", rotuloHistorico: "PATRONAL (20%)" },
   { campo: "sest_senat", chave: "sestSenat", rotuloPadrao: "SEST/SENAT", rotuloHistorico: "SEST/SENAT (2,5%)" },

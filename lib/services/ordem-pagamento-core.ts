@@ -67,6 +67,8 @@ export const ordemPagamentoSchema = z.object({
   outrosDescontos: safeNumber.optional(),
   taxaBancaria: safeNumber.optional(),
   taxaPix: safeNumber.optional(),
+  // B10: 2º ISS, valor livre.
+  issBs: safeNumber.optional(),
   // T26: ADMIN confirmou reter mesmo com credor MEI.
   sobrescreverMei: z.boolean().optional(),
   totalDescontos: safeNumber.optional(),
@@ -100,6 +102,7 @@ export function montarInformados(parsedData: any): Partial<Record<CampoTributari
     ['outrosDescontos', 'outros'],
     ['taxaBancaria', 'taxa_bancaria'],
     ['taxaPix', 'taxa_pix'],
+    ['issBs', 'iss_bs'],
   ];
   for (const [campoPayload, campoEngine] of mapa) {
     const valor = parsedData[campoPayload];
@@ -141,6 +144,7 @@ export interface OpCriada {
   outrosDescontos: number;
   taxaBancaria: number;
   taxaPix: number;
+  issBs: number;
   totalDescontos: number;
   valorLiquido: number;
 }
@@ -225,6 +229,7 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
   const finalOutros = fromCents(resultado.itens.outros ?? 0);
   const finalTaxaBancaria = fromCents(resultado.itens.taxa_bancaria ?? 0);
   const finalTaxaPix = fromCents(resultado.itens.taxa_pix ?? 0);
+  const finalIssBs = fromCents(resultado.itens.iss_bs ?? 0);
   const finalTotalDescontos = fromCents(resultado.totalDescontosCents);
   const finalLiquido = fromCents(resultado.liquidoCents);
   const snapshotJson = JSON.stringify(resultado.snapshot);
@@ -243,8 +248,8 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
             saldo_anterior, valor_empenho, valor_pagamento,
             irrf, iss, inss, sest_senat, patronal, outros_descontos, taxa_bancaria, taxa_pix,
             total_descontos, valor_liquido, retencoes_snapshot,
-            numero_cheque, data_emissao, data_pagamento, usuario_id
-          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            numero_cheque, data_emissao, data_pagamento, usuario_id, iss_bs
+          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       id, liquidacao_id || null, neReal, numeroDaOpGerado, subGerado,
       credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
@@ -254,7 +259,9 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
       toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamentoArredondado,
       finalIrrf, finalIss, finalInss, finalSestSenat, finalPatronal, finalOutros, finalTaxaBancaria, finalTaxaPix,
       finalTotalDescontos, finalLiquido, snapshotJson,
-      chequeFormatado, dataEmissao || null, dataPagamento || null, usuarioId
+      chequeFormatado, dataEmissao || null, dataPagamento || null, usuarioId,
+      // B10: no fim da lista (migration_23).
+      finalIssBs,
     ]
   );
 
@@ -299,6 +306,7 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
     outrosDescontos: finalOutros,
     taxaBancaria: finalTaxaBancaria,
     taxaPix: finalTaxaPix,
+    issBs: finalIssBs,
     totalDescontos: finalTotalDescontos,
     valorLiquido: finalLiquido,
   };

@@ -7,10 +7,11 @@ import { inssPessoaFisica, irrfPessoaFisica, type DadosPessoaFisica, type Result
 import type { ConfigRetencaoCampoMapeado } from "@/lib/services/config-retencoes.service";
 
 export type CampoTributario = "irrf" | "iss" | "inss" | "patronal" | "sest_senat";
-export type CampoDesconto = "outros" | "taxa_bancaria" | "taxa_pix";
+// B10: iss_bs = 2º ISS, valor livre digitado na OP (entra no total, fora da DARF).
+export type CampoDesconto = "outros" | "taxa_bancaria" | "taxa_pix" | "iss_bs";
 
 export const CAMPOS_TRIBUTARIOS: CampoTributario[] = ["irrf", "iss", "inss", "patronal", "sest_senat"];
-export const CAMPOS_DESCONTO: CampoDesconto[] = ["outros", "taxa_bancaria", "taxa_pix"];
+export const CAMPOS_DESCONTO: CampoDesconto[] = ["outros", "taxa_bancaria", "taxa_pix", "iss_bs"];
 
 /**
  * Campos só informativos (R15/D15): calculados, gravados e impressos, mas FORA

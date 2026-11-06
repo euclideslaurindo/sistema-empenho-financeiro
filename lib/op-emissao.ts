@@ -48,6 +48,8 @@ export interface CredorLinha {
   outrosDescontos: string;
   taxaBancaria: string;
   taxaPix: string;
+  /** B10: 2º ISS, valor livre. */
+  issBs?: string;
   camposInformados: string[];
   sobrescreverMei: boolean;
   previaAvisos: string[];
@@ -106,7 +108,7 @@ export function linhaDoCredor(credor: CredorApi, historicoNe: string | null | un
     numeroCheque: "",
     dataPagamento: "",
     itens: [{ especificacao: especificacaoPadrao(historicoNe, numeroNe), quantidade: 1, unidade: "UN", valorUnitario: "" }],
-    irrf: "", iss: "", inss: "", sestSenat: "", patronal: "", outrosDescontos: "", taxaBancaria: "", taxaPix: "",
+    irrf: "", iss: "", inss: "", sestSenat: "", patronal: "", outrosDescontos: "", taxaBancaria: "", taxaPix: "", issBs: "",
     camposInformados: [],
     sobrescreverMei: false,
     previaAvisos: [],

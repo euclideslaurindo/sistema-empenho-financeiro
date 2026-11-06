@@ -37,6 +37,7 @@ export default function RetencoesSimulador({
   const [brutoTexto, setBrutoTexto] = useState("");
   const [taxaBancariaTexto, setTaxaBancariaTexto] = useState("");
   const [taxaPixTexto, setTaxaPixTexto] = useState("");
+  const [issBsTexto, setIssBsTexto] = useState("");
 
   const elementos = elementosWatch || [];
   const elementoSelecionado = elementos.find((e: any) => e.codigo === elementoCodigo);
@@ -59,9 +60,10 @@ export default function RetencoesSimulador({
       camposConfig: camposWatch || [],
       taxaBancariaReais: parseFormNumber(taxaBancariaTexto),
       taxaPixReais: parseFormNumber(taxaPixTexto),
+      issBsReais: parseFormNumber(issBsTexto),
       aliquotaIrrf: aliquotaNatureza,
     });
-  }, [brutoTexto, elementoCodigo, regrasElemento, camposWatch, taxaBancariaTexto, taxaPixTexto, aliquotaNatureza]);
+  }, [brutoTexto, elementoCodigo, regrasElemento, camposWatch, taxaBancariaTexto, taxaPixTexto, issBsTexto, aliquotaNatureza]);
 
   return (
     <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
@@ -73,7 +75,7 @@ export default function RetencoesSimulador({
         cálculo da OP — só uma conferência rápida pra você antes de salvar.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
         <div>
           <label htmlFor="sim-elemento" className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
             Elemento
@@ -150,6 +152,19 @@ export default function RetencoesSimulador({
             placeholder="0,00"
             value={taxaPixTexto}
             onChange={(e) => setTaxaPixTexto(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold"
+          />
+        </div>
+        <div>
+          <label htmlFor="sim-iss-bs" className="block text-xs font-black text-slate-500 uppercase tracking-widest mb-2">
+            ISS-BS
+          </label>
+          <input
+            id="sim-iss-bs"
+            type="text"
+            placeholder="0,00"
+            value={issBsTexto}
+            onChange={(e) => setIssBsTexto(e.target.value)}
             className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold"
           />
         </div>
