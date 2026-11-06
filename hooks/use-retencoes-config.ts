@@ -20,6 +20,8 @@ export interface ConfigRetencoes {
   regras: Record<string, string[]>;
   /** B7a: regras próprias por subelemento; [] = nenhuma retenção. */
   regrasSubelemento?: Record<string, string[]>;
+  /** B9: alíquota do IRRF pela natureza do subelemento (ex.: 4,8 = 4,80%). */
+  irrfSubelemento?: Record<string, number>;
   versao: string;
 }
 

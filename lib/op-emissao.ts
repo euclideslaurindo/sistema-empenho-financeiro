@@ -27,6 +27,8 @@ export interface CredorLinha {
   cpfCnpj: string;
   nomeCredor: string;
   credorMei: boolean;
+  /** B9: optante pelo Simples Nacional (sem retenção de IR). Ausente = não. */
+  credorSimples?: boolean;
   municipioExpediente: string;
   rg: string;
   endereco: string;
@@ -66,6 +68,8 @@ export interface CredorApi {
   nome?: string;
   isMei?: number | boolean | null;
   is_mei?: number | boolean | null;
+  isSimples?: number | boolean | null;
+  is_simples?: number | boolean | null;
   municipioExpediente?: string | null;
   rg?: string | null;
   endereco?: string | null;
@@ -90,6 +94,7 @@ export function linhaDoCredor(credor: CredorApi, historicoNe: string | null | un
     cpfCnpj: credor.cpfCnpj || credor.cpf_cnpj || "",
     nomeCredor: credor.nome || "",
     credorMei: !!Number(credor.isMei ?? credor.is_mei ?? 0),
+    credorSimples: !!Number(credor.isSimples ?? credor.is_simples ?? 0),
     municipioExpediente: credor.municipioExpediente || "",
     rg: credor.rg || "",
     endereco: credor.endereco || "",
@@ -205,6 +210,7 @@ export function validarEmissao(
           estadoCampoOp(cfg as any, elementoCodigo, ctx.config!.regras, ctx.perfil, {
             credorMei: !!c.credorMei,
             sobrescreverMei: !!c.sobrescreverMei,
+            credorSimples: !!c.credorSimples,
           }).obrigatorio &&
           !(c.camposInformados || []).includes(cfg.campo)
       );

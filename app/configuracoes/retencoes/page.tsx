@@ -148,6 +148,8 @@ export default function RetencoesConfigPage() {
   const [pfDirty, setPfDirty] = useState(false);
   // B7a: regras próprias por subelemento — salvas linha a linha, fora do form.
   const [regrasSubelemento, setRegrasSubelemento] = useState<Record<string, string[]>>({});
+  // B9: alíquota do IRRF pela natureza do subelemento — salva linha a linha.
+  const [irrfSubelemento, setIrrfSubelemento] = useState<Record<string, number>>({});
 
   const methods = useForm<FormValues>({ defaultValues: { campos: [], elementos: [] } });
   const {
@@ -176,6 +178,7 @@ export default function RetencoesConfigPage() {
       setDefaultValuesSnapshot(dv);
       setVersaoBase(config.versao);
       setRegrasSubelemento(config.regrasSubelemento ?? {});
+      setIrrfSubelemento(config.irrfSubelemento ?? {});
     }
   }, [config, elementos, reset]);
 
@@ -339,6 +342,15 @@ export default function RetencoesConfigPage() {
                   elementos={elementos}
                   regras={config?.regras ?? {}}
                   regrasSubelemento={regrasSubelemento}
+                  irrfSubelemento={irrfSubelemento}
+                  onSalvoAliquota={(codigo, aliquota) =>
+                    setIrrfSubelemento((atual) => {
+                      const novo = { ...atual };
+                      if (aliquota === null) delete novo[codigo];
+                      else novo[codigo] = aliquota;
+                      return novo;
+                    })
+                  }
                   onSalvo={(codigo, regra) =>
                     setRegrasSubelemento((atual) => {
                       const novo = { ...atual };
@@ -348,7 +360,7 @@ export default function RetencoesConfigPage() {
                     })
                   }
                 />
-                <RetencoesSimulador elementosApi={elementos} regrasSubelemento={regrasSubelemento} />
+                <RetencoesSimulador elementosApi={elementos} regrasSubelemento={regrasSubelemento} irrfSubelemento={irrfSubelemento} />
               </form>
             </FormProvider>
           )}

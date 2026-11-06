@@ -64,12 +64,12 @@ export async function calcularRetencoesDaOp(
   e: EntradaCalculoOp,
   cache: CacheCalculo = semCache
 ): Promise<ResultadoCalculoOp> {
-  const { campos, regras, regrasSubelemento } = await cache.memo('config', () => obterConfigRetencoes(conn));
+  const { campos, regras, regrasSubelemento, irrfSubelemento } = await cache.memo('config', () => obterConfigRetencoes(conn));
 
   // T33: no 3.3.90.33 a taxa de expediente vem só do Município (Expediente);
   // a `cidade` do endereço não entra no cálculo. Credor inativo é ignorado
   // (o cadastro não deixa desativar credor que já tem OP).
-  const sqlCredor = `SELECT municipioExpediente, is_mei FROM credores
+  const sqlCredor = `SELECT municipioExpediente, is_mei, is_simples FROM credores
      WHERE ativo = 1
        AND (cpf_cnpj = ? OR REPLACE(REPLACE(REPLACE(REPLACE(cpf_cnpj, '.', ''), '-', ''), '/', ''), ' ', '') = ?)
      LIMIT 1`;
@@ -79,6 +79,8 @@ export async function calcularRetencoesDaOp(
   );
   const credor = credores?.[0];
   const credorMei = !!Number(credor?.is_mei);
+  // B9: optante pelo Simples Nacional não sofre retenção de IR (migration_22).
+  const credorSimples = !!Number(credor?.is_simples);
 
   const perfilCalculo = perfilDoElemento(e.elementoCodigo);
 
@@ -132,6 +134,8 @@ export async function calcularRetencoesDaOp(
     credorMei,
     sobrescreverMei: e.sobrescreverMei,
     pessoaFisica,
+    aliquotasIrrfSubelemento: irrfSubelemento,
+    credorSimples,
   });
   return { resultado, configCampos: campos, perfilCalculo };
 }

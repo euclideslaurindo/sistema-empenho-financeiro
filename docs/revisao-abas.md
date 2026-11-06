@@ -423,6 +423,16 @@ Os problemas estão em volta dessas telas.
 - [ ] **PF-05** OP de R$ 4.000,00 no 3.3.90.36 → IRRF 0,00 e INSS 440,00. OP de estagiário (3.3.90.36.08) → continua sem retenção.
 - [ ] **PF-06** Uma OP de 3.3.90.39 (ou outro elemento) continua com IRRF de 1,5%; uma OP de transporte (3.3.90.33) dá os mesmos valores de antes.
 
+**IR de pessoa jurídica pela natureza — 3.3.90.39 — e credor do Simples Nacional (B9)**
+- [ ] **PJ-01** Rodar a `database/migration_22.sql` no Workbench: a consulta 0 vem **vazia** (nenhum 3.3.90.39.xx antes); depois, (a) 28 subelementos 3.3.90.39.01 a .28 com a alíquota, (b) 0,24 → 3 · 1,20 → 11 · 2,40 → 3 · 4,80 → 11, (c) a coluna `is_simples` em credores, (d) 0 credores Simples, (e) a versão 22.
+- [ ] **PJ-02** Configurações → Retenções → **Matriz**: no 3.3.90.39 desmarcar **INSS, SEST/SENAT e Patronal** (ficam IRRF e ISS) e salvar — a confirmação mostra "3.3.90.39 deixa de ter …".
+- [ ] **PJ-03** Configurações → Retenções → **Exceções por subelemento**: os 28 subelementos do 3.3.90.39 com a coluna "IR natureza (%)" preenchida (ex.: 3.3.90.39.22 Limpeza = 4,8). Mudar uma, confirmar (mostra antes → depois) e voltar.
+- [ ] **PJ-04** **Simulador** (Retenções padrão): 3.3.90.39 + 3.3.90.39.22, R$ 10.000,00 → IRRF 480,00, ISS 500,00, líquido 9.020,00 (com o aviso "IR pela natureza… 4,8%").
+- [ ] **PJ-05** NE de 3.3.90.39 com o subelemento "3.3.90.39.22 - Limpeza" e OP de R$ 10.000,00: campo "IRRF (4,8%)" 480,00, ISS 500,00, INSS/SEST/Patronal "Não se aplica", líquido 9.020,00; salvar e conferir os mesmos valores, **sem DARF**. Com "3.3.90.39.01" (combustíveis) → IRRF 24,00.
+- [ ] **PJ-06** NE de 3.3.90.39 **sem** subelemento → "IRRF (1,5%)" 150,00.
+- [ ] **PJ-07** Credores: marcar "Optante pelo Simples Nacional" num credor PJ e salvar → selo "SIMPLES" na lista e na busca da OP. OP desse credor no 3.3.90.39 + Limpeza → IRRF 0,00 com "Isento de IR (Simples Nacional)" e o aviso; ISS 500,00 continua (líquido 9.500,00).
+- [ ] **PJ-08** Credor MEI continua sem nenhuma retenção; OP de 3.3.90.36 (PF) e de transporte (3.3.90.33) com os mesmos valores de antes.
+
 ### Resultado do teste
 
 | Item | ✅/❌ | Observação |

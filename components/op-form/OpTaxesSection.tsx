@@ -82,6 +82,7 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
   const subelemento = useWatch({ control, name: "subelemento" });
   const camposInformados: string[] = useWatch({ control, name: n("camposInformados") }) || [];
   const credorMei: boolean = !!useWatch({ control, name: n("credorMei") });
+  const credorSimples: boolean = !!useWatch({ control, name: n("credorSimples") });
   const sobrescreverMei: boolean = !!useWatch({ control, name: n("sobrescreverMei") });
   const valoresCampos = useWatch({ control, name: nomesForm });
   const chaveValores = JSON.stringify(valoresCampos);
@@ -115,6 +116,8 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
           perfil,
           credorMei,
           sobrescreverMei,
+          credorSimples,
+          aliquotasIrrfSubelemento: config.irrfSubelemento,
         });
       } catch {
         return; // valor digitado inválido (ex.: maior que o bruto): o resumo mostra o alerta
@@ -128,7 +131,7 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
     return () => clearTimeout(timer);
     // chaveValores/chaveInformados representam os arrays observados (identidade muda a cada render)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [valorPagamento, elemento, subelemento, chaveInformados, chaveValores, config, perfil, credorMei, sobrescreverMei, setValue, getValues, n, basePath]);
+  }, [valorPagamento, elemento, subelemento, chaveInformados, chaveValores, config, perfil, credorMei, credorSimples, sobrescreverMei, setValue, getValues, n, basePath]);
 
   return null;
 }
@@ -425,9 +428,11 @@ function CamposRetencao({ config, perfil, basePath, efeitos }: { config: ConfigR
   const subelemento = useWatch({ control, name: "subelemento" });
   const previaAvisos: string[] = useWatch({ control, name: n("previaAvisos") }) || [];
   const credorMei: boolean = !!useWatch({ control, name: n("credorMei") });
+  const credorSimples: boolean = !!useWatch({ control, name: n("credorSimples") });
   const sobrescreverMei: boolean = !!useWatch({ control, name: n("sobrescreverMei") });
   const elementoCodigo = extrairCodigoElemento(elemento);
-  const regra = regraDaTela(config, elementoCodigo, extrairCodigoElemento(subelemento));
+  const subelementoCodigo = extrairCodigoElemento(subelemento);
+  const regra = regraDaTela(config, elementoCodigo, subelementoCodigo);
   const elementoConhecido = regra.codigo !== null && regra.regras[regra.codigo] !== undefined;
   const transporte = perfilDoElemento(elementoCodigo) === "TRANSPORTE_AUTONOMO";
   const pessoaFisica = perfilDoElemento(elementoCodigo) === "PESSOA_FISICA";
@@ -439,6 +444,12 @@ function CamposRetencao({ config, perfil, basePath, efeitos }: { config: ConfigR
   return (
     <>
       {credorMei && <BannerMei perfil={perfil} sobrescreverMei={sobrescreverMei} basePath={basePath} />}
+      {credorSimples && !credorMei && !transporte && (
+        <p role="note" className="mb-4 flex items-center gap-2 text-sm font-semibold text-sky-800">
+          <ShieldCheck className="w-4 h-4" /> Credor do Simples Nacional: sem retenção de IR. As demais retenções seguem a regra do
+          elemento.
+        </p>
+      )}
       {!elemento ? (
         <p className="mb-6 text-sm font-semibold text-slate-500">Selecione a NE para calcular as retenções.</p>
       ) : transporte ? (
@@ -488,12 +499,12 @@ function CamposRetencao({ config, perfil, basePath, efeitos }: { config: ConfigR
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {campos.map((cfg) => {
-          const estado = estadoCampoOp(cfg, regra.codigo, regra.regras, perfil, { credorMei, sobrescreverMei });
+          const estado = estadoCampoOp(cfg, regra.codigo, regra.regras, perfil, { credorMei, sobrescreverMei, credorSimples });
           return (
             <CampoRetencaoInput
               key={cfg.campo}
               campo={cfg.campo as CampoRetencao}
-              rotulo={rotuloCampoDoElemento(cfg, elementoCodigo)}
+              rotulo={rotuloCampoDoElemento(cfg, elementoCodigo, subelementoCodigo, config.irrfSubelemento)}
               editavel={estado.editavel}
               obrigatorio={estado.obrigatorio}
               dica={estado.dica}
