@@ -70,17 +70,35 @@ describe('linhasDescontoDaOp', () => {
     ]);
   });
 
-  test('OP antiga (sem snapshot): rótulos históricos, 8 linhas', () => {
+  test('OP antiga (sem snapshot): rótulos históricos, 9 linhas (com o ISS-BS, B10)', () => {
     expect(rotulos({ retencoesSnapshot: null })).toEqual([
-      'IRRF (1,5%)', 'ISS (5%)', 'INSS (11%)', 'PATRONAL (20%)', 'SEST/SENAT (2,5%)',
+      'IRRF (1,5%)', 'ISS (5%)', 'ISS-BS', 'INSS (11%)', 'PATRONAL (20%)', 'SEST/SENAT (2,5%)',
       'OUTROS / IBS-CBS', 'Taxa bancária (expediente)', 'Taxa PIX',
     ]);
-    expect(rotulos({ retencoesSnapshot: 'json quebrado' })).toHaveLength(8);
+    expect(rotulos({ retencoesSnapshot: 'json quebrado' })).toHaveLength(9);
   });
 
-  test('documento em branco: 8 linhas sem percentual', () => {
-    expect(LINHAS_DOCUMENTO_EM_BRANCO).toHaveLength(8);
+  test('documento em branco: 9 linhas sem percentual (com o ISS-BS)', () => {
+    expect(LINHAS_DOCUMENTO_EM_BRANCO).toHaveLength(9);
+    expect(LINHAS_DOCUMENTO_EM_BRANCO[2]).toEqual({ chave: 'issBs', rotulo: 'ISS-BS' });
     expect(LINHAS_DOCUMENTO_EM_BRANCO.some((l) => l.rotulo.includes('%'))).toBe(false);
+  });
+});
+
+describe('ISS-BS (B10) na via', () => {
+  test('snapshot com o campo iss_bs: linha "ISS-BS" sem percentual, depois do ISS', () => {
+    const snap = {
+      elemento: '3.3.90.39',
+      campos: {
+        iss: { rotulo: 'ISS', aliquota: 5, automatico: true, ativo: true, aplica: true, valor: 50 },
+        iss_bs: { rotulo: 'ISS-BS', aliquota: null, automatico: false, ativo: true, aplica: true, valor: 20 },
+      },
+    };
+    expect(rotulos({ retencoesSnapshot: snap })).toEqual(['ISS (5%)', 'ISS-BS']);
+  });
+  test('desativado pelo admin: não aparece', () => {
+    const snap = { campos: { iss_bs: { rotulo: 'ISS-BS', automatico: false, ativo: false, aplica: true, valor: 0 } } };
+    expect(rotulos({ retencoesSnapshot: snap })).toEqual([]);
   });
 });
 

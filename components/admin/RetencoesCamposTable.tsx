@@ -3,7 +3,7 @@ import { useFormContext, useFieldArray, useWatch } from "react-hook-form";
 
 // Campos não-tributários: "Entra na DARF" nunca se aplica a eles (mesma
 // regra do Zod em lib/schemas.ts, T06).
-const CAMPOS_NAO_TRIBUTARIOS = ["outros", "taxa_bancaria", "taxa_pix"];
+const CAMPOS_NAO_TRIBUTARIOS = ["outros", "taxa_bancaria", "taxa_pix", "iss_bs"];
 
 /** Mantém só dígitos + 1 vírgula, no máximo 4 casas decimais. Diferente de
  * maskCurrency (que é de centavos/2 casas) — alíquota aceita até 4 casas. */

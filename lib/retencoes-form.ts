@@ -26,6 +26,7 @@ export const CAMPO_FORM: Record<CampoRetencao, string> = {
   outros: "outrosDescontos",
   taxa_bancaria: "taxaBancaria",
   taxa_pix: "taxaPix",
+  iss_bs: "issBs",
 };
 
 export const CAMPOS_RETENCAO = Object.keys(CAMPO_FORM) as CampoRetencao[];

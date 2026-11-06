@@ -433,6 +433,13 @@ Os problemas estão em volta dessas telas.
 - [ ] **PJ-07** Credores: marcar "Optante pelo Simples Nacional" num credor PJ e salvar → selo "SIMPLES" na lista e na busca da OP. OP desse credor no 3.3.90.39 + Limpeza → IRRF 0,00 com "Isento de IR (Simples Nacional)" e o aviso; ISS 500,00 continua (líquido 9.500,00).
 - [ ] **PJ-08** Credor MEI continua sem nenhuma retenção; OP de 3.3.90.36 (PF) e de transporte (3.3.90.33) com os mesmos valores de antes.
 
+**ISS editável pelo GESTOR e ISS-BS — valor livre (B10)**
+- [ ] **IS-01** Rodar a `database/migration_23.sql` no Workbench: (a) a coluna `iss_bs` em ordens_pagamento, (b) o campo iss_bs "ISS-BS" VALOR_DIGITADO, editável, fora da DARF, (c) a versão 23.
+- [ ] **IS-02** Configurações → Retenções → Campos: marcar **"Editável pelo operador"** no ISS e salvar.
+- [ ] **IS-03** Como GESTOR, OP de R$ 1.000,00: o ISS vem 50,00 e dá para trocar por 30,00 (o cálculo não sobrescreve); o campo **ISS-BS** aparece vazio e editável; digitar 20,00 → o líquido cai 20,00.
+- [ ] **IS-04** Salvar, reabrir e reimprimir: a via mostra a linha "ISS-BS 20,00" logo depois do ISS; a DARF da OP não inclui o ISS-BS.
+- [ ] **IS-05** Editar só o histórico dessa OP: o ISS-BS continua 20,00. OP antiga mostra ISS-BS 0,00.
+
 ### Resultado do teste
 
 | Item | ✅/❌ | Observação |
