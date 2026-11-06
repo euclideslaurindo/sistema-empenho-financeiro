@@ -384,12 +384,13 @@ export default function RetencoesConfigPage() {
             <span className="block mb-3 font-bold text-amber-700">
               Vale para todas as OPs novas. OPs já emitidas não mudam.
             </span>
-            <ul className="list-disc pl-5 space-y-1 text-slate-700 max-h-60 overflow-y-auto">
-              {diffPendente?.map((linha, i) => (
-                <li key={i}>{linha}</li>
-              ))}
-            </ul>
           </AlertDialogDescription>
+          {/* Fora da Description: ela é um <p>, e <ul> dentro de <p> quebra a hidratação. */}
+          <ul className="-mt-4 mb-6 list-disc pl-5 space-y-1 text-sm font-medium text-slate-700 max-h-60 overflow-y-auto">
+            {diffPendente?.map((linha, i) => (
+              <li key={i}>{linha}</li>
+            ))}
+          </ul>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
