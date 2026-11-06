@@ -74,7 +74,7 @@ export class OrdemPagamentoService {
                 itens_json as itensJson,
                 saldo_anterior as saldoAnterior, valor_empenho as valorEmpenho, valor_pagamento as valorPagamento,
                 irrf, iss, inss, sest_senat as sestSenat, patronal, outros_descontos as outrosDescontos, total_descontos as totalDescontos, valor_liquido as valorLiquido,
-                taxa_bancaria as taxaBancaria, taxa_pix as taxaPix, retencoes_snapshot as retencoesSnapshot,
+                taxa_bancaria as taxaBancaria, taxa_pix as taxaPix, iss_bs as issBs, retencoes_snapshot as retencoesSnapshot,
                 numero_cheque as numeroCheque,
                 DATE_FORMAT(data_emissao, '%Y-%m-%d') as dataEmissao,
                 DATE_FORMAT(data_pagamento, '%Y-%m-%d') as dataPagamento,
@@ -287,7 +287,7 @@ export class OrdemPagamentoService {
         const precisaRecalcular = valorMudou || credorMudou || elementoMudou || subelementoMudou;
 
         let finalIrrf: number, finalIss: number, finalInss: number, finalSestSenat: number, finalPatronal: number;
-        let finalOutros: number, finalTaxaBancaria: number, finalTaxaPix: number;
+        let finalOutros: number, finalTaxaBancaria: number, finalTaxaPix: number, finalIssBs: number;
         let finalTotalDescontos: number, finalLiquido: number, snapshotJson: string | null;
 
         if (precisaRecalcular) {
@@ -311,6 +311,7 @@ export class OrdemPagamentoService {
           finalOutros = fromCents(resultado.itens.outros ?? 0);
           finalTaxaBancaria = fromCents(resultado.itens.taxa_bancaria ?? 0);
           finalTaxaPix = fromCents(resultado.itens.taxa_pix ?? 0);
+          finalIssBs = fromCents(resultado.itens.iss_bs ?? 0);
           finalTotalDescontos = fromCents(resultado.totalDescontosCents);
           finalLiquido = fromCents(resultado.liquidoCents);
           snapshotJson = JSON.stringify(resultado.snapshot);
@@ -323,6 +324,7 @@ export class OrdemPagamentoService {
           finalOutros = parseFloat(oldOp.outros_descontos) || 0;
           finalTaxaBancaria = parseFloat(oldOp.taxa_bancaria) || 0;
           finalTaxaPix = parseFloat(oldOp.taxa_pix) || 0;
+          finalIssBs = parseFloat(oldOp.iss_bs) || 0;
           finalTotalDescontos = parseFloat(oldOp.total_descontos) || 0;
           finalLiquido = parseFloat(oldOp.valor_liquido) || 0;
           snapshotJson = oldOp.retencoes_snapshot ? JSON.stringify(oldOp.retencoes_snapshot) : null;
@@ -342,7 +344,7 @@ export class OrdemPagamentoService {
             saldo_anterior = ?, valor_empenho = ?, valor_pagamento = ?,
             irrf = ?, iss = ?, inss = ?, sest_senat = ?, patronal = ?, outros_descontos = ?, taxa_bancaria = ?, taxa_pix = ?,
             total_descontos = ?, valor_liquido = ?, retencoes_snapshot = ?,
-            numero_cheque = ?, data_emissao = ?, data_pagamento = ?, historico = ?, usuario_id = ?
+            numero_cheque = ?, data_emissao = ?, data_pagamento = ?, historico = ?, usuario_id = ?, iss_bs = ?
            WHERE id = ?`,
           [
             sub || '01', credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
@@ -351,7 +353,8 @@ export class OrdemPagamentoService {
             toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamentoArredondado,
             finalIrrf, finalIss, finalInss, finalSestSenat, finalPatronal, finalOutros, finalTaxaBancaria, finalTaxaPix,
             finalTotalDescontos, finalLiquido, snapshotJson,
-            numeroCheque ? numeroCheque.trim() : null, dataEmissao || null, dataPagamento || null, historico || '', usuarioId, id
+            numeroCheque ? numeroCheque.trim() : null, dataEmissao || null, dataPagamento || null, historico || '', usuarioId,
+            finalIssBs, id
           ]
         );
 

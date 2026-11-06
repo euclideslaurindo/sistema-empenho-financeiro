@@ -105,6 +105,8 @@ export interface OrdemPagamentoDB {
   outros_descontos: number | string | null;
   taxa_bancaria: number | string;
   taxa_pix: number | string;
+  /** B10: 2º ISS, valor livre (migration_23). */
+  iss_bs?: number | string;
   total_descontos: number | string | null;
   valor_liquido: number | string | null;
   // JSON nativo do MySQL: mysql2 já entrega objeto, nunca string (mesma
