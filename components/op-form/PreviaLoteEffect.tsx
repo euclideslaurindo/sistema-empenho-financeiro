@@ -5,7 +5,7 @@ import { apiClient } from "@/lib/api-client";
 import { toCents } from "@/lib/money";
 import { extrairCodigoElemento } from "@/lib/elementos";
 import { calculoNoServidor, perfilDoElemento } from "@/lib/perfis-calculo";
-import { CAMPO_FORM, ehCampoRetencao, informadosValidosDaLinha, valoresCalculadosDoForm, type Perfil } from "@/lib/retencoes-form";
+import { camposExtrasDaConfig, ehCampoRetencao, informadosValidosDaLinha, nomeFormDoCampo, valoresCalculadosDoForm, type Perfil } from "@/lib/retencoes-form";
 import { montarPayloadLote, type CredorLinha } from "@/lib/op-emissao";
 import { aplicarCalculadosNaLinha, itensDaPreviaEmCentavos, textosDaPrevia } from "@/components/op-form/OpTaxesSection";
 import type { ConfigRetencoes } from "@/hooks/use-retencoes-config";
@@ -26,7 +26,7 @@ export function assinaturaDaLinha(c: Partial<CredorLinha>, dataEmissao: unknown)
   const informados = (c.camposInformados || [])
     .filter(ehCampoRetencao)
     .sort()
-    .map((campo) => `${campo}=${toCents((c as any)[CAMPO_FORM[campo]])}`);
+    .map((campo) => `${campo}=${toCents((c as any)[nomeFormDoCampo(campo)])}`);
   return JSON.stringify([
     String(c.cpfCnpj ?? ""),
     toCents(c.valorPagamento),
@@ -57,6 +57,7 @@ export function PreviaLoteEffect({ config, perfil, atraso = 400 }: { config: Con
   const subelementoCodigo = extrairCodigoElemento(subelemento);
   const ativo = calculoNoServidor(perfilDoElemento(elementoCodigo)) && !!neCarregada;
   const textos = textosDaPrevia(elementoCodigo);
+  const extras = camposExtrasDaConfig(config); // B12
   // chave -> assinatura cujo resultado já está na linha
   const aplicadas = useRef(new Map<string, string>());
   // chave -> assinatura já enviada e ainda sem resposta (não manda duas vezes)
@@ -94,7 +95,7 @@ export function PreviaLoteEffect({ config, perfil, atraso = 400 }: { config: Con
         if (validos.length !== informados.length) setValue(`${basePath(i)}.camposInformados`, validos);
 
         if (!c.cpfCnpj || toCents(c.valorPagamento) <= 0) {
-          aplicarCalculadosNaLinha(getValues, setValue, basePath(i), valoresCalculadosDoForm({}, validos));
+          aplicarCalculadosNaLinha(getValues, setValue, basePath(i), valoresCalculadosDoForm({}, validos, extras));
           setValue(`${basePath(i)}.previaAvisos`, [!c.cpfCnpj ? textos.semCredor : textos.semValor]);
           aplicadas.current.set(c.chave, assinatura);
           return;
@@ -115,11 +116,11 @@ export function PreviaLoteEffect({ config, perfil, atraso = 400 }: { config: Con
         if (assinaturaDaLinha(atuais[i], getValues("dataEmissao")) !== pronta.assinatura) return; // mudou de novo
         const validos = (atuais[i].camposInformados || []).filter(ehCampoRetencao);
         if ("erro" in resultado && resultado.erro) {
-          aplicarCalculadosNaLinha(getValues, setValue, basePath(i), valoresCalculadosDoForm({}, validos));
+          aplicarCalculadosNaLinha(getValues, setValue, basePath(i), valoresCalculadosDoForm({}, validos, extras));
           setValue(`${basePath(i)}.previaAvisos`, [resultado.erro]);
         } else {
           const r = resultado as LinhaPrevia;
-          aplicarCalculadosNaLinha(getValues, setValue, basePath(i), valoresCalculadosDoForm(itensDaPreviaEmCentavos(r.itens), validos));
+          aplicarCalculadosNaLinha(getValues, setValue, basePath(i), valoresCalculadosDoForm(itensDaPreviaEmCentavos(r.itens), validos, extras));
           setValue(`${basePath(i)}.previaAvisos`, r.avisos || []);
         }
         aplicadas.current.set(pronta.chave, pronta.assinatura);
@@ -145,7 +146,7 @@ export function PreviaLoteEffect({ config, perfil, atraso = 400 }: { config: Con
           const atuais: CredorLinha[] = getValues("credores") || [];
           const i = atuais.findIndex((c) => c.chave === pronta.chave);
           if (i < 0) continue;
-          aplicarCalculadosNaLinha(getValues, setValue, basePath(i), valoresCalculadosDoForm({}, atuais[i].camposInformados || []));
+          aplicarCalculadosNaLinha(getValues, setValue, basePath(i), valoresCalculadosDoForm({}, atuais[i].camposInformados || [], extras));
           setValue(`${basePath(i)}.previaAvisos`, [e?.message || textos.falhou]);
         }
       }

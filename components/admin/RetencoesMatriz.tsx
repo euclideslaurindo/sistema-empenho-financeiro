@@ -1,23 +1,17 @@
 "use client";
 import { useFormContext, useFieldArray, useWatch } from "react-hook-form";
+import { colunasDaMatriz } from "@/lib/retencoes-form";
 
-const CAMPOS_TRIBUTARIOS = ["irrf", "iss", "inss", "patronal", "sest_senat"] as const;
-const ROTULOS: Record<string, string> = {
-  irrf: "IRRF",
-  iss: "ISS",
-  inss: "INSS",
-  patronal: "Patronal",
-  sest_senat: "SEST/SENAT",
-};
+type Coluna = { campo: string; rotulo: string };
 
-function LinhaElemento({ index, totalLinhas }: { index: number; totalLinhas: number }) {
+function LinhaElemento({ index, totalLinhas, colunas }: { index: number; totalLinhas: number; colunas: Coluna[] }) {
   const { register, control, setValue, getValues } = useFormContext<any>();
   const codigo: string = useWatch({ control, name: `elementos.${index}.codigo` });
   const descricao: string = useWatch({ control, name: `elementos.${index}.descricao` });
   const legado: boolean = useWatch({ control, name: `elementos.${index}.legado` });
 
   const marcarLinha = (valor: boolean) => {
-    for (const campo of CAMPOS_TRIBUTARIOS) {
+    for (const { campo } of colunas) {
       setValue(`elementos.${index}.campos.${campo}`, valor, { shouldValidate: true, shouldDirty: true });
     }
   };
@@ -32,12 +26,12 @@ function LinhaElemento({ index, totalLinhas }: { index: number; totalLinhas: num
           </span>
         )}
       </th>
-      {CAMPOS_TRIBUTARIOS.map((campo) => (
+      {colunas.map(({ campo, rotulo }) => (
         <td key={campo} className="py-3 text-center">
           <input
             type="checkbox"
             {...register(`elementos.${index}.campos.${campo}` as const)}
-            aria-label={`${codigo} aplica ${ROTULOS[campo]}`}
+            aria-label={`${codigo} aplica ${rotulo}`}
             className="rounded text-blue-900"
           />
         </td>
@@ -65,6 +59,9 @@ function LinhaElemento({ index, totalLinhas }: { index: number; totalLinhas: num
 export default function RetencoesMatriz() {
   const { control, setValue, getValues } = useFormContext<any>();
   const { fields } = useFieldArray({ control, name: "elementos" });
+  // B12: colunas = tributários fixos + taxas "x_" percentuais criadas pelo ADMIN.
+  const campos = useWatch({ control, name: "campos" });
+  const colunas = colunasDaMatriz(campos);
 
   const marcarColuna = (campo: string, valor: boolean) => {
     const elementos = getValues("elementos") || [];
@@ -84,15 +81,15 @@ export default function RetencoesMatriz() {
           <thead>
             <tr className="border-b border-slate-100">
               <th scope="col" className="pb-2 text-xs font-black text-slate-500 uppercase tracking-widest">Elemento</th>
-              {CAMPOS_TRIBUTARIOS.map((campo) => (
+              {colunas.map(({ campo, rotulo }) => (
                 <th key={campo} scope="col" className="pb-2 text-xs font-black text-slate-500 uppercase tracking-widest text-center">
                   <div className="flex flex-col items-center gap-1">
-                    <span>{ROTULOS[campo]}</span>
+                    <span>{rotulo}</span>
                     <div className="flex gap-1">
                       <button
                         type="button"
                         onClick={() => marcarColuna(campo, true)}
-                        aria-label={`Marcar ${ROTULOS[campo]} em todos os elementos`}
+                        aria-label={`Marcar ${rotulo} em todos os elementos`}
                         className="text-[10px] font-bold text-blue-700 hover:underline normal-case"
                       >
                         todos
@@ -100,7 +97,7 @@ export default function RetencoesMatriz() {
                       <button
                         type="button"
                         onClick={() => marcarColuna(campo, false)}
-                        aria-label={`Limpar ${ROTULOS[campo]} em todos os elementos`}
+                        aria-label={`Limpar ${rotulo} em todos os elementos`}
                         className="text-[10px] font-bold text-slate-500 hover:underline normal-case"
                       >
                         nenhum
@@ -114,7 +111,7 @@ export default function RetencoesMatriz() {
           </thead>
           <tbody>
             {fields.map((field, index) => (
-              <LinhaElemento key={field.id} index={index} totalLinhas={fields.length} />
+              <LinhaElemento key={field.id} index={index} totalLinhas={fields.length} colunas={colunas} />
             ))}
           </tbody>
         </table>

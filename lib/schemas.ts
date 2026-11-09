@@ -95,9 +95,14 @@ function temNoMaximoCasasDecimais(valor: number, max: number): boolean {
   return i === -1 || str.length - i - 1 <= max;
 }
 
-const configRetencaoCampoSchema = z
+// B12: taxa criada pelo ADMIN ("x_<slug>").
+const REGEX_TAXA_EXTRA = /^x_[a-z0-9_]{1,28}$/;
+const ehCampoValido = (c: string) => (CAMPOS_RETENCAO_VALIDOS as readonly string[]).includes(c) || REGEX_TAXA_EXTRA.test(c);
+const ehCampoDaMatriz = (c: string) => (CAMPOS_TRIBUTARIOS as readonly string[]).includes(c) || REGEX_TAXA_EXTRA.test(c);
+
+export const configRetencaoCampoSchema = z
   .object({
-    campo: z.enum(CAMPOS_RETENCAO_VALIDOS),
+    campo: z.string().refine(ehCampoValido, 'Campo de retenção inválido.'),
     rotulo: z
       .string()
       .min(1, 'Rótulo é obrigatório.')
@@ -126,13 +131,14 @@ const configRetencaoCampoSchema = z
     if (d.tipo === 'PERCENTUAL' && d.calculoAutomatico && d.aliquota === null) {
       ctx.addIssue({ code: 'custom', path: ['aliquota'], message: 'Alíquota é obrigatória quando o cálculo é automático.' });
     }
-    if (!(CAMPOS_TRIBUTARIOS as readonly string[]).includes(d.campo) && d.entraDarf) {
+    const extraPercentual = REGEX_TAXA_EXTRA.test(d.campo) && d.tipo === 'PERCENTUAL';
+    if (!(CAMPOS_TRIBUTARIOS as readonly string[]).includes(d.campo) && !extraPercentual && d.entraDarf) {
       ctx.addIssue({ code: 'custom', path: ['entraDarf'], message: `${d.campo} não pode entrar na DARF.` });
     }
   });
 
 export const configRetencoesSchema = z.object({
   campos: z.array(configRetencaoCampoSchema).min(1),
-  regras: z.record(z.string(), z.array(z.enum(CAMPOS_TRIBUTARIOS))),
+  regras: z.record(z.string(), z.array(z.string().refine(ehCampoDaMatriz, 'Campo de retenção inválido.'))),
   versaoBase: z.string().optional(),
 });

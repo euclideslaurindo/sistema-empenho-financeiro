@@ -440,6 +440,14 @@ Os problemas estão em volta dessas telas.
 - [ ] **IS-04** Salvar, reabrir e reimprimir: a via mostra a linha "ISS-BS 20,00" logo depois do ISS; a DARF da OP não inclui o ISS-BS.
 - [ ] **IS-05** Editar só o histórico dessa OP: o ISS-BS continua 20,00. OP antiga mostra ISS-BS 0,00.
 
+**Taxas personalizadas — o ADMIN cria (B12)**
+- [ ] **TX-01** Rodar a `database/migration_25.sql` no Workbench: a consulta 0 dá 0 antes; depois, (a) 4 colunas e (b) a versão 25.
+- [ ] **TX-02** Configurações → Retenções → Campos → **Nova taxa**: "Taxa Teste", Percentual 2%, marcar "Entra na DARF" → criar. A taxa aparece na tabela com o selo "personalizada" e vira coluna na **Matriz**. (Com alterações não salvas o botão fica desabilitado.)
+- [ ] **TX-03** Na Matriz, marcar "Taxa Teste" no 3.3.90.39 e salvar. OP de R$ 1.000,00 num 3.3.90.39 → campo "Taxa Teste (2%)" 20,00, o líquido desconta e a DARF da OP soma os 20,00.
+- [ ] **TX-04** Nova taxa "Contribuição" do tipo **Valor digitado** → aparece em toda OP, vazia e editável; digitar 7,00 → o líquido cai 7,00. Não vira coluna na Matriz.
+- [ ] **TX-05** Reimprimir a OP: linhas "Taxa Teste (2%) 20,00" e "Contribuição 7,00".
+- [ ] **TX-06** Desmarcar "Ativo" da Taxa Teste e salvar → não aparece mais em OP nova; a OP já emitida continua igual na reimpressão. Tentar criar outra taxa com o mesmo rótulo → "Já existe uma taxa com esse nome".
+
 ### Resultado do teste
 
 | Item | ✅/❌ | Observação |

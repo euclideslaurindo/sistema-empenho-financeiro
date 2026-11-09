@@ -7,6 +7,7 @@
 // para cima, regra da T01).
 import {
   avisosMei,
+  calcularExtras,
   CAMPOS_DESCONTO,
   CAMPOS_INFORMATIVOS,
   CAMPOS_TRIBUTARIOS,
@@ -69,7 +70,9 @@ export interface EntradaTransporte {
   /** T26: ADMIN confirmou reter mesmo sendo MEI (só valores digitados). */
   sobrescreverMei?: boolean;
   config: ConfigRetencaoCampoMapeado[];
-  informados: Partial<Record<CampoTributario | CampoDesconto, number>>;
+  informados: Partial<Record<CampoTributario | CampoDesconto, number>> & Partial<Record<string, number>>;
+  /** B12: campos da Matriz do 3.3.90.33 (para as taxas "x_" percentuais). */
+  camposAplicaveis?: string[];
   perfil: "ADMIN" | "GESTOR" | "CONSULTA";
 }
 
@@ -154,6 +157,20 @@ export function calcularTransporteAutonomo(e: EntradaTransporte): ResultadoCalcu
     const informado = e.informados[campo];
     itens[campo] = permitido && informado !== undefined ? validarInformado(campo, informado, e.brutoCents) : 0;
   }
+
+  // B12: taxas criadas pelo ADMIN (percentual vale pela Matriz do 3.3.90.33).
+  Object.assign(
+    itens,
+    calcularExtras({
+      brutoCents: e.brutoCents,
+      config: e.config,
+      camposAplicaveis: e.camposAplicaveis ?? [],
+      informados: e.informados,
+      perfil: e.perfil,
+      credorMei: e.credorMei,
+      sobrescreverMei: e.sobrescreverMei,
+    })
+  );
 
   // 11-12: patronal é informativa — fora do total e do líquido.
   const informativos: string[] = [...CAMPOS_INFORMATIVOS];

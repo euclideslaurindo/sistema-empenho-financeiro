@@ -9,6 +9,7 @@ import { recalcularStatusNe } from '@/lib/services/saldo-ne';
 import { entraDarfDaConfig, removerDarfDaOp, sincronizarDarfDaOp } from '@/lib/services/darf.service';
 import { criarOpNaTransacao, garantirLiquidoNaoNegativo, mensagemItensNaoBatem, montarInformados, ordemPagamentoSchema, toDecimal } from '@/lib/services/ordem-pagamento-core';
 import { formatarBRL } from '@/lib/money';
+import { apagarExtrasDaOp, extrasDoResultado, gravarExtrasDaOp } from '@/lib/services/op-extras.service';
 
 export type ServiceResult<T = any> = 
   | { success: true; data: T; status?: number }
@@ -289,6 +290,8 @@ export class OrdemPagamentoService {
         let finalIrrf: number, finalIss: number, finalInss: number, finalSestSenat: number, finalPatronal: number;
         let finalOutros: number, finalTaxaBancaria: number, finalTaxaPix: number, finalIssBs: number;
         let finalTotalDescontos: number, finalLiquido: number, snapshotJson: string | null;
+        // B12: só com recálculo as taxas "x_" são regravadas.
+        let extrasNovas: Record<string, number> | null = null;
 
         if (precisaRecalcular) {
           const { resultado } = await calcularRetencoesDaOp(conn, {
@@ -312,6 +315,7 @@ export class OrdemPagamentoService {
           finalTaxaBancaria = fromCents(resultado.itens.taxa_bancaria ?? 0);
           finalTaxaPix = fromCents(resultado.itens.taxa_pix ?? 0);
           finalIssBs = fromCents(resultado.itens.iss_bs ?? 0);
+          extrasNovas = extrasDoResultado(resultado.itens);
           finalTotalDescontos = fromCents(resultado.totalDescontosCents);
           finalLiquido = fromCents(resultado.liquidoCents);
           snapshotJson = JSON.stringify(resultado.snapshot);
@@ -358,13 +362,15 @@ export class OrdemPagamentoService {
           ]
         );
 
+        if (extrasNovas && Object.keys(extrasNovas).length > 0) await gravarExtrasDaOp(conn, id, extrasNovas, true);
+
         // Mesma transação: DARF paga que mudaria de valor/competência bloqueia a edição (D13).
         await sincronizarDarfDaOp(
           conn,
           {
             id, numeroNe: neSegura, numeroOp: oldOp.numero_empenho ?? null, sub: sub || '01',
             credorCpfCnpj, credorNome: credorNome || null, dataPagamento, dataEmissao,
-            valores: { irrf: finalIrrf, iss: finalIss, inss: finalInss, patronal: finalPatronal, sest_senat: finalSestSenat },
+            valores: { irrf: finalIrrf, iss: finalIss, inss: finalInss, patronal: finalPatronal, sest_senat: finalSestSenat, ...(extrasNovas ?? {}) },
           },
           { manterValorExistente: !precisaRecalcular }
         );
@@ -429,6 +435,7 @@ export class OrdemPagamentoService {
         const numeroNe = oldOp.numero_ne;
 
         await removerDarfDaOp(conn, id); // DARF paga -> 409, antes de apagar a OP
+        await apagarExtrasDaOp(conn, id); // B12
         await conn.execute('DELETE FROM ordens_pagamento WHERE id = ?', [id]);
 
         // AUDITORIA: Salvar exclusão

@@ -8,6 +8,7 @@ import { useAppStore } from "@/lib/store";
 import { useRetencoesConfig, type ConfigRetencoes } from "@/hooks/use-retencoes-config";
 import { apiClient } from "@/lib/api-client";
 import { parseFormNumber } from "@/lib/utils";
+import { colunasDaMatriz } from "@/lib/retencoes-form";
 import RetencoesCamposTable from "@/components/admin/RetencoesCamposTable";
 import RetencoesMatriz from "@/components/admin/RetencoesMatriz";
 import RetencoesSimulador from "@/components/admin/RetencoesSimulador";
@@ -24,14 +25,6 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 
-const CAMPOS_TRIBUTARIOS = ["irrf", "iss", "inss", "patronal", "sest_senat"];
-const ROTULOS_CAMPO: Record<string, string> = {
-  irrf: "IRRF",
-  iss: "ISS",
-  inss: "INSS",
-  patronal: "Patronal",
-  sest_senat: "SEST/SENAT",
-};
 
 interface CampoFormValue {
   campo: string;
@@ -68,10 +61,11 @@ function montarDefaultValues(config: ConfigRetencoes, elementosApi: any[]): Form
     ordem: c.ordem,
   }));
 
+  const colunas = colunasDaMatriz(config.campos);
   const elementos: ElementoFormValue[] = elementosApi.map((el) => {
     const aplicaveis = config.regras[el.codigo] || [];
     const camposMap: Record<string, boolean> = {};
-    for (const c of CAMPOS_TRIBUTARIOS) camposMap[c] = aplicaveis.includes(c);
+    for (const { campo } of colunas) camposMap[campo] = aplicaveis.includes(campo);
     return { codigo: el.codigo, descricao: el.descricao, legado: !!el.legado, campos: camposMap };
   });
 
@@ -103,16 +97,16 @@ function gerarDiffCampos(original: CampoFormValue[], atual: CampoFormValue[]): s
   return diffs;
 }
 
-function gerarDiffMatriz(original: ElementoFormValue[], atual: ElementoFormValue[]): string[] {
+function gerarDiffMatriz(original: ElementoFormValue[], atual: ElementoFormValue[], colunas: Array<{ campo: string; rotulo: string }>): string[] {
   const diffs: string[] = [];
   for (const el of atual) {
     const orig = original.find((o) => o.codigo === el.codigo);
     if (!orig) continue;
-    for (const campo of CAMPOS_TRIBUTARIOS) {
+    for (const { campo, rotulo } of colunas) {
       const antes = !!orig.campos[campo];
       const depois = !!el.campos[campo];
       if (antes !== depois) {
-        diffs.push(`${el.codigo} ${depois ? "passa a ter" : "deixa de ter"} ${ROTULOS_CAMPO[campo]}`);
+        diffs.push(`${el.codigo} ${depois ? "passa a ter" : "deixa de ter"} ${rotulo}`);
       }
     }
   }
@@ -211,7 +205,7 @@ export default function RetencoesConfigPage() {
 
   const onSubmit = (data: FormValues) => {
     if (!defaultValuesSnapshot) return;
-    const diff = [...gerarDiffCampos(defaultValuesSnapshot.campos, data.campos), ...gerarDiffMatriz(defaultValuesSnapshot.elementos, data.elementos)];
+    const diff = [...gerarDiffCampos(defaultValuesSnapshot.campos, data.campos), ...gerarDiffMatriz(defaultValuesSnapshot.elementos, data.elementos, colunasDaMatriz(data.campos))];
     if (diff.length === 0) {
       toast.info("Nada para salvar.");
       return;
@@ -236,7 +230,12 @@ export default function RetencoesConfigPage() {
           ordem: c.ordem,
         })),
         regras: Object.fromEntries(
-          data.elementos.map((el) => [el.codigo, CAMPOS_TRIBUTARIOS.filter((c) => el.campos[c])])
+          data.elementos.map((el) => [
+            el.codigo,
+            colunasDaMatriz(data.campos)
+              .map((c) => c.campo)
+              .filter((c) => el.campos[c]),
+          ])
         ),
         versaoBase,
       };
@@ -336,13 +335,14 @@ export default function RetencoesConfigPage() {
           ) : (
             <FormProvider {...methods}>
               <form>
-                <RetencoesCamposTable />
+                <RetencoesCamposTable onTaxaCriada={recarregar} />
                 <RetencoesMatriz />
                 <RetencoesSubelementos
                   elementos={elementos}
                   regras={config?.regras ?? {}}
                   regrasSubelemento={regrasSubelemento}
                   irrfSubelemento={irrfSubelemento}
+                  colunas={colunasDaMatriz(config?.campos)}
                   onSalvoAliquota={(codigo, aliquota) =>
                     setIrrfSubelemento((atual) => {
                       const novo = { ...atual };

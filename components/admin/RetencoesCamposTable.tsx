@@ -1,5 +1,7 @@
 "use client";
 import { useFormContext, useFieldArray, useWatch } from "react-hook-form";
+import { ehTaxaExtra } from "@/lib/retencoes";
+import NovaTaxaDialog from "@/components/admin/NovaTaxaDialog";
 
 // Campos não-tributários: "Entra na DARF" nunca se aplica a eles (mesma
 // regra do Zod em lib/schemas.ts, T06).
@@ -31,7 +33,9 @@ function LinhaCampo({ index }: { index: number }) {
 
   const aliquotaDesabilitada = tipo !== "PERCENTUAL" || !calculoAutomatico;
   const calculoAutomaticoDesabilitado = tipo !== "PERCENTUAL";
-  const entraDarfDesabilitado = CAMPOS_NAO_TRIBUTARIOS.includes(campo);
+  // B12: taxa criada "x_" só entra na DARF se for percentual.
+  const extra = ehTaxaExtra(campo);
+  const entraDarfDesabilitado = CAMPOS_NAO_TRIBUTARIOS.includes(campo) || (extra && tipo !== "PERCENTUAL");
 
   return (
     <tr className="border-b border-slate-100 last:border-0">
@@ -42,6 +46,11 @@ function LinhaCampo({ index }: { index: number }) {
           aria-label={`Rótulo de ${campo}`}
           className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm font-bold focus:outline-none focus:border-blue-800"
         />
+        {extra && (
+          <span className="mt-1 inline-block text-[10px] font-black uppercase tracking-widest bg-sky-50 border border-sky-200 text-sky-700 px-2 py-0.5 rounded-full">
+            personalizada
+          </span>
+        )}
       </td>
       <td className="py-3 pr-2 text-xs font-bold text-slate-500 uppercase tracking-widest">
         {tipo === "PERCENTUAL" ? "Percentual" : "Valor digitado"}
@@ -117,14 +126,22 @@ function LinhaCampo({ index }: { index: number }) {
   );
 }
 
-export default function RetencoesCamposTable() {
-  const { control } = useFormContext<any>();
+export default function RetencoesCamposTable({ onTaxaCriada }: { onTaxaCriada?: () => void } = {}) {
+  const {
+    control,
+    formState: { isDirty },
+  } = useFormContext<any>();
   const { fields } = useFieldArray({ control, name: "campos" });
 
   return (
     <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] mb-8">
       <div className="flex items-center mb-6 pb-4 border-b border-slate-100">
         <h2 className="text-lg font-bold text-slate-800">Campos de Retenções e Descontos</h2>
+        {onTaxaCriada && (
+          <div className="ml-auto">
+            <NovaTaxaDialog desabilitado={isDirty} onCriada={onTaxaCriada} />
+          </div>
+        )}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left">

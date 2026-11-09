@@ -20,6 +20,8 @@ import { apiClient } from "@/lib/api-client";
 import {
   CAMPO_FORM,
   CAMPOS_RETENCAO,
+  camposExtrasDaConfig,
+  nomeFormDoCampo,
   camposInformativos,
   ehCampoRetencao,
   estadoCampoOp,
@@ -40,14 +42,19 @@ import type { ConfigRetencoes } from "@/hooks/use-retencoes-config";
 const NOMES_FORM = CAMPOS_RETENCAO.map((c) => CAMPO_FORM[c]);
 
 // Nomes dos campos POR CREDOR (T35-A). elemento, empenho e dataEmissao são da
-// emissão e ficam sempre na raiz.
-function useNomesDaLinha(basePath: string) {
+// emissão e ficam sempre na raiz. B12: `extras` = taxas "x_" da config.
+function useNomesDaLinha(basePath: string, extras: string[] = []) {
+  const chaveExtras = extras.join("|");
   return useMemo(
-    () => ({
-      n: (nome: string) => nomeNaLinha(basePath, nome),
-      nomesForm: NOMES_FORM.map((nome) => nomeNaLinha(basePath, nome)),
-    }),
-    [basePath]
+    () => {
+      const nomes = [...NOMES_FORM, ...(chaveExtras ? chaveExtras.split("|") : [])];
+      return {
+        n: (nome: string) => nomeNaLinha(basePath, nome),
+        nomes,
+        nomesForm: nomes.map((nome) => nomeNaLinha(basePath, nome)),
+      };
+    },
+    [basePath, chaveExtras]
   );
 }
 
@@ -76,7 +83,8 @@ export function aplicarCalculadosNaLinha(
 // mostrado é o valor que vai ser gravado.
 function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes; perfil: Perfil; basePath: string }) {
   const { control, setValue, getValues } = useFormContext<any>();
-  const { n, nomesForm } = useNomesDaLinha(basePath);
+  const extras = camposExtrasDaConfig(config);
+  const { n, nomesForm } = useNomesDaLinha(basePath, extras);
   const valorPagamento = useWatch({ control, name: n("valorPagamento") });
   const elemento = useWatch({ control, name: "elemento" });
   const subelemento = useWatch({ control, name: "subelemento" });
@@ -123,7 +131,7 @@ function AutoCalcEffect({ config, perfil, basePath }: { config: ConfigRetencoes;
         return; // valor digitado inválido (ex.: maior que o bruto): o resumo mostra o alerta
       }
 
-      aplicarCalculadosNaLinha(getValues, setValue, basePath, valoresCalculadosDoForm(resultado.itens, informadosValidos));
+      aplicarCalculadosNaLinha(getValues, setValue, basePath, valoresCalculadosDoForm(resultado.itens, informadosValidos, extras));
       if (!mesmaLista(informadosValidos, camposInformados)) {
         setValue(n("camposInformados"), informadosValidos);
       }
@@ -155,7 +163,8 @@ export function textosDaPrevia(elementoCodigo: string | null) {
  */
 function PreviaServidorEffect({ config, perfil, basePath }: { config: ConfigRetencoes; perfil: Perfil; basePath: string }) {
   const { control, setValue, getValues } = useFormContext<any>();
-  const { n, nomesForm } = useNomesDaLinha(basePath);
+  const extras = camposExtrasDaConfig(config);
+  const { n, nomesForm } = useNomesDaLinha(basePath, extras);
   const elemento = useWatch({ control, name: "elemento" });
   const subelemento = useWatch({ control, name: "subelemento" });
   const empenho = useWatch({ control, name: "empenho" });
@@ -178,7 +187,7 @@ function PreviaServidorEffect({ config, perfil, basePath }: { config: ConfigRete
     let cancelado = false;
 
     const limparCalculados = (informadosValidos: string[]) =>
-      aplicarCalculadosNaLinha(getValues, setValue, basePath, valoresCalculadosDoForm({}, informadosValidos));
+      aplicarCalculadosNaLinha(getValues, setValue, basePath, valoresCalculadosDoForm({}, informadosValidos, extras));
 
     const timer = setTimeout(async () => {
       const informadosValidos = informadosValidosDaLinha(
@@ -200,9 +209,13 @@ function PreviaServidorEffect({ config, perfil, basePath }: { config: ConfigRete
 
       const valores = (basePath ? getValues(basePath) : getValues()) || {};
       const retencoesInformadas: Record<string, number> = {};
+      const extrasInformadas: Record<string, number> = {};
       for (const campo of informadosValidos) {
-        if (ehCampoRetencao(campo)) retencoesInformadas[CAMPO_FORM[campo]] = toCents(valores[CAMPO_FORM[campo]]) / 100;
+        if (!ehCampoRetencao(campo)) continue;
+        if (campo in CAMPO_FORM) retencoesInformadas[nomeFormDoCampo(campo)] = toCents(valores[nomeFormDoCampo(campo)]) / 100;
+        else extrasInformadas[campo] = toCents(valores[campo]) / 100; // B12: "x_"
       }
+      if (Object.keys(extrasInformadas).length > 0) retencoesInformadas.extras = extrasInformadas as any;
 
       try {
         const previa = await apiClient.post<{ itens: Record<string, number>; avisos: string[] }>(
@@ -218,7 +231,7 @@ function PreviaServidorEffect({ config, perfil, basePath }: { config: ConfigRete
           }
         );
         if (cancelado) return;
-        aplicarCalculadosNaLinha(getValues, setValue, basePath, valoresCalculadosDoForm(itensDaPreviaEmCentavos(previa.itens), informadosValidos));
+        aplicarCalculadosNaLinha(getValues, setValue, basePath, valoresCalculadosDoForm(itensDaPreviaEmCentavos(previa.itens), informadosValidos, extras));
         setValue(n("previaAvisos"), previa.avisos || []);
       } catch (e: any) {
         if (cancelado) return;
@@ -238,9 +251,10 @@ function PreviaServidorEffect({ config, perfil, basePath }: { config: ConfigRete
   return null;
 }
 
-/** Itens da prévia (em reais) → centavos, para o mesmo caminho do cálculo local. */
-export function itensDaPreviaEmCentavos(itens: Record<string, number> | undefined): Partial<Record<CampoRetencao, number>> {
-  return Object.fromEntries(CAMPOS_RETENCAO.map((campo) => [campo, toCents(itens?.[campo] ?? 0)]));
+/** Itens da prévia (em reais) → centavos, para o mesmo caminho do cálculo local (B12: com as "x_"). */
+export function itensDaPreviaEmCentavos(itens: Record<string, number> | undefined): Partial<Record<string, number>> {
+  const extras = Object.keys(itens ?? {}).filter((c) => ehCampoRetencao(c) && !(c in CAMPO_FORM));
+  return Object.fromEntries([...CAMPOS_RETENCAO, ...extras].map((campo) => [campo, toCents(itens?.[campo] ?? 0)]));
 }
 
 /**
@@ -267,14 +281,14 @@ export function EfeitosRetencaoLinha({
   );
 }
 
-function TaxesTotalSummary({ basePath }: { basePath: string }) {
+function TaxesTotalSummary({ basePath, extras = [] }: { basePath: string; extras?: string[] }) {
   const { control } = useFormContext<any>();
-  const { n, nomesForm } = useNomesDaLinha(basePath);
+  const { n, nomes, nomesForm } = useNomesDaLinha(basePath, extras);
   const valorPagamento = useWatch({ control, name: n("valorPagamento") });
   const elemento = useWatch({ control, name: "elemento" });
   const valoresCampos: unknown[] = useWatch({ control, name: nomesForm }) || [];
 
-  const valores = Object.fromEntries(NOMES_FORM.map((nome, i) => [nome, valoresCampos[i]]));
+  const valores = Object.fromEntries(nomes.map((nome, i) => [nome, valoresCampos[i]]));
   const brutoCents = toCents(valorPagamento);
   const descontosCents = somarDescontosCents(valores, camposInformativos(extrairCodigoElemento(elemento)));
   const liquidoCents = brutoCents - descontosCents;
@@ -324,7 +338,7 @@ function CampoRetencaoInput({
 }) {
   const { register, setValue, getValues } = useFormContext<any>();
   const { n } = useNomesDaLinha(basePath);
-  const nome = n(CAMPO_FORM[campo]);
+  const nome = n(nomeFormDoCampo(campo));
   const inputId = idNaLinha(basePath, `op-retencao-${campo}`);
   const dicaId = `${inputId}-dica`;
 
@@ -555,7 +569,7 @@ export default function OpTaxesSection({
         <p className="text-sm font-semibold text-slate-500">Carregando configuração de retenções...</p>
       )}
 
-      <TaxesTotalSummary basePath={basePath} />
+      <TaxesTotalSummary basePath={basePath} extras={camposExtrasDaConfig(config)} />
     </div>
   );
 }
