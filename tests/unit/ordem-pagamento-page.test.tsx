@@ -147,7 +147,8 @@ describe('Emissão de OP com lista de credores (T35-B)', () => {
     fireEvent.click(alternar);
     expect(alternar).toHaveAttribute('aria-expanded', 'true');
     expect(linha(0).getByText('Dados do cadastro (somente leitura)')).toBeInTheDocument();
-    expect(linha(0).getByDisplayValue('Transporte escolar')).toBeInTheDocument(); // item padrão = Observações da NE
+    // B11: a especificação do item vem em branco (não puxa as Observações da NE).
+    expect(linha(0).queryByDisplayValue('Transporte escolar')).toBeNull();
   });
 
   test('líquido da linha calculado com o painel fechado', async () => {
@@ -336,4 +337,78 @@ test('aplicar a data do 1º credor a todos (D40)', async () => {
     await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId('linha-credor-0')));
   });
 
+});
+
+describe('B11 — Ordens Recentes: carregar uma OP como modelo', () => {
+  const OP = {
+    id: 'op-9', numeroNe: NE.numero, numeroEmpenho: '2026.OP.0009', sub: '01', credorNome: 'Bruno Motorista',
+    credorCpfCnpj: '222.222.222-22', valorPagamento: '40.00', numeroCheque: '123', dataPagamento: '2026-10-15', dataEmissao: '2026-10-15',
+  };
+  const COMPLETA = { ...OP, itensJson: JSON.stringify([{ especificacao: 'Rota zona rural', quantidade: 2, unidade: 'DIA', valorUnitario: 20 }]) };
+
+  function rotearComOp({ neStatus = 'EMITIDO', credorExiste = true } = {}) {
+    rotear();
+    const base = (apiClient.get as any).getMockImplementation();
+    (apiClient.get as any).mockImplementation(async (url: string) => {
+      if (url === '/api/ordens-pagamento') return { ordens: [OP] };
+      if (url.startsWith('/api/ordens-pagamento?numeroNe=')) return { ordens: [COMPLETA] };
+      if (url.startsWith('/api/notas-empenho?numero=')) return { ne: { ...NE, status: neStatus } };
+      if (url.startsWith('/api/credores?busca=')) {
+        const busca = decodeURIComponent(url.split('busca=')[1].split('&')[0]);
+        if (/^\d+$/.test(busca)) {
+          return { credores: credorExiste ? CREDORES.filter((c) => c.cpfCnpj.replace(/\D/g, '') === busca) : [] };
+        }
+      }
+      return base(url);
+    });
+  }
+  const linhaRecente = () => screen.findByRole('row', { name: /Carregar a OP 2026\.OP\.0009 \/01 no formulário/ });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    saldoRestante = 90;
+  });
+
+  test('clicar carrega NE, credor do cadastro, valor e itens; cheque e data em branco', async () => {
+    rotearComOp();
+    render(<OrdemPagamento />);
+    fireEvent.click(await linhaRecente());
+    await waitFor(() => expect(screen.getByTestId('linha-credor-0')).toBeInTheDocument());
+    expect(screen.getByLabelText('Nota de Empenho (NE)')).toHaveValue(NE.numero);
+    expect(linha(0).getByText('Bruno Motorista')).toBeInTheDocument();
+    expect(linha(0).getByText('MEI')).toBeInTheDocument(); // veio do cadastro atual
+    expect(linha(0).getByLabelText('Valor a Pagar R$')).toHaveValue('40,00');
+    fireEvent.click(linha(0).getByRole('button', { name: /Detalhes/ }));
+    expect(linha(0).getByDisplayValue('Rota zona rural')).toBeInTheDocument();
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('2026.OP.0009 /01 carregada como modelo'));
+  });
+
+  test('Enter também carrega; com credores na lista, pede confirmação antes', async () => {
+    rotearComOp();
+    render(<OrdemPagamento />);
+    await carregarNe();
+    await adicionar('Ana');
+    fireEvent.keyDown(await linhaRecente(), { key: 'Enter' });
+    expect(await screen.findByText('Carregar a OP 2026.OP.0009 como modelo?')).toBeInTheDocument();
+    expect(linha(0).getByText('Ana Motorista')).toBeInTheDocument(); // nada descartado ainda
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar e carregar' }));
+    await waitFor(() => expect(linha(0).getByText('Bruno Motorista')).toBeInTheDocument());
+    expect(screen.queryByTestId('linha-credor-1')).toBeNull();
+  });
+
+  test('NE cancelada: avisa e não carrega', async () => {
+    rotearComOp({ neStatus: 'CANCELADO' });
+    render(<OrdemPagamento />);
+    fireEvent.click(await linhaRecente());
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('CANCELADA')));
+    expect(screen.queryByTestId('linha-credor-0')).toBeNull();
+  });
+
+  test('credor fora do cadastro: avisa e não carrega', async () => {
+    rotearComOp({ credorExiste: false });
+    render(<OrdemPagamento />);
+    fireEvent.click(await linhaRecente());
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('não está mais no cadastro')));
+    expect(screen.queryByTestId('linha-credor-0')).toBeNull();
+  });
 });

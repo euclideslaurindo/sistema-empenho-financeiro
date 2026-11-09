@@ -35,12 +35,10 @@ export const EmpenhoVia = ({
             </span>
           </div>
           <div className="text-right flex flex-col items-end justify-end pb-2 pt-2 min-w-[140px]">
-            <span className="text-[17px] font-bold uppercase tracking-wider text-slate-900 leading-none">
-              EMPENHO Nº {data.numeroEmpenho || (typeof empenhoIndex === "number" ? empenhoIndex + 1 : 1)}
-            </span>
+            {/* B11: sem o "EMPENHO Nº"; o sub-empenho só com o número. */}
             {data.sub && (
-              <span className="text-[13px] font-bold uppercase tracking-wider text-slate-700 mt-1">
-                SUB-EMPENHO: {data.sub}
+              <span className="text-[17px] font-bold uppercase tracking-wider text-slate-900 leading-none" data-testid="via-sub">
+                {data.sub}
               </span>
             )}
           </div>
@@ -299,17 +297,19 @@ export const EmpenhoVia = ({
           </div>
 
           <div className="border-l border-black h-full flex items-center px-3 text-[10px] bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50">
-            <span className="font-bold uppercase mr-2">PAGO EM (CHEQUE Nº)</span>
+            {/* B11: data de pagamento da OP (o nº do cheque segue no recibo). */}
+            <span className="font-bold uppercase mr-2">PAGO EM</span>
             <div className="border border-black w-[95px] h-[22px] flex items-center justify-center font-bold">
               {isEditing ? (
                 <input
-                  value={data.numeroCheque || ""}
-                  onChange={(e) => onChange("numeroCheque", e.target.value)}
+                  value={data.pagoData || ""}
+                  onChange={(e) => onChange("pagoData", e.target.value)}
+                  aria-label="Pago em"
                   className="w-full h-full text-center outline-none bg-yellow-50 font-bold"
                 />
               ) : (
-                <span className="tracking-tight">
-                  {data.numeroCheque || ""}
+                <span className="tracking-tight" data-testid="via-pago-em">
+                  {data.pagoData || ""}
                 </span>
               )}
             </div>

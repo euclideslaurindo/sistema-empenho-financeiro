@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { apiClient } from "@/lib/api-client";
+import { camposDaNe } from "@/lib/op-emissao";
 import { useListboxKeyboardNav } from "@/hooks/use-listbox-keyboard-nav";
 import { useDebouncedCallback } from "@/hooks/use-debounce";
 import { CamposElementoSubelemento } from "@/components/op-form/CamposElementoSubelemento";
@@ -48,13 +49,7 @@ export default function OpPaymentData({
   const [nePendente, setNePendente] = useState<any | null>(null);
 
   const aplicarNe = (ne: any) => {
-    setValue("empenho", ne.numero);
-    setValue("neCarregada", ne.numero);
-    setValue("historicoNe", ne.historico || "");
-    setValue("unidadeOrcamentaria", ne.unidadeOrcamentaria || "");
-    setValue("gestao", ne.gestao || "");
-    setValue("elemento", ne.elemento || "");
-    setValue("subelemento", ne.subelemento || "");
+    for (const [campo, valor] of Object.entries(camposDaNe(ne))) setValue(campo, valor);
     toast.success(`Dados da NE ${ne.numero} carregados.`);
   };
 

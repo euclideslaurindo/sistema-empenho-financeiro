@@ -37,16 +37,16 @@ const valor = (rotulo: string) => document.querySelector(`[data-rotulo="${rotulo
 beforeEach(() => vi.clearAllMocks());
 
 describe("PessoaFisicaSimulador — mesmo cálculo da OP", () => {
-  test("R$ 5.200,00: INSS 572, dedução 607,20, IRRF 71,63", () => {
+  test("R$ 5.200,00: INSS 572, dedução 607,20, IRRF 71,62", () => {
     render(<PessoaFisicaSimulador parametros={LISTA_PF} irrf={LISTA_IRRF} config={CONFIG} regras={REGRAS} />);
     fireEvent.change(screen.getByLabelText("Valor bruto"), { target: { value: "5.200,00" } });
     expect(valor("INSS")).toBe("572,00");
     expect(valor("Dedução do IR (maior entre INSS e desconto simplificado)")).toBe("607,20");
     expect(valor("Base de cálculo do IRRF")).toBe("4.592,80");
     expect(valor("IRRF pela tabela")).toBe("357,89");
-    expect(valor("Redutor")).toBe("286,26");
-    expect(valor("IRRF")).toBe("71,63");
-    expect(screen.getByTestId("simpf-liquido").textContent).toBe("4.166,37");
+    expect(valor("Redutor")).toBe("286,27");
+    expect(valor("IRRF")).toBe("71,62");
+    expect(screen.getByTestId("simpf-liquido").textContent).toBe("4.166,38");
   });
 
   test("R$ 4.000,00: IRRF isento", () => {
@@ -70,7 +70,7 @@ describe("PessoaFisicaConfig", () => {
       url.includes("calculo-pessoa-fisica") ? LISTA_PF : LISTA_IRRF
     );
     render(<PessoaFisicaConfig config={CONFIG} regras={REGRAS} onDirtyChange={vi.fn()} />);
-    expect(await screen.findByLabelText("Redutor — constante (R$)")).toHaveValue("978,61");
+    expect(await screen.findByLabelText("Redutor — constante (R$)")).toHaveValue("978,62");
     expect(screen.getByLabelText("Isento de IRRF até o bruto de (R$)")).toHaveValue("5000");
     expect(screen.getByLabelText("Teto do INSS retido (R$)")).toHaveValue("932,31");
     expect(apiClient.get).toHaveBeenCalledWith("/api/configuracoes/calculo-pessoa-fisica");
@@ -94,7 +94,7 @@ describe("PessoaFisicaConfig", () => {
     expect(corpo).toEqual({
       vigenteDe: "2027-01-01",
       parametros: {
-        inss_teto: 932.31, desconto_simplificado: 607.2, isencao_ate: 5500, redutor_ate: 7350, redutor_constante: 978.61,
+        inss_teto: 932.31, desconto_simplificado: 607.2, isencao_ate: 5500, redutor_ate: 7350, redutor_constante: 978.62,
         redutor_coeficiente: 0.133145,
       },
     });

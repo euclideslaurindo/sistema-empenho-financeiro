@@ -71,12 +71,12 @@ beforeEach(() => {
 });
 
 describe('prévia da OP de 3.3.90.36', () => {
-  test('R$ 5.200,00 → INSS 572,00 e IRRF 71,63 (exemplo do documento)', async () => {
+  test('R$ 5.200,00 → INSS 572,00 e IRRF 71,62 (redutor 978,62)', async () => {
     const { status, body } = await previa(5200);
     expect(status).toBe(200);
     expect(body.perfil).toBe('PESSOA_FISICA');
-    expect(body.itens).toMatchObject({ irrf: 71.63, inss: 572, iss: 260, sest_senat: 130, patronal: 1040 });
-    expect(body.valorLiquido).toBe(4166.37);
+    expect(body.itens).toMatchObject({ irrf: 71.62, inss: 572, iss: 260, sest_senat: 130, patronal: 1040 });
+    expect(body.valorLiquido).toBe(4166.38);
   });
 
   test('R$ 4.000,00 → IRRF 0 (isento); R$ 10.000,00 → INSS no teto', async () => {
@@ -126,8 +126,8 @@ describe('OP gravada de 3.3.90.36', () => {
     );
     expect(r.success).toBe(true);
     const p = chamadas.find(([s]) => s.includes('INSERT INTO ordens_pagamento'))![1];
-    expect(p.slice(18, 23)).toEqual([71.63, 260, 572, 130, 1040]); // irrf, iss, inss, sest_senat, patronal
-    expect(p[27]).toBe(4166.37);
+    expect(p.slice(18, 23)).toEqual([71.62, 260, 572, 130, 1040]); // irrf, iss, inss, sest_senat, patronal
+    expect(p[27]).toBe(4166.38);
     expect(JSON.parse(p[28])).toMatchObject({
       perfil: 'PESSOA_FISICA', vigencia: '2026-01-01', vigencia_irrf: '2026-01-01', base_irrf: 4592.8, deducao_irrf: 607.2,
     });
@@ -145,7 +145,7 @@ describe('lote: parâmetros lidos uma vez por data', () => {
       calcularRetencoesDaOp(undefined, { ...base, brutoCents: 520000 }, cache),
       calcularRetencoesDaOp(undefined, { ...base, brutoCents: 400000 }, cache),
     ]);
-    expect(a.resultado.itens.irrf).toBe(7163);
+    expect(a.resultado.itens.irrf).toBe(7162);
     expect(b.resultado.itens.irrf).toBe(0);
     const calls = (query as any).mock.calls as any[];
     expect(calls.filter(([s]: any) => s.includes('FROM calculo_parametros'))).toHaveLength(1);
@@ -163,7 +163,7 @@ async function chamar(handler: (r: NextRequest) => Promise<any>, caminho: string
   return { status: res.status, body: await res.json() };
 }
 const PARAMETROS_PF = {
-  inss_teto: 932.31, desconto_simplificado: 607.2, isencao_ate: 5000, redutor_ate: 7350, redutor_constante: 978.61, redutor_coeficiente: 0.133145,
+  inss_teto: 932.31, desconto_simplificado: 607.2, isencao_ate: 5000, redutor_ate: 7350, redutor_constante: 978.62, redutor_coeficiente: 0.133145,
 };
 function transacao(respostas: Array<[RegExp, unknown[]]> = []) {
   const chamadas: Array<{ sql: string; params: any[] }> = [];
@@ -204,12 +204,12 @@ describe('/api/configuracoes/calculo-pessoa-fisica', () => {
         return [{ v: '2026-01-01' }];
       }
       expect(params).toEqual(['PESSOA_FISICA']);
-      return [{ chave: 'redutor_constante', valor: '978.610000', vigente_de: '2026-01-01' }];
+      return [{ chave: 'redutor_constante', valor: '978.620000', vigente_de: '2026-01-01' }];
     });
     const { status, body } = await chamar(rotaPf.GET, 'calculo-pessoa-fisica');
     expect(status).toBe(200);
     expect(body.vigencias).toEqual([
-      { vigenteDe: '2026-01-01', parametros: { redutor_constante: '978.610000' }, emUso: true, editavel: false },
+      { vigenteDe: '2026-01-01', parametros: { redutor_constante: '978.620000' }, emUso: true, editavel: false },
     ]);
   });
 
@@ -229,7 +229,7 @@ describe('/api/configuracoes/calculo-pessoa-fisica', () => {
     const inserts = chamadas.filter((c) => c.sql.includes('INSERT INTO calculo_parametros'));
     expect(inserts.map((c) => c.params[1]).sort()).toEqual(Object.keys(PARAMETROS_PF).sort());
     expect(inserts.every((c) => c.params[0] === 'PESSOA_FISICA' && c.params[3] === '2027-01-01')).toBe(true);
-    expect(inserts.find((c) => c.params[1] === 'redutor_constante')!.params[2]).toBe(978.61);
+    expect(inserts.find((c) => c.params[1] === 'redutor_constante')!.params[2]).toBe(978.62);
     const emUso = chamadas.find((c) => c.sql.includes('JSON_EXTRACT'))!;
     expect(emUso.params).toEqual(['PESSOA_FISICA']);
     const audit = chamadas.find((c) => c.sql.includes('INSERT INTO auditoria_financeira'))!;

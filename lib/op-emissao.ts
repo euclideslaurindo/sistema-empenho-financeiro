@@ -85,12 +85,58 @@ let contadorChave = 0;
 const novaChave = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `linha-${Date.now()}-${++contadorChave}`;
 
-export function especificacaoPadrao(historicoNe: string | null | undefined, numeroNe: string): string {
-  return String(historicoNe ?? "").trim() || `Pagamento referente ao empenho ${numeroNe}`;
+/** Campos do topo da emissão que vêm da NE (mesmos do "Carregar dados da NE"). */
+export function camposDaNe(ne: any): Record<string, string> {
+  return {
+    empenho: ne?.numero || "",
+    neCarregada: ne?.numero || "",
+    historicoNe: ne?.historico || "",
+    unidadeOrcamentaria: ne?.unidadeOrcamentaria || "",
+    gestao: ne?.gestao || "",
+    elemento: ne?.elemento || "",
+    subelemento: ne?.subelemento || "",
+  };
 }
 
-/** Linha nova a partir do cadastro, já com 1 item (Observações da NE, sem valor). */
-export function linhaDoCredor(credor: CredorApi, historicoNe: string | null | undefined, numeroNe: string): CredorLinha {
+/** "1100.5" | 1100.5 → "1.100,50" (formato dos campos de valor do formulário). */
+const valorNoForm = (v: unknown) => {
+  const n = Number(String(v ?? "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? formatarBRL(toCents(n)) : "";
+};
+
+/**
+ * B11: linha da emissão a partir de uma OP já emitida (modelo das "Ordens
+ * Recentes"): credor do cadastro atual + valor e itens da OP. Cheque e data de
+ * pagamento em branco; as retenções são recalculadas (nada é copiado).
+ */
+export function linhaDaOpModelo(op: { valorPagamento?: unknown; itensJson?: unknown }, credor: CredorApi): CredorLinha {
+  const linha = linhaDoCredor(credor);
+  let itens: any[] = [];
+  try {
+    itens = typeof op.itensJson === "string" ? JSON.parse(op.itensJson) : Array.isArray(op.itensJson) ? (op.itensJson as any[]) : [];
+  } catch {
+    itens = [];
+  }
+  const copiados: ItemOp[] = (Array.isArray(itens) ? itens : [])
+    .filter((i) => i && typeof i === "object")
+    .map((i) => ({
+      especificacao: String(i.especificacao ?? ""),
+      quantidade: Number(i.quantidade) > 0 ? Number(i.quantidade) : 1,
+      unidade: String(i.unidade || "UN"),
+      valorUnitario: valorNoForm(i.valorUnitario),
+    }));
+  return {
+    ...linha,
+    valorPagamento: valorNoForm(op.valorPagamento),
+    itens: copiados.length > 0 ? copiados : linha.itens,
+  };
+}
+
+/**
+ * Linha nova a partir do cadastro, já com 1 item em branco: a especificação é
+ * o usuário quem escreve (B11 — antes vinha a Observação da NE).
+ */
+export function linhaDoCredor(credor: CredorApi, _historicoNe?: string | null, _numeroNe?: string): CredorLinha {
   return {
     chave: novaChave(),
     cpfCnpj: credor.cpfCnpj || credor.cpf_cnpj || "",
@@ -107,7 +153,7 @@ export function linhaDoCredor(credor: CredorApi, historicoNe: string | null | un
     valorPagamento: "",
     numeroCheque: "",
     dataPagamento: "",
-    itens: [{ especificacao: especificacaoPadrao(historicoNe, numeroNe), quantidade: 1, unidade: "UN", valorUnitario: "" }],
+    itens: [{ especificacao: "", quantidade: 1, unidade: "UN", valorUnitario: "" }],
     irrf: "", iss: "", inss: "", sestSenat: "", patronal: "", outrosDescontos: "", taxaBancaria: "", taxaPix: "", issBs: "",
     camposInformados: [],
     sobrescreverMei: false,

@@ -122,9 +122,9 @@ describe('OP de estagiário (3.3.90.36.08)', () => {
     const chamadas = mockTransacao({ regrasSub: [{ subelemento_codigo: '3.3.90.36.08', campos: 'irrf' }] });
     await emitir(5200);
     const p = gravada(chamadas);
-    // B8: sem INSS retido, a dedução do IR é o desconto simplificado (607,20) → IRRF 71,63.
-    expect(p.slice(18, 23)).toEqual([71.63, 0, 0, 0, 0]);
-    expect(p[27]).toBe(5128.37);
+    // B8: sem INSS retido, a dedução do IR é o desconto simplificado (607,20) → IRRF 71,62.
+    expect(p.slice(18, 23)).toEqual([71.62, 0, 0, 0, 0]);
+    expect(p[27]).toBe(5128.38);
   });
 
   test('outro subelemento do 3.3.90.36, sem regra própria, segue o elemento', async () => {

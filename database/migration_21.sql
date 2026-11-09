@@ -31,7 +31,7 @@ INSERT IGNORE INTO calculo_parametros (perfil, chave, valor, vigente_de) VALUES
  ('PESSOA_FISICA', 'desconto_simplificado', 607.20,   '2026-01-01'),
  ('PESSOA_FISICA', 'isencao_ate',           5000.00,  '2026-01-01'),
  ('PESSOA_FISICA', 'redutor_ate',           7350.00,  '2026-01-01'),
- ('PESSOA_FISICA', 'redutor_constante',     978.61,   '2026-01-01'),
+ ('PESSOA_FISICA', 'redutor_constante',     978.62,   '2026-01-01'),
  ('PESSOA_FISICA', 'redutor_coeficiente',   0.133145, '2026-01-01');
 
 INSERT IGNORE INTO schema_migrations (version) VALUES ('21');
@@ -41,7 +41,7 @@ INSERT IGNORE INTO schema_migrations (version) VALUES ('21');
 -- ------------------------------------------------------------
 -- a) esperado: 6 linhas, vigência 2026-01-01:
 --    desconto_simplificado 607.20 · inss_teto 932.31 · isencao_ate 5000.00 ·
---    redutor_ate 7350.00 · redutor_coeficiente 0.133145 · redutor_constante 978.61
+--    redutor_ate 7350.00 · redutor_coeficiente 0.133145 · redutor_constante 978.62
 SELECT chave, valor, vigente_de FROM calculo_parametros
  WHERE perfil = 'PESSOA_FISICA' ORDER BY chave;
 
