@@ -19,6 +19,11 @@ export function correspondeAoLogin(emailBanco: string, entrada: string): boolean
   const digitado = String(entrada ?? "").trim().toLowerCase();
   if (!email || !digitado) return false;
   if (email === digitado) return true;
+  // B11: sem "@", vale a parte antes do @ de um e-mail real, EXATA
+  // ("amanda" → amanda@adm.educacao.pe.gov.br; não "amanda.souza@…").
+  if (!digitado.includes("@") && email.slice(0, email.indexOf("@")) === digitado && !email.endsWith("@empenho.local")) {
+    return true;
+  }
   const nome = escaparRegex(normalizarNomeUsuario(digitado));
   return new RegExp(`^${nome}(\\.[0-9a-f]{8})?@empenho\\.local$`).test(email);
 }

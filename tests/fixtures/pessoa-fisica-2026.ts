@@ -8,7 +8,7 @@ export const PARAMETROS_PF_2026: ParametrosPessoaFisica = {
   desconto_simplificado: '607.200000',
   isencao_ate: '5000.000000',
   redutor_ate: '7350.000000',
-  redutor_constante: '978.610000',
+  redutor_constante: '978.620000',
   redutor_coeficiente: '0.133145',
 };
 

@@ -40,7 +40,9 @@ describe('linhaDoCredor', () => {
       'NE-7'
     );
     expect(l).toMatchObject({ cpfCnpj: '222.222.222-22', nomeCredor: 'Bruno', credorMei: true, municipioExpediente: 'Canhotinho', rg: '9', pix: 'x@y', valorPagamento: '' });
-    expect(l.itens).toEqual([{ especificacao: 'Pagamento referente ao empenho NE-7', quantidade: 1, unidade: 'UN', valorUnitario: '' }]);
+    // B11: a especificação vem em branco (não puxa a Observação da NE).
+    expect(l.itens).toEqual([{ especificacao: '', quantidade: 1, unidade: 'UN', valorUnitario: '' }]);
+    expect(linhaDoCredor({ cpfCnpj: '1' }, 'Observação da NE', 'NE-7').itens[0].especificacao).toBe('');
     expect(l.chave).toBeTruthy();
     expect(linhaDoCredor({ cpfCnpj: '1' }, 'Obs', 'NE').chave).not.toBe(l.chave);
   });

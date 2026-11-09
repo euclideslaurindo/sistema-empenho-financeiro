@@ -61,9 +61,11 @@ export async function POST(request: NextRequest) {
 
     // O LIKE só traz candidatos; quem decide é correspondeAoLogin (nome EXATO).
     // Antes: LIKE + LIMIT 1 deixava "joao" pegar "joao.silva" e recusar a senha certa.
+    // B11: "amanda" também busca amanda@<qualquer domínio> (% e _ escapados).
+    const parteLocal = `${String(email).trim().toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}@%`;
     const dbUsers = await query<UsuarioDB[]>(
-      'SELECT id, nome, email, senha_hash, perfil, ativo FROM usuarios WHERE email = ? OR email = ? OR email LIKE ? LIMIT 20',
-      [fakeEmailOld, email, fakeEmailPattern]
+      'SELECT id, nome, email, senha_hash, perfil, ativo FROM usuarios WHERE email = ? OR email = ? OR email LIKE ? OR email LIKE ? LIMIT 20',
+      [fakeEmailOld, email, fakeEmailPattern, parteLocal]
     );
     const candidatos = candidatosDoLogin(dbUsers || [], email);
 

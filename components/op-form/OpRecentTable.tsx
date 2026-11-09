@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import React, { useState } from "react";
 import { Search, Trash2 } from "lucide-react";
 import { formatCurrency, formatDateOnlyBR } from "@/lib/utils";
 import { useDebouncedCallback } from "@/hooks/use-debounce";
@@ -22,11 +22,14 @@ export default function OpRecentTable({
   ops,
   onSearch,
   onExcluir,
+  onCarregar,
 }: {
   ops: any[];
   onSearch: (term: string) => void;
   /** Devolve true se excluiu (fecha o diálogo). */
   onExcluir?: (op: any, motivo: string) => Promise<boolean>;
+  /** B11: clicar (ou Enter) na linha carrega a OP no formulário como modelo. */
+  onCarregar?: (op: any) => void;
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedOnSearch = useDebouncedCallback(onSearch, 400);
@@ -89,7 +92,21 @@ export default function OpRecentTable({
           </thead>
           <tbody className="divide-y divide-slate-50">
             {ops.map((op) => (
-              <tr key={op.id} className="group hover:bg-blue-50/50 transition-colors">
+              <tr
+                key={op.id}
+                className={`group hover:bg-blue-50/50 transition-colors ${onCarregar ? "cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset" : ""}`}
+                {...(onCarregar
+                  ? {
+                      tabIndex: 0,
+                      title: "Carregar no formulário como modelo",
+                      "aria-label": `Carregar a OP ${op.numeroEmpenho || ""}${op.sub ? ` /${op.sub}` : ""} no formulário`,
+                      onClick: () => onCarregar(op),
+                      onKeyDown: (e: React.KeyboardEvent) => {
+                        if (e.key === "Enter") onCarregar(op);
+                      },
+                    }
+                  : {})}
+              >
                 <td className="py-5 font-bold text-blue-900 rounded-l-lg pl-2">
                   <span>{op.numeroEmpenho || "-"}</span>
                   {op.sub && <span className="ml-1 font-semibold text-slate-500">/{op.sub}</span>}
@@ -103,7 +120,11 @@ export default function OpRecentTable({
                   <td className="py-5 pr-2 text-right">
                     <button
                       type="button"
-                      onClick={() => setParaExcluir(op)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setParaExcluir(op);
+                      }}
+                      onKeyDown={(e) => e.stopPropagation()}
                       aria-label={`Excluir OP ${op.numeroEmpenho || ""}${op.sub ? ` /${op.sub}` : ""}`}
                       title="Excluir OP"
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-md transition-all"

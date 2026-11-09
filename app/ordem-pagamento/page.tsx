@@ -17,7 +17,9 @@ import { useAppStore } from "@/lib/store";
 import { toCents, formatarBRL } from "@/lib/money";
 import { idNaLinha, type Perfil } from "@/lib/retencoes-form";
 import {
+  camposDaNe,
   credorNaLista,
+  linhaDaOpModelo,
   linhaDoCredor,
   linhaDoErroServidor,
   liquidoLinhaCents,
@@ -84,6 +86,8 @@ export default function OrdemPagamento() {
   const [resultado, setResultado] = useState<ResultadoEmissao | null>(null);
   const [confirmarLimpar, setConfirmarLimpar] = useState(false);
   const [confirmarNovaEmissao, setConfirmarNovaEmissao] = useState(false);
+  // B11: OP das "Ordens Recentes" a carregar como modelo (com credores na lista, pede confirmação).
+  const [opModelo, setOpModelo] = useState<any | null>(null);
   // Busca das OPs recentes: só a resposta da última consulta vale.
   const buscaOps = useRef("");
   const ultimaConsultaOps = useRef(0);
@@ -96,7 +100,7 @@ export default function OrdemPagamento() {
   });
 
   const methods = useForm<EmissaoForm>({ defaultValues: valoresIniciais() });
-  const { control, getValues, reset, setError, clearErrors, formState: { errors } } = methods;
+  const { control, getValues, setValue, reset, setError, clearErrors, formState: { errors } } = methods;
   const { fields, append, remove, replace } = useFieldArray({ control, name: "credores" });
   const neCarregada: string = useWatch({ control, name: "neCarregada" }) || "";
 
@@ -169,6 +173,46 @@ export default function OrdemPagamento() {
       return false;
     }
   };
+
+  /**
+   * B11: carrega uma OP das "Ordens Recentes" no formulário, como modelo de
+   * uma emissão nova: NE + credor (do cadastro atual) + valor e itens. Cheque
+   * e data ficam em branco; as retenções são recalculadas.
+   */
+  const carregarDaOp = async (op: any) => {
+    setOpModelo(null);
+    try {
+      const [{ ne }, { ordens }] = await Promise.all([
+        apiClient.get(`/api/notas-empenho?numero=${encodeURIComponent(op.numeroNe)}`),
+        apiClient.get(`/api/ordens-pagamento?numeroNe=${encodeURIComponent(op.numeroNe)}`),
+      ]);
+      if (!ne) throw new Error(`NE ${op.numeroNe} não encontrada.`);
+      if (ne.status === "CANCELADO") {
+        toast.error(`A NE ${ne.numero} está CANCELADA: não dá para usar esta OP como modelo.`);
+        return;
+      }
+      const completa = (ordens || []).find((o: any) => o.id === op.id) || op;
+      const digitos = String(op.credorCpfCnpj || "").replace(/\D/g, "");
+      const { credores } = await apiClient.get(`/api/credores?busca=${encodeURIComponent(digitos || op.credorCpfCnpj || "")}`);
+      const credor = (credores || []).find(
+        (c: any) => String(c.cpfCnpj || c.cpf_cnpj || "").replace(/\D/g, "") === digitos
+      );
+      if (!credor) {
+        toast.error(`O credor ${op.credorNome || op.credorCpfCnpj} não está mais no cadastro.`);
+        return;
+      }
+      reset(valoresIniciais());
+      esquecerEstadoDasLinhas();
+      for (const [campo, valor] of Object.entries(camposDaNe(ne))) setValue(campo as any, valor);
+      append(linhaDaOpModelo(completa, credor));
+      toast.success(`OP ${op.numeroEmpenho || ""}${op.sub ? ` /${op.sub}` : ""} carregada como modelo. Confira o valor e a data.`);
+      document.documentElement.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    } catch (error: any) {
+      toast.error(error?.message || "Não foi possível carregar a OP.");
+    }
+  };
+
+  const pedirCarregarOp = (op: any) => (fields.length > 0 ? setOpModelo(op) : carregarDaOp(op));
 
   const adicionarCredor = (credor: CredorApi) => {
     const atuais = getValues("credores") || [];
@@ -352,7 +396,12 @@ export default function OrdemPagamento() {
           />
         </FormProvider>
 
-        <OpRecentTable ops={ops} onSearch={fetchOps} onExcluir={ehAdmin ? excluirOp : undefined} />
+        <OpRecentTable
+          ops={ops}
+          onSearch={fetchOps}
+          onExcluir={ehAdmin ? excluirOp : undefined}
+          onCarregar={somenteLeitura ? undefined : pedirCarregarOp}
+        />
       </div>
 
       <DialogoEmissao resultado={resultado} onFechar={() => setResultado(null)} />
@@ -364,6 +413,19 @@ export default function OrdemPagamento() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={limparLista}>Limpar lista</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!opModelo} onOpenChange={(aberto) => !aberto && setOpModelo(null)}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Carregar a OP {opModelo?.numeroEmpenho} como modelo?</AlertDialogTitle>
+          <AlertDialogDescription>
+            A NE e os {fields.length === 1 ? "dados do credor" : `${fields.length} credores`} desta emissão serão descartados.
+          </AlertDialogDescription>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar esta emissão</AlertDialogCancel>
+            <AlertDialogAction onClick={() => opModelo && carregarDaOp(opModelo)}>Descartar e carregar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

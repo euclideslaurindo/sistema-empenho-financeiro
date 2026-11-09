@@ -109,16 +109,16 @@ describe('OpTaxesSection com subelemento', () => {
 
   test('regra parcial e troca de subelemento recalculam', async () => {
     const methods = renderSecao('3.3.90.36.08 - Estagiários', { ...CONFIG, regrasSubelemento: { '3.3.90.36.08': ['irrf'] } }, '5.200,00');
-    // Sem INSS retido, a dedução do IR é o desconto simplificado (607,20): IRRF 71,63.
-    await waitFor(() => expect(liquido()).toBe('R$ 5.128,37'));
-    expect(input('IRRF (tabela progressiva)').value).toBe('71,63');
+    // Sem INSS retido, a dedução do IR é o desconto simplificado (607,20): IRRF 71,62.
+    await waitFor(() => expect(liquido()).toBe('R$ 5.128,38'));
+    expect(input('IRRF (tabela progressiva)').value).toBe('71,62');
     expect(screen.getByText(/regra própria do subelemento 3\.3\.90\.36\.08/)).toBeInTheDocument();
     ne.subelemento = '';
     act(() => methods().setValue('subelemento', ''));
-    // 5.200 − INSS 572 − IRRF 71,63 − ISS 260 − SEST/SENAT 130 (patronal fora do total).
-    await waitFor(() => expect(liquido()).toBe('R$ 4.166,37'));
+    // 5.200 − INSS 572 − IRRF 71,62 − ISS 260 − SEST/SENAT 130 (patronal fora do total).
+    await waitFor(() => expect(liquido()).toBe('R$ 4.166,38'));
     expect(input('INSS (11%)').value).toBe('572,00');
-    expect(input('IRRF (tabela progressiva)').value).toBe('71,63');
+    expect(input('IRRF (tabela progressiva)').value).toBe('71,62');
   });
 
   test('config antiga, sem regrasSubelemento (servidor sem a migration): segue o elemento', async () => {
