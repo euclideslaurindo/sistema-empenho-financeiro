@@ -132,7 +132,15 @@ export function lerValorMonetario(valor: unknown): number {
 export function totalItemCents(quantidade: unknown, valorUnitario: unknown): Centavos {
   const qtd = Number(quantidade);
   if (!Number.isFinite(qtd)) return 0;
-  return Math.round(qtd * toCents(valorUnitario as string | number | null | undefined));
+  // Auditoria: conta inteira exata. Antes, qtd × centavos em ponto flutuante
+  // dava 2,3 × 25 = 57,4999… e o item saía 0,57 em vez de 0,58. A quantidade
+  // é lida com até 4 casas (× 10.000, inteiro); arredonda meio para cima.
+  const q4 = BigInt(Math.round(qtd * 10_000));
+  const prod = q4 * BigInt(toCents(valorUnitario as string | number | null | undefined));
+  const negativo = prod < 0n;
+  const abs = negativo ? -prod : prod;
+  const cents = Number((abs * 2n + 10_000n) / 20_000n);
+  return negativo ? -cents : cents;
 }
 
 export function somaItensCents(itens: Array<{ quantidade?: unknown; valorUnitario?: unknown }> | null | undefined): Centavos {

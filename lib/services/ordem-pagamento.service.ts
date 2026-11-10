@@ -354,7 +354,9 @@ export class OrdemPagamentoService {
             sub || '01', credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
             elementoGravado, subelementoGravado,
             itensJson,
-            toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamentoArredondado,
+            // Auditoria: valor empenhado e saldo anterior são os da emissão
+            // (gravados na OP), nunca do payload da edição.
+            toDecimal(oldOp.saldo_anterior), toDecimal(oldOp.valor_empenho), vPagamentoArredondado,
             finalIrrf, finalIss, finalInss, finalSestSenat, finalPatronal, finalOutros, finalTaxaBancaria, finalTaxaPix,
             finalTotalDescontos, finalLiquido, snapshotJson,
             numeroCheque ? numeroCheque.trim() : null, dataEmissao || null, dataPagamento || null, historico || '', usuarioId,
