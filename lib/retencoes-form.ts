@@ -3,6 +3,8 @@
 // vai ignorar — mas quem decide o valor gravado continua sendo o servidor.
 import {
   aliquotaIrrfDaNatureza,
+  ehExtraPercentual,
+  ehTaxaExtra,
   CAMPOS_INFORMATIVOS,
   CAMPOS_TRIBUTARIOS,
   regraDaOp,
@@ -31,9 +33,42 @@ export const CAMPO_FORM: Record<CampoRetencao, string> = {
 
 export const CAMPOS_RETENCAO = Object.keys(CAMPO_FORM) as CampoRetencao[];
 
+/** B12: as taxas criadas pelo ADMIN ("x_…") também são campos de retenção da tela. */
 export function ehCampoRetencao(campo: string): campo is CampoRetencao {
-  return campo in CAMPO_FORM;
+  return campo in CAMPO_FORM || ehTaxaExtra(campo);
 }
+
+/** Nome do campo no formulário: o fixo (ex.: "sestSenat") ou o próprio "x_…". */
+export const nomeFormDoCampo = (campo: string): string => (CAMPO_FORM as Record<string, string>)[campo] ?? campo;
+
+const ROTULOS_TRIBUTARIOS: Record<string, string> = {
+  irrf: "IRRF",
+  iss: "ISS",
+  inss: "INSS",
+  patronal: "Patronal",
+  sest_senat: "SEST/SENAT",
+};
+
+/**
+ * B12: colunas da Matriz (e das exceções por subelemento): os 5 tributários
+ * fixos + as taxas "x_" percentuais (ativas ou não — desativar não apaga a
+ * Matriz delas).
+ */
+export function colunasDaMatriz(
+  campos: Array<{ campo?: string; rotulo?: string; tipo?: string }> | null | undefined
+): Array<{ campo: string; rotulo: string }> {
+  const extras = (campos ?? [])
+    .filter((c) => ehTaxaExtra(c.campo) && c.tipo === "PERCENTUAL")
+    .map((c) => ({ campo: c.campo as string, rotulo: c.rotulo || (c.campo as string) }));
+  return [...CAMPOS_TRIBUTARIOS.map((c) => ({ campo: c, rotulo: ROTULOS_TRIBUTARIOS[c] })), ...extras];
+}
+
+/** B12: taxas "x_" ativas da config, na ordem. */
+export const camposExtrasDaConfig = (config: { campos: Array<Partial<ConfigRetencaoCampoMapeado>> } | null | undefined): string[] =>
+  (config?.campos ?? [])
+    .filter((c) => !!c.ativo && ehTaxaExtra(c.campo))
+    .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+    .map((c) => c.campo as string);
 
 export interface RegraDaTela {
   /** Código cuja regra vale (subelemento com regra própria ou elemento). */
@@ -69,7 +104,8 @@ export function estadoCampo(
   perfil: Perfil
 ): EstadoCampo {
   const podeEditar = cfg.editavelOperador || perfil === "ADMIN";
-  if (!(CAMPOS_TRIBUTARIOS as string[]).includes(cfg.campo)) {
+  // B12: taxa "x_" percentual segue a Matriz, como um tributário.
+  if (!(CAMPOS_TRIBUTARIOS as string[]).includes(cfg.campo) && !ehExtraPercentual(cfg)) {
     return { editavel: podeEditar, obrigatorio: false, dica: null };
   }
 
@@ -99,7 +135,7 @@ export function estadoCampoOp(
   perfil: Perfil,
   mei: { credorMei: boolean; sobrescreverMei: boolean; credorSimples?: boolean } = { credorMei: false, sobrescreverMei: false }
 ): EstadoCampo {
-  if (mei.credorMei && (CAMPOS_TRIBUTARIOS as string[]).includes(cfg.campo)) {
+  if (mei.credorMei && ((CAMPOS_TRIBUTARIOS as string[]).includes(cfg.campo) || ehExtraPercentual(cfg))) {
     const manual = mei.sobrescreverMei && perfil === "ADMIN";
     return { editavel: manual, obrigatorio: false, dica: manual ? "Valor manual (ADMIN, credor MEI)" : "Isento (MEI)" };
   }
@@ -136,18 +172,25 @@ export function informadosEmCentavos(
   const informados: Partial<Record<CampoRetencao, number>> = {};
   for (const campo of camposInformados) {
     if (ehCampoRetencao(campo)) {
-      informados[campo] = toCents(valores[CAMPO_FORM[campo]] as string | number | undefined);
+      informados[campo] = toCents(valores[nomeFormDoCampo(campo)] as string | number | undefined);
     }
   }
   return informados;
 }
 
-/** `excluir`: campos informativos, que não entram no total (ex.: patronal no transporte). */
+/**
+ * `excluir`: campos informativos, que não entram no total (ex.: patronal no
+ * transporte). B12: soma também as taxas "x_" presentes nos valores.
+ */
 export function somarDescontosCents(valores: Record<string, unknown>, excluir: CampoRetencao[] = []): number {
-  return CAMPOS_RETENCAO.filter((c) => !excluir.includes(c)).reduce(
+  const fixos = CAMPOS_RETENCAO.filter((c) => !excluir.includes(c)).reduce(
     (total, campo) => total + toCents(valores[CAMPO_FORM[campo]] as string | number | undefined),
     0
   );
+  const extras = Object.keys(valores ?? {})
+    .filter((k) => ehTaxaExtra(k))
+    .reduce((total, k) => total + toCents(valores[k] as string | number | undefined), 0);
+  return fixos + extras;
 }
 
 /**
@@ -219,14 +262,17 @@ export function informadosValidosDaLinha(
  * de fora: o valor do operador nunca é sobrescrito.
  */
 export function valoresCalculadosDoForm(
-  itensCents: Partial<Record<CampoRetencao, number>>,
-  informadosValidos: string[]
+  itensCents: Partial<Record<string, number>>,
+  informadosValidos: string[],
+  /** B12: taxas "x_" da config (para também limpar as que não vieram no cálculo). */
+  extras: string[] = []
 ): Record<string, string> {
   const novos: Record<string, string> = {};
-  for (const campo of CAMPOS_RETENCAO) {
+  const campos = [...CAMPOS_RETENCAO, ...new Set([...extras, ...Object.keys(itensCents).filter((k) => ehTaxaExtra(k))])];
+  for (const campo of campos) {
     if (informadosValidos.includes(campo)) continue;
     const cents = itensCents[campo] ?? 0;
-    novos[CAMPO_FORM[campo]] = cents > 0 ? maskCurrency(cents / 100) : "";
+    novos[nomeFormDoCampo(campo)] = cents > 0 ? maskCurrency(cents / 100) : "";
   }
   return novos;
 }

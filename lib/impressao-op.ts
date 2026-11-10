@@ -67,7 +67,33 @@ export function linhasDescontoDaOp(op: { retencoesSnapshot?: unknown }): LinhaDe
     ].filter(Boolean);
     linhas.push({ chave: c.chave, rotulo: partes.length > 0 ? `${rotulo} (${partes.join(", ")})` : rotulo });
   }
+  // B12: taxas criadas pelo ADMIN ("x_…"), com o rótulo e a alíquota da época.
+  for (const [campo, s] of Object.entries(snapshot.campos as Record<string, any>)) {
+    if (!REGEX_EXTRA.test(campo) || !s || s.ativo === false || s.aplica === false) continue;
+    if (mei && s.automatico) continue; // percentual: isenta no MEI, como os tributários
+    const aliquota = s.automatico && s.aliquota !== null && s.aliquota !== undefined ? Number(s.aliquota) : null;
+    const rotulo = s.rotulo || campo;
+    linhas.push({
+      chave: campo,
+      rotulo:
+        aliquota !== null && Number.isFinite(aliquota)
+          ? `${rotulo} (${aliquota.toLocaleString("pt-BR", { maximumFractionDigits: 4 })}%)`
+          : rotulo,
+    });
+  }
   return linhas;
+}
+
+const REGEX_EXTRA = /^x_[a-z0-9_]{1,28}$/;
+
+/** B12: valores das taxas "x_" da OP (do snapshot, como foram calculadas), já formatados. */
+export function valoresExtrasDaOp(op: { retencoesSnapshot?: unknown }): Record<string, string> {
+  const campos = lerSnapshot(op.retencoesSnapshot)?.campos ?? {};
+  return Object.fromEntries(
+    Object.entries(campos as Record<string, any>)
+      .filter(([campo]) => REGEX_EXTRA.test(campo))
+      .map(([campo, s]) => [campo, formatarValorOp(s?.valor ?? 0)])
+  );
 }
 
 export function formatarValorOp(valor: string | number | null | undefined): string {

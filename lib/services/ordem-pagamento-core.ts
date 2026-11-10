@@ -6,6 +6,7 @@ import type { CampoTributario, CampoDesconto } from '@/lib/retencoes';
 import { toCents, fromCents, formatarBRL, itensBatemComValor, lerValorMonetario, somaItensCents } from '@/lib/money';
 import { calcularProximoNumeroOp } from '@/lib/services/numeracao-op';
 import { entraDarfDaConfig, sincronizarDarfDaOp } from '@/lib/services/darf.service';
+import { extrasDoResultado, gravarExtrasDaOp } from '@/lib/services/op-extras.service';
 
 // Miolo da criação de OP (T34-A): o que acontece DENTRO da transação depois
 // que a NE já foi travada. Sem transação, sem retry e sem status da NE — quem
@@ -69,6 +70,8 @@ export const ordemPagamentoSchema = z.object({
   taxaPix: safeNumber.optional(),
   // B10: 2º ISS, valor livre.
   issBs: safeNumber.optional(),
+  // B12: taxas criadas pelo ADMIN, valor digitado/sobrescrito ({ x_campo: valor }).
+  extras: z.record(z.string().regex(/^x_[a-z0-9_]{1,28}$/), safeNumber).optional(),
   // T26: ADMIN confirmou reter mesmo com credor MEI.
   sobrescreverMei: z.boolean().optional(),
   totalDescontos: safeNumber.optional(),
@@ -109,6 +112,10 @@ export function montarInformados(parsedData: any): Partial<Record<CampoTributari
     if (valor !== undefined) {
       informados[campoEngine] = toCents(valor);
     }
+  }
+  // B12: taxas "x_" (o schema já validou o nome).
+  for (const [campo, valor] of Object.entries(parsedData?.extras ?? {})) {
+    if (valor !== undefined && valor !== null) (informados as Record<string, number>)[campo] = toCents(valor as any);
   }
   return informados;
 }
@@ -281,13 +288,17 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
     );
   }
 
+  // B12: taxas criadas pelo ADMIN (mesma transação).
+  const extras = extrasDoResultado(resultado.itens);
+  await gravarExtrasDaOp(conn, id, extras);
+
   // Mesma transação: erro na DARF desfaz a OP.
   await sincronizarDarfDaOp(
     conn,
     {
       id, numeroNe: neReal, numeroOp: numeroDaOpGerado, sub: subGerado,
       credorCpfCnpj, credorNome: credorNome || null, dataPagamento, dataEmissao,
-      valores: { irrf: finalIrrf, iss: finalIss, inss: finalInss, patronal: finalPatronal, sest_senat: finalSestSenat },
+      valores: { irrf: finalIrrf, iss: finalIss, inss: finalInss, patronal: finalPatronal, sest_senat: finalSestSenat, ...extras },
     },
     { entraDarf: entraDarfDaConfig(configCampos) }
   );

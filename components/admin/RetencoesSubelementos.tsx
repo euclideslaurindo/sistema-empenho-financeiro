@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { perfilDoElemento } from "@/lib/perfis-calculo";
 import { numero } from "@/lib/transporte-admin";
+import { colunasDaMatriz } from "@/lib/retencoes-form";
 import type { ElementoOption } from "@/hooks/use-elementos";
 import {
   AlertDialog,
@@ -21,14 +22,9 @@ import {
 // B9: cada subelemento pode ter a alíquota do IRRF pela natureza (IN RFB
 // 1.234/2012, ex.: 3.3.90.39.22 Limpeza = 4,80%); vazio = alíquota padrão.
 
-const CAMPOS_TRIBUTARIOS = ["irrf", "iss", "inss", "patronal", "sest_senat"] as const;
-const ROTULOS: Record<string, string> = {
-  irrf: "IRRF",
-  iss: "ISS",
-  inss: "INSS",
-  patronal: "Patronal",
-  sest_senat: "SEST/SENAT",
-};
+type Coluna = { campo: string; rotulo: string };
+/** Os 5 tributários fixos; B12: a tela passa também as taxas "x_" percentuais. */
+const COLUNAS_FIXAS: Coluna[] = colunasDaMatriz([]);
 
 /** null = sem regra própria (segue o elemento). */
 type Regra = string[] | null;
@@ -46,8 +42,12 @@ export function subelementosComRegra(elementos: ElementoOption[]): SubelementoDa
     .flatMap((el) => (el.subelementos || []).map((s) => ({ codigo: s.codigo, descricao: s.descricao, elementoCodigo: el.codigo })));
 }
 
-export const nomesDosCampos = (campos: string[]) =>
-  campos.length === 0 ? "nenhuma retenção" : CAMPOS_TRIBUTARIOS.filter((c) => campos.includes(c)).map((c) => ROTULOS[c]).join(", ");
+export const nomesDosCampos = (campos: string[], colunas: Coluna[] = COLUNAS_FIXAS) => {
+  if (campos.length === 0) return "nenhuma retenção";
+  const conhecidas = colunas.filter((c) => campos.includes(c.campo)).map((c) => c.rotulo);
+  const outras = campos.filter((c) => !colunas.some((k) => k.campo === c));
+  return [...conhecidas, ...outras].join(", ");
+};
 
 const mesmaRegra = (a: Regra, b: Regra) =>
   a === null || b === null ? a === b : a.length === b.length && a.every((c) => b.includes(c));
@@ -69,8 +69,15 @@ export function descreverMudancaAliquota(codigo: string, antes: number | null, d
 }
 
 /** Texto da confirmação: o que valia e o que passa a valer. */
-export function descreverMudanca(codigo: string, antes: Regra, depois: Regra, regraElemento: string[]): string {
-  const texto = (r: Regra) => (r === null ? `segue o elemento (${nomesDosCampos(regraElemento)})` : `regra própria: ${nomesDosCampos(r)}`);
+export function descreverMudanca(
+  codigo: string,
+  antes: Regra,
+  depois: Regra,
+  regraElemento: string[],
+  colunas: Coluna[] = COLUNAS_FIXAS
+): string {
+  const texto = (r: Regra) =>
+    r === null ? `segue o elemento (${nomesDosCampos(regraElemento, colunas)})` : `regra própria: ${nomesDosCampos(r, colunas)}`;
   return `${codigo}: ${texto(antes)} → ${texto(depois)}`;
 }
 
@@ -81,7 +88,9 @@ function LinhaSubelemento({
   onSalvo,
   aliquotaSalva,
   onSalvoAliquota,
+  colunas = COLUNAS_FIXAS,
 }: {
+  colunas?: Coluna[];
   sub: SubelementoDaLista;
   salva: Regra;
   regraElemento: string[];
@@ -117,7 +126,7 @@ function LinhaSubelemento({
       toast.success(`Regra do subelemento ${sub.codigo} salva.`);
       setConfirmando(false);
       if (aliquotaAlterada) onSalvoAliquota(sub.codigo, aliquota as number | null);
-      if (regraAlterada) onSalvo(sub.codigo, regra === null ? null : CAMPOS_TRIBUTARIOS.filter((c) => regra.includes(c)));
+      if (regraAlterada) onSalvo(sub.codigo, regra === null ? null : colunas.map((c) => c.campo).filter((c) => regra.includes(c)));
     } catch (err: any) {
       toast.error(err?.message || "Erro ao salvar a regra do subelemento.");
     } finally {
@@ -143,20 +152,20 @@ function LinhaSubelemento({
         </label>
       </td>
       {propria ? (
-        CAMPOS_TRIBUTARIOS.map((campo) => (
+        colunas.map(({ campo, rotulo }) => (
           <td key={campo} className="py-3 text-center">
             <input
               type="checkbox"
               checked={marcados.includes(campo)}
               onChange={(e) => alternarCampo(campo, e.target.checked)}
-              aria-label={`${sub.codigo} aplica ${ROTULOS[campo]}`}
+              aria-label={`${sub.codigo} aplica ${rotulo}`}
               className="rounded text-blue-900"
             />
           </td>
         ))
       ) : (
-        <td colSpan={CAMPOS_TRIBUTARIOS.length} className="py-3 text-xs text-slate-500">
-          Segue o elemento {sub.elementoCodigo}: {nomesDosCampos(regraElemento)}
+        <td colSpan={colunas.length} className="py-3 text-xs text-slate-500">
+          Segue o elemento {sub.elementoCodigo}: {nomesDosCampos(regraElemento, colunas)}
         </td>
       )}
       <td className="py-3 px-2 whitespace-nowrap">
@@ -190,7 +199,7 @@ function LinhaSubelemento({
             <AlertDialogDescription>
               <span className="block mb-3 font-bold text-amber-700">Vale para todas as OPs novas. OPs já emitidas não mudam.</span>
               {regraAlterada && (
-                <span className="block text-slate-700">{descreverMudanca(sub.codigo, salva, regra, regraElemento)}</span>
+                <span className="block text-slate-700">{descreverMudanca(sub.codigo, salva, regra, regraElemento, colunas)}</span>
               )}
               {aliquotaAlterada && (
                 <span className="block text-slate-700">
@@ -218,7 +227,10 @@ export default function RetencoesSubelementos({
   onSalvo,
   irrfSubelemento = {},
   onSalvoAliquota = () => {},
+  colunas = COLUNAS_FIXAS,
 }: {
+  /** B12: colunas da Matriz (tributários + taxas "x_" percentuais). */
+  colunas?: Coluna[];
   elementos: ElementoOption[];
   /** Regras salvas por elemento (o que o subelemento sem regra própria segue). */
   regras: Record<string, string[]>;
@@ -251,9 +263,9 @@ export default function RetencoesSubelementos({
               <tr className="border-b border-slate-100">
                 <th scope="col" className="pb-2 text-xs font-black text-slate-500 uppercase tracking-widest">Subelemento</th>
                 <th scope="col" className="pb-2 text-xs font-black text-slate-500 uppercase tracking-widest">Regra</th>
-                {CAMPOS_TRIBUTARIOS.map((campo) => (
+                {colunas.map(({ campo, rotulo }) => (
                   <th key={campo} scope="col" className="pb-2 text-xs font-black text-slate-500 uppercase tracking-widest text-center">
-                    {ROTULOS[campo]}
+                    {rotulo}
                   </th>
                 ))}
                 <th scope="col" className="pb-2 px-2 text-xs font-black text-slate-500 uppercase tracking-widest">IR natureza (%)</th>
@@ -271,6 +283,7 @@ export default function RetencoesSubelementos({
                   onSalvo={onSalvo}
                   aliquotaSalva={irrfSubelemento[sub.codigo] ?? null}
                   onSalvoAliquota={onSalvoAliquota}
+                  colunas={colunas}
                 />
               ))}
             </tbody>

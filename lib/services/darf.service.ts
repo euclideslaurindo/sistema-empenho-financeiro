@@ -2,7 +2,7 @@ import { query, withTransaction } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 import { fromCents, toCents } from '@/lib/money';
-import { CAMPOS_TRIBUTARIOS, type CampoTributario } from '@/lib/retencoes';
+import { CAMPOS_TRIBUTARIOS, ehExtraPercentual, type CampoTributario } from '@/lib/retencoes';
 import { obterConfigRetencoes, type ConfigRetencaoCampoMapeado } from '@/lib/services/config-retencoes.service';
 import { rotuloMunicipio } from '@/lib/credor-endereco';
 
@@ -14,16 +14,20 @@ export type ServiceResult<T = any> =
 // Valor e competência (puros)
 // ---------------------------------------------------------------------------
 
-/** Campos tributários que compõem a DARF pela config vigente (seed: INSS, Patronal, SEST/SENAT — D4). */
-export function entraDarfDaConfig(campos: ConfigRetencaoCampoMapeado[]): CampoTributario[] {
+/**
+ * Campos que compõem a DARF pela config vigente (seed: INSS, Patronal,
+ * SEST/SENAT — D4). B12: também as taxas percentuais criadas pelo ADMIN
+ * marcadas "entra na DARF".
+ */
+export function entraDarfDaConfig(campos: ConfigRetencaoCampoMapeado[]): string[] {
   return campos
-    .filter((c) => c.ativo && c.entraDarf && (CAMPOS_TRIBUTARIOS as string[]).includes(c.campo))
-    .map((c) => c.campo as CampoTributario);
+    .filter((c) => c.ativo && c.entraDarf && ((CAMPOS_TRIBUTARIOS as string[]).includes(c.campo) || ehExtraPercentual(c)))
+    .map((c) => c.campo);
 }
 
 export function calcularDarf(
-  valores: Partial<Record<CampoTributario, number | string | null>>,
-  entraDarf: CampoTributario[]
+  valores: Partial<Record<string, number | string | null>>,
+  entraDarf: string[]
 ): { valorCents: number; detalhe: Record<string, number> } {
   const detalhe: Record<string, number> = {};
   let valorCents = 0;
@@ -65,7 +69,7 @@ export interface OpParaDarf {
   credorNome: string | null;
   dataPagamento: string | null | undefined;
   dataEmissao: string | null | undefined;
-  valores: Partial<Record<CampoTributario, number>>;
+  valores: Partial<Record<string, number>>;
 }
 
 const ERRO_DARF_PAGA = 'DARF já paga: reabra o status antes de alterar a OP.';
@@ -78,7 +82,7 @@ const ERRO_DARF_PAGA = 'DARF já paga: reabra o status antes de alterar a OP.';
 export async function sincronizarDarfDaOp(
   conn: PoolConnection,
   op: OpParaDarf,
-  opcoes: { entraDarf?: CampoTributario[]; manterValorExistente?: boolean } = {}
+  opcoes: { entraDarf?: string[]; manterValorExistente?: boolean } = {}
 ) {
   const competencia = competenciaDaOp(op.dataPagamento, op.dataEmissao);
 

@@ -47,7 +47,9 @@ export function simularRetencoes(entrada: SimuladorEntrada): SimuladorResultado 
   let totalDescontosCents = 0;
 
   for (const c of entrada.camposConfig) {
-    if (!(CAMPOS_TRIBUTARIOS as readonly string[]).includes(c.campo)) continue;
+    // B12: as taxas "x_" percentuais entram como os tributários (pela Matriz).
+    const extraPercentual = /^x_[a-z0-9_]{1,28}$/.test(c.campo) && c.tipo === "PERCENTUAL";
+    if (!(CAMPOS_TRIBUTARIOS as readonly string[]).includes(c.campo) && !extraPercentual) continue;
 
     const aplicaAoElemento = c.ativo && entrada.regrasElemento.includes(c.campo);
     const valor =
