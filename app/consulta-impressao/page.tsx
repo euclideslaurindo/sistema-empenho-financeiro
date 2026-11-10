@@ -21,6 +21,7 @@ import {
   formatarValorOp,
   itensParaImpressao,
   linhasDescontoDaOp,
+  pessoaTipoDoDocumento,
   notaDescontosDaOp,
 } from "@/lib/impressao-op";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -283,6 +284,8 @@ export default function ConsultaImpressao() {
         emissaoAno: ano,
         credorNome: op.credorNome || "",
         credorCpfCnpj: op.credorCpfCnpj || "",
+        // CNPJ na linha "CNPJ" (antes ia sempre na linha "CPF").
+        pessoaTipo: pessoaTipoDoDocumento(op.credorCpfCnpj),
         credorEndereco: op.credorEndereco || "",
         valorEmpenho: brl(op.valorEmpenho),
         saldoAnterior: brl(op.saldoAnterior),

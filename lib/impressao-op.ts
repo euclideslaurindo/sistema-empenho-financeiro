@@ -70,6 +70,14 @@ export function linhasDescontoDaOp(op: { retencoesSnapshot?: unknown }): LinhaDe
   return linhas;
 }
 
+/**
+ * Linha da via onde sai o documento do credor: CNPJ (14 dígitos) na linha
+ * "CNPJ"; CPF (ou documento incompleto) na linha "CPF".
+ */
+export function pessoaTipoDoDocumento(cpfCnpj: string | null | undefined): "FISICA" | "JURIDICA" {
+  return String(cpfCnpj ?? "").replace(/\D/g, "").length === 14 ? "JURIDICA" : "FISICA";
+}
+
 export function formatarValorOp(valor: string | number | null | undefined): string {
   return formatarBRL(toCents(valor));
 }
