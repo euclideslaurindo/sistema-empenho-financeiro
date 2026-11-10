@@ -105,6 +105,8 @@ export async function calcularRetencoesDaOp(
       config: campos,
       informados: e.informados,
       perfil: e.perfilUsuario,
+      // B12: taxas "x_" percentuais seguem a Matriz do elemento.
+      camposAplicaveis: e.elementoCodigo ? regras[e.elementoCodigo] : undefined,
     });
     return { resultado, configCampos: campos, perfilCalculo };
   }

@@ -3,6 +3,7 @@
 // (POST /api/ordens-pagamento/lote, T34-C), com o mesmo motor de retenções.
 import { toCents, formatarBRL, itensBatemComValor, totalItemCents as totalItemCentsDaMoeda } from "@/lib/money";
 import { extrairCodigoElemento } from "@/lib/elementos";
+import { ehTaxaExtra } from "@/lib/retencoes";
 import {
   CAMPO_FORM,
   camposInformativos,
@@ -289,8 +290,12 @@ export function montarPayloadLote(valores: EmissaoValores) {
     credores: (valores.credores || []).map((c) => {
       // Só o que o operador digitou vai como retenção: chave ausente = cálculo do servidor (T10).
       const informadas: Record<string, number> = {};
+      const extras: Record<string, number> = {};
       for (const campo of c.camposInformados || []) {
-        if (ehCampoRetencao(campo)) informadas[CAMPO_FORM[campo]] = toCents((c as any)[CAMPO_FORM[campo]]) / 100;
+        if (!ehCampoRetencao(campo)) continue;
+        // B12: taxas "x_" vão em `extras`.
+        if (ehTaxaExtra(campo)) extras[campo] = toCents((c as any)[campo]) / 100;
+        else informadas[CAMPO_FORM[campo as keyof typeof CAMPO_FORM]] = toCents((c as any)[CAMPO_FORM[campo as keyof typeof CAMPO_FORM]]) / 100;
       }
       return {
         credorCpfCnpj: c.cpfCnpj,
@@ -304,6 +309,7 @@ export function montarPayloadLote(valores: EmissaoValores) {
           valorUnitario: toCents(i.valorUnitario) / 100,
         })),
         ...informadas,
+        ...(Object.keys(extras).length > 0 ? { extras } : {}),
         ...(c.credorMei && c.sobrescreverMei ? { sobrescreverMei: true } : {}),
       };
     }),

@@ -1,9 +1,9 @@
 import { query, withTransaction } from '@/lib/db';
 import type { PoolConnection } from 'mysql2/promise';
-import { configRetencoesSchema } from '@/lib/schemas';
+import { configRetencaoCampoSchema, configRetencoesSchema } from '@/lib/schemas';
 import { ConfigRetencaoDB, ElementoRetencaoDB } from '@/lib/types/db';
 import { z } from 'zod';
-import { CAMPOS_TRIBUTARIOS, type CampoTributario } from '@/lib/retencoes';
+import { CAMPOS_TRIBUTARIOS, ehTaxaExtra, slugTaxaExtra, type CampoTributario } from '@/lib/retencoes';
 import { codigoDoElementoPai } from '@/lib/elementos';
 import { perfilDoElemento } from '@/lib/perfis-calculo';
 
@@ -68,10 +68,28 @@ export function subelementoAceitaRegraPropria(subelementoCodigo: string): boolea
   return perfilDoElemento(codigoDoElementoPai(subelementoCodigo)) !== 'TRANSPORTE_AUTONOMO';
 }
 
-/** "irrf, iss" → ['irrf', 'iss'], na ordem dos tributários; '' → [] (nenhuma retenção). */
-export function camposDoTexto(texto: string | null | undefined): CampoTributario[] {
-  const lidos = new Set(String(texto ?? '').split(',').map((c) => c.trim()));
-  return CAMPOS_TRIBUTARIOS.filter((c) => lidos.has(c));
+/**
+ * "irrf, iss" → ['irrf', 'iss'], na ordem dos tributários; '' → [] (nenhuma
+ * retenção). B12: as taxas criadas ("x_…") vêm depois, na ordem gravada.
+ */
+export function camposDoTexto(texto: string | null | undefined): string[] {
+  const lidos = String(texto ?? '').split(',').map((c) => c.trim()).filter(Boolean);
+  const unicos = [...new Set(lidos)];
+  return [...CAMPOS_TRIBUTARIOS.filter((c) => unicos.includes(c)), ...unicos.filter((c) => ehTaxaExtra(c))];
+}
+
+/** B12: taxas percentuais criadas pelo ADMIN — as únicas "x_" que entram na Matriz. */
+async function extrasPercentuais(conn: PoolConnection | undefined): Promise<Set<string>> {
+  const rows = await executar<{ campo: string; tipo: string }[]>(conn, 'SELECT campo, tipo FROM config_retencoes');
+  return new Set((rows || []).filter((r) => ehTaxaExtra(r.campo) && r.tipo === 'PERCENTUAL').map((r) => r.campo));
+}
+
+function conferirExtrasDaMatriz(campos: string[], validos: Set<string>) {
+  for (const campo of campos) {
+    if (ehTaxaExtra(campo) && !validos.has(campo)) {
+      throw { status: 400, error: `Taxa "${campo}" não existe ou não é percentual: não pode entrar na Matriz.` };
+    }
+  }
 }
 
 /** B7a: regras próprias por subelemento (subelemento_retencoes). Tabela inexistente → {}. */
@@ -139,8 +157,8 @@ export const regraSubelementoSchema = z.object({
   subelementoCodigo: z.string().trim().regex(/^\d(?:\.\d+){4,}$/, 'Código de subelemento inválido.'),
   /** null = sem regra própria (segue o elemento); [] = nenhuma retenção. */
   campos: z
-    .array(z.enum(CAMPOS_TRIBUTARIOS as [CampoTributario, ...CampoTributario[]]))
-    .max(CAMPOS_TRIBUTARIOS.length)
+    .array(z.string().refine((c) => (CAMPOS_TRIBUTARIOS as string[]).includes(c) || ehTaxaExtra(c), 'Campo de retenção inválido.'))
+    .max(40)
     .nullable(),
 });
 
@@ -159,7 +177,7 @@ export async function salvarRegraSubelemento(
   }
   const parsed = regraSubelementoSchema.parse(body); // ZodError -> 400
   const codigo = parsed.subelementoCodigo;
-  const novo = parsed.campos === null ? null : CAMPOS_TRIBUTARIOS.filter((c) => parsed.campos!.includes(c));
+  const novo = parsed.campos === null ? null : camposDoTexto(parsed.campos.join(','));
 
   if (!subelementoAceitaRegraPropria(codigo)) {
     return { success: false, error: 'Subelemento de transporte (3.3.90.33) tem cálculo próprio e não aceita regra por subelemento.', status: 400 };
@@ -169,6 +187,7 @@ export async function salvarRegraSubelemento(
     await withTransaction(async (conn) => {
       const sub = await executar<{ codigo: string }[]>(conn, 'SELECT codigo FROM subelementos_despesa WHERE codigo = ?', [codigo]);
       if (!sub || sub.length === 0) throw { status: 400, error: `Subelemento "${codigo}" não encontrado.` };
+      if (novo && novo.some((c) => ehTaxaExtra(c))) conferirExtrasDaMatriz(novo, await extrasPercentuais(conn));
 
       const atual = await executar<{ campos: string | null }[]>(
         conn,
@@ -280,6 +299,73 @@ export async function salvarAliquotaIrrfSubelemento(
   return { success: true, data: { subelementoCodigo: codigo, aliquota: novo } };
 }
 
+export const novaTaxaSchema = z.object({
+  rotulo: z.string().trim().min(1).max(60),
+  tipo: z.enum(['PERCENTUAL', 'VALOR_DIGITADO']),
+  aliquota: z.number().nullable().optional(),
+  calculoAutomatico: z.boolean().optional(),
+  editavelOperador: z.boolean().optional(),
+  entraDarf: z.boolean().optional(),
+});
+
+/**
+ * B12: o ADMIN cria uma taxa nova ("x_<slug do rótulo>"). Não há exclusão:
+ * taxa usada em OP só se desativa. Auditoria com a taxa criada.
+ */
+export async function criarTaxaExtra(
+  body: unknown,
+  usuarioId: string,
+  perfil: string
+): Promise<ServiceResult<ConfigRetencaoCampoMapeado>> {
+  if (perfil !== 'ADMIN') {
+    return { success: false, error: 'Acesso negado. Perfil insuficiente para esta operacao.', status: 403 };
+  }
+  const dados = novaTaxaSchema.parse(body); // ZodError -> 400
+  const campo = slugTaxaExtra(dados.rotulo);
+  if (!campo) return { success: false, error: 'Rótulo inválido: use letras ou números.', status: 400 };
+  const percentual = dados.tipo === 'PERCENTUAL';
+  const linha = configRetencaoCampoSchema.parse({
+    campo,
+    rotulo: dados.rotulo,
+    tipo: dados.tipo,
+    aliquota: percentual ? (dados.aliquota ?? null) : null,
+    calculoAutomatico: percentual ? (dados.calculoAutomatico ?? true) : false,
+    editavelOperador: percentual ? !!dados.editavelOperador : true,
+    entraDarf: percentual ? !!dados.entraDarf : false,
+    ativo: true,
+    ordem: 0,
+  });
+
+  try {
+    const criada = await withTransaction(async (conn) => {
+      const existentes = await executar<{ campo: string; ordem: number }[]>(conn, 'SELECT campo, ordem FROM config_retencoes FOR UPDATE');
+      if ((existentes || []).some((r) => r.campo === campo)) {
+        throw { status: 409, error: `Já existe uma taxa com esse nome (${campo}). Use outro rótulo.` };
+      }
+      const ordem = Math.max(0, ...(existentes || []).map((r) => Number(r.ordem) || 0)) + 10;
+      await executar(
+        conn,
+        `INSERT INTO config_retencoes
+           (campo, rotulo, tipo, aliquota, calculo_automatico, editavel_operador, entra_darf, ativo, ordem, updated_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+        [campo, linha.rotulo, linha.tipo, linha.aliquota, linha.calculoAutomatico ? 1 : 0, linha.editavelOperador ? 1 : 0, linha.entraDarf ? 1 : 0, ordem, usuarioId]
+      );
+      const nova = { ...linha, ordem } as ConfigRetencaoCampoMapeado;
+      await executar(
+        conn,
+        `INSERT INTO auditoria_financeira (id, entidade, entidade_id, acao, dados_anteriores, dados_novos, usuario_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [crypto.randomUUID(), 'config_retencoes', campo, 'CREATE', null, JSON.stringify(nova), usuarioId]
+      );
+      return nova;
+    });
+    return { success: true, data: criada, status: 201 };
+  } catch (error: any) {
+    if (error.status && error.error) return { success: false, error: error.error, status: error.status };
+    throw error;
+  }
+}
+
 export async function salvarConfigRetencoes(body: any, usuarioId: string | null): Promise<ServiceResult<null>> {
   const parsed = configRetencoesSchema.parse(body); // ZodError sobe -> 400 via withErrorHandler
 
@@ -303,6 +389,11 @@ export async function salvarConfigRetencoes(body: any, usuarioId: string | null)
           throw { status: 400, error: `Elemento "${elementoCodigo}" não encontrado.` };
         }
       }
+      // B12: "x_" na Matriz só se for taxa percentual que existe.
+      const extrasValidas = new Set(
+        configRowsAntes.filter((r: any) => ehTaxaExtra(r.campo) && r.tipo === 'PERCENTUAL').map((r: any) => r.campo)
+      );
+      for (const campos of Object.values(parsed.regras)) conferirExtrasDaMatriz(campos, extrasValidas);
 
       const antes = { campos: configRowsAntes.map(mapCampo), regras: await montarRegras(conn) };
 

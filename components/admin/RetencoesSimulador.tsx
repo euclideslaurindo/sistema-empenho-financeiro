@@ -1,7 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { simularRetencoes, CAMPOS_TRIBUTARIOS } from "@/lib/retencoes-simulador";
+import { simularRetencoes } from "@/lib/retencoes-simulador";
+import { colunasDaMatriz } from "@/lib/retencoes-form";
 import { formatarBRL, toCents } from "@/lib/money";
 import { parseFormNumber } from "@/lib/utils";
 import { aliquotaIrrfDaNatureza, regraDaOp } from "@/lib/retencoes";
@@ -44,10 +45,12 @@ export default function RetencoesSimulador({
   const subelementos = elementosApi.find((e) => e.codigo === elementoCodigo)?.subelementos ?? [];
   const regrasElemento = useMemo(() => {
     if (!elementoSelecionado) return [];
-    const doElemento = CAMPOS_TRIBUTARIOS.filter((c) => elementoSelecionado.campos?.[c]);
+    const doElemento = colunasDaMatriz(camposWatch)
+      .map((c) => c.campo)
+      .filter((c) => elementoSelecionado.campos?.[c]);
     // Mesma escolha do cálculo da OP (lib/retencoes.ts).
     return regraDaOp(elementoCodigo, subelementoCodigo || null, { [elementoCodigo]: doElemento }, regrasSubelemento).campos ?? [];
-  }, [elementoSelecionado, elementoCodigo, subelementoCodigo, regrasSubelemento]);
+  }, [elementoSelecionado, elementoCodigo, subelementoCodigo, regrasSubelemento, camposWatch]);
   const regraPropria = !!subelementoCodigo && regrasSubelemento[subelementoCodigo] !== undefined;
   const aliquotaNatureza = aliquotaIrrfDaNatureza(elementoCodigo, subelementoCodigo || null, irrfSubelemento);
 
@@ -194,9 +197,9 @@ export default function RetencoesSimulador({
             </p>
           )}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-            {CAMPOS_TRIBUTARIOS.map((campo) => (
+            {colunasDaMatriz(camposWatch).map(({ campo, rotulo }) => (
               <div key={campo} className="text-center">
-                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">{ROTULOS[campo]}</p>
+                <p className="text-xs font-black text-slate-500 uppercase tracking-widest">{ROTULOS[campo] ?? rotulo}</p>
                 <p className="text-sm font-bold text-slate-700">{formatarBRL(resultado.itensCents[campo] || 0)}</p>
               </div>
             ))}

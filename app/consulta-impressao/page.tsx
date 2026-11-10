@@ -22,6 +22,7 @@ import {
   itensParaImpressao,
   linhasDescontoDaOp,
   pessoaTipoDoDocumento,
+  valoresExtrasDaOp,
   notaDescontosDaOp,
 } from "@/lib/impressao-op";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -322,6 +323,7 @@ export default function ConsultaImpressao() {
         taxaBancaria: formatarValorOp(op.taxaBancaria),
         taxaPix: formatarValorOp(op.taxaPix),
         issBs: formatarValorOp(op.issBs),
+        ...valoresExtrasDaOp(op), // B12
         linhasDescontos: linhasDescontoDaOp(op),
         notaDescontos: notaDescontosDaOp(op),
         totalDescontos: brl(op.totalDescontos),

@@ -14,6 +14,80 @@ export const CAMPOS_TRIBUTARIOS: CampoTributario[] = ["irrf", "iss", "inss", "pa
 export const CAMPOS_DESCONTO: CampoDesconto[] = ["outros", "taxa_bancaria", "taxa_pix", "iss_bs"];
 
 /**
+ * B12: taxa criada pelo ADMIN em Configurações ("x_<slug>", até 30 chars).
+ * Percentual = como um tributário (vale pela Matriz, zera para MEI, pode
+ * entrar na DARF); valor digitado = como um desconto (ISS-BS, taxas).
+ */
+export const REGEX_TAXA_EXTRA = /^x_[a-z0-9_]{1,28}$/;
+export const ehTaxaExtra = (campo: string | null | undefined): boolean => REGEX_TAXA_EXTRA.test(String(campo ?? ""));
+export const ehExtraPercentual = (cfg: { campo: string; tipo: string }) => ehTaxaExtra(cfg.campo) && cfg.tipo === "PERCENTUAL";
+
+/** "Taxa Ambiental (Mun.)" → "x_taxa_ambiental_mun" (sem acento, até 30 chars). */
+export function slugTaxaExtra(rotulo: string): string {
+  const base = String(rotulo ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 28)
+    .replace(/_+$/g, "");
+  return base ? `x_${base}` : "";
+}
+
+export interface EntradaExtras {
+  brutoCents: number;
+  config: ConfigRetencaoCampoMapeado[];
+  /** Campos que a regra da OP aplica (elemento/subelemento); undefined = elemento desconhecido. */
+  camposAplicaveis: string[] | undefined;
+  informados: Partial<Record<string, number>>;
+  perfil: "ADMIN" | "GESTOR" | "CONSULTA";
+  credorMei?: boolean;
+  sobrescreverMei?: boolean;
+}
+
+/**
+ * B12: valores das taxas criadas pelo ADMIN, com as mesmas regras das fixas.
+ * Sem nenhuma "x_" na config, devolve {} (o cálculo atual não muda).
+ */
+export function calcularExtras(e: EntradaExtras): Record<string, number> {
+  const itens: Record<string, number> = {};
+  const sobrescreverMei = !!e.credorMei && !!e.sobrescreverMei && e.perfil === "ADMIN";
+  for (const cfg of e.config) {
+    if (!ehTaxaExtra(cfg.campo)) continue;
+    const campo = cfg.campo;
+    const informado = e.informados[campo];
+    if (!cfg.ativo) {
+      itens[campo] = 0;
+      continue;
+    }
+    const podeEditar = cfg.editavelOperador || e.perfil === "ADMIN";
+    if (cfg.tipo !== "PERCENTUAL") {
+      // Valor digitado: como as taxas (vale também para MEI).
+      itens[campo] = podeEditar && informado !== undefined ? validarInformado(campo, informado, e.brutoCents) : 0;
+      continue;
+    }
+    // Percentual: como um tributário.
+    if (e.credorMei) {
+      itens[campo] = valorTributarioMei(campo, true, informado, sobrescreverMei, e.brutoCents);
+      continue;
+    }
+    if (e.camposAplicaveis === undefined) {
+      itens[campo] = podeEditar && informado !== undefined ? validarInformado(campo, informado, e.brutoCents) : 0;
+      continue;
+    }
+    if (!e.camposAplicaveis.includes(campo)) {
+      itens[campo] = 0;
+      continue;
+    }
+    let valor = cfg.calculoAutomatico && cfg.aliquota != null ? calcPercentCents(e.brutoCents, cfg.aliquota) : 0;
+    if ((!cfg.calculoAutomatico || podeEditar) && informado !== undefined) valor = validarInformado(campo, informado, e.brutoCents);
+    itens[campo] = valor;
+  }
+  return itens;
+}
+
+/**
  * Campos só informativos (R15/D15): calculados, gravados e impressos, mas FORA
  * do total de descontos e do líquido — em todos os elementos. A patronal é o
  * INSS que o órgão paga; não sai do valor que o credor recebe.
@@ -35,7 +109,8 @@ export interface EntradaCalculo {
   // só deve incluir uma chave se o valor realmente veio do payload do
   // cliente — ver nota no plano da T10 sobre o contrato que a T11 precisa
   // respeitar (não mandar sempre os 8 campos com "" / 0).
-  informados: Partial<Record<CampoTributario | CampoDesconto, number>>;
+  // B12: aceita também as taxas criadas pelo ADMIN ("x_…").
+  informados: Partial<Record<CampoTributario | CampoDesconto, number>> & Partial<Record<string, number>>;
   perfil: "ADMIN" | "GESTOR" | "CONSULTA";
   /** Regra 0: credor MEI não sofre retenção (lido do cadastro no servidor). */
   credorMei?: boolean;
@@ -250,6 +325,20 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
     itens[campo] = permitido && informado !== undefined ? validarInformado(campo, informado, brutoCents) : 0;
   }
 
+  // B12: taxas criadas pelo ADMIN.
+  Object.assign(
+    itens,
+    calcularExtras({
+      brutoCents,
+      config,
+      camposAplicaveis,
+      informados,
+      perfil,
+      credorMei: entrada.credorMei,
+      sobrescreverMei: entrada.sobrescreverMei,
+    })
+  );
+
   const totalDescontosCents = Object.entries(itens)
     .filter(([campo]) => !ehInformativo(campo))
     .reduce((a, [, b]) => a + b, 0);
@@ -299,7 +388,9 @@ export function calcularRetencoes(entrada: EntradaCalculo): ResultadoCalculo {
           automatico: cfg.calculoAutomatico,
           ativo: cfg.ativo,
           aplica:
-            !tributarios.includes(cfg.campo) || elementoDesconhecido || (camposAplicaveis as string[]).includes(cfg.campo),
+            (!tributarios.includes(cfg.campo) && !ehExtraPercentual(cfg)) ||
+            elementoDesconhecido ||
+            (camposAplicaveis as string[]).includes(cfg.campo),
           valor: (itens[cfg.campo] ?? 0) / 100,
           ...(ehInformativo(cfg.campo) ? { informativo: true } : {}),
         },
