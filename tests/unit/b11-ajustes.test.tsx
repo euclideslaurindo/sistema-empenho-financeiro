@@ -112,3 +112,25 @@ describe('migration_24', () => {
     expect(ativo).not.toMatch(/\b(DROP|DELETE|ALTER|TRUNCATE)\b/i);
   });
 });
+
+describe('via: CPF x CNPJ', () => {
+  test('CNPJ vai na linha "CNPJ"; CPF na linha "CPF"', async () => {
+    const { pessoaTipoDoDocumento } = await import('@/lib/impressao-op');
+    expect(pessoaTipoDoDocumento('11.222.333/0001-81')).toBe('JURIDICA');
+    expect(pessoaTipoDoDocumento('138.958.414-39')).toBe('FISICA');
+    expect(pessoaTipoDoDocumento('')).toBe('FISICA');
+  });
+
+  test('a via mostra o documento na linha certa', () => {
+    // Coluna dos valores: 1ª linha = CPF, 2ª linha = CNPJ.
+    const linhaDoDoc = (doc: string) => {
+      const linha = screen.getByText(doc).closest('div.flex-1.flex')!;
+      return Array.from(linha.parentElement!.children).indexOf(linha) === 0 ? 'CPF' : 'CNPJ';
+    };
+    const { unmount } = render(<EmpenhoVia data={{ credorCpfCnpj: '11.222.333/0001-81', pessoaTipo: 'JURIDICA' }} isEditing={false} onChange={vi.fn()} />);
+    expect(linhaDoDoc('11.222.333/0001-81')).toBe('CNPJ');
+    unmount();
+    render(<EmpenhoVia data={{ credorCpfCnpj: '138.958.414-39', pessoaTipo: 'FISICA' }} isEditing={false} onChange={vi.fn()} />);
+    expect(linhaDoDoc('138.958.414-39')).toBe('CPF');
+  });
+});
