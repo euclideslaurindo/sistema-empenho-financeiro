@@ -12,7 +12,9 @@ import {
   Pencil,
   FileText,
   AlertTriangle,
+  FileWarning,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store";
 import {
@@ -622,6 +624,18 @@ export default function NotasEmpenho() {
                       </td>
                       <td className="py-5 text-right rounded-r-lg pr-2">
                         <div className="flex items-center justify-end gap-2">
+                          {/* B13: sobrou recurso na NE → justificativa de sobra (salvar/imprimir). */}
+                          {!isCancelado && ne.saldo && toCents(ne.saldo.restante) > 0 && (
+                            <Link
+                              href={`/notas-empenho/justificativa?ne=${encodeURIComponent(ne.numero)}`}
+                              title="Justificativa de sobra de recurso"
+                              aria-label={`Justificativa de sobra de recurso da NE ${ne.numero}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-white rounded-md transition-all"
+                            >
+                              <FileWarning className="w-4 h-4" />
+                            </Link>
+                          )}
                           {!isCancelado && (
                             <button
                               title="Editar"
