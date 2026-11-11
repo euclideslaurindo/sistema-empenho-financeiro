@@ -262,8 +262,9 @@ export async function criarOpNaTransacao(conn: PoolConnection, dados: DadosOp, c
       credorNome || '', credorCpfCnpj || '', credorRg || '', credorEndereco || '',
       unidadeOrcamentaria || '', elementoGravado, subelementoGravado, gestao || '', historico || '',
       itensJson,
-      // grava o mesmo valor (em centavos) que entrou no cálculo das retenções
-      toDecimal(saldoAnterior), toDecimal(valorEmpenho), vPagamentoArredondado,
+      // Auditoria: valor empenhado e saldo anterior SEMPRE do servidor (NE e
+      // soma das OPs nesta transação), nunca do payload — a via imprime os dois.
+      fromCents(saldoCents), fromCents(toCents(valorNe)), vPagamentoArredondado,
       finalIrrf, finalIss, finalInss, finalSestSenat, finalPatronal, finalOutros, finalTaxaBancaria, finalTaxaPix,
       finalTotalDescontos, finalLiquido, snapshotJson,
       chequeFormatado, dataEmissao || null, dataPagamento || null, usuarioId,
