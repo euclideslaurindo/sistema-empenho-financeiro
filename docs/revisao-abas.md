@@ -448,6 +448,14 @@ Os problemas estão em volta dessas telas.
 - [ ] **TX-05** Reimprimir a OP: linhas "Taxa Teste (2%) 20,00" e "Contribuição 7,00".
 - [ ] **TX-06** Desmarcar "Ativo" da Taxa Teste e salvar → não aparece mais em OP nova; a OP já emitida continua igual na reimpressão. Tentar criar outra taxa com o mesmo rótulo → "Já existe uma taxa com esse nome".
 
+**Justificativa de sobra de recurso da NE (B13)**
+- [ ] **JS-01** Rodar a `database/migration_26.sql` no Workbench: a consulta 0 dá 0 antes; depois, (a) 12 colunas e (b) a versão 26.
+- [ ] **JS-02** Notas de Empenho: NE com saldo (ex.: R$ 2.000 com OP de R$ 1.500) mostra o ícone "Justificativa de sobra"; NE sem saldo ou cancelada não mostra.
+- [ ] **JS-03** Abrir: saldo R$ 500,00 "(quinhentos reais)", objeto = Observação da NE. Sem motivo marcado, Salvar e Imprimir ficam desabilitados.
+- [ ] **JS-04** Marcar 2 motivos, editar o texto de um, preencher "Outros fatores", mudar o saldo atualizado → a folha ao lado acompanha. Salvar → "Salva em … por …".
+- [ ] **JS-05** Imprimir / Salvar PDF: uma folha A4, com brasão, só os motivos marcados, sem as instruções em maiúsculas do modelo.
+- [ ] **JS-06** Reabrir: volta o que foi salvo. Emitir outra OP na NE e reabrir → aviso "O saldo da NE mudou desde que a justificativa foi salva".
+
 ### Resultado do teste
 
 | Item | ✅/❌ | Observação |
