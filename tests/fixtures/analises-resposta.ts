@@ -7,7 +7,7 @@ const LONGOS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Jul
 
 const zeroMes = (i: number) => ({
   mes: `2026-${String(i + 1).padStart(2, '0')}`, rotulo: MESES[i], longo: LONGOS[i],
-  empenhado: 0, pago: 0, ops: 0, nes: 0, irrf: 0, iss: 0, inss: 0, sest: 0, patronal: 0,
+  empenhado: 0, pago: 0, ops: 0, nes: 0, irrf: 0, iss: 0, inss: 0, sest: 0, patronal: 0, outras: 0,
 });
 
 export function respostaExemplo(): RespostaAnalises {

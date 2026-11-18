@@ -202,20 +202,21 @@ const SERIES_RETENCAO = [
   { chave: 'iss', nome: 'ISS', fundo: paleta.categoricas[1] },
   { chave: 'irrf', nome: 'IRRF', fundo: paleta.categoricas[2] },
   { chave: 'sest', nome: 'SEST/SENAT', fundo: paleta.categoricas[3] },
+  { chave: 'outras', nome: 'Outras retenções', fundo: paleta.azulClaro },
   { chave: 'patronal', nome: 'Patronal (informativa)', fundo: paleta.hachuraPatronal },
 ] as const;
 
 export function montarRetencoes(r: RespostaAnalises): Montado<{ categorias: Categoria[]; series: Serie[]; valores: Valores }> {
-  const valores: Valores = Object.fromEntries(r.meses.map((m) => [m.mes, { inss: m.inss, iss: m.iss, irrf: m.irrf, sest: m.sest, patronal: m.patronal }]));
-  const vazio = !r.meses.some((m) => m.inss || m.iss || m.irrf || m.sest || m.patronal);
+  const valores: Valores = Object.fromEntries(r.meses.map((m) => [m.mes, { inss: m.inss, iss: m.iss, irrf: m.irrf, sest: m.sest, outras: m.outras ?? 0, patronal: m.patronal }]));
+  const vazio = !r.meses.some((m) => m.inss || m.iss || m.irrf || m.sest || m.outras || m.patronal);
   return {
     titulo: vazio ? 'Nenhuma retenção no período' : `${curto(r.kpis.retido)} retidos dos credores no período`,
     vazio,
     legenda: SERIES_RETENCAO.map((s) => ({ nome: s.nome, fundo: s.fundo })),
     tabela: {
       legenda: 'Retenções e encargos por mês',
-      colunas: ['Mês', 'INSS', 'ISS', 'IRRF', 'SEST/SENAT', 'Patronal'],
-      linhas: r.meses.map((m) => [m.longo, brl(m.inss), brl(m.iss), brl(m.irrf), brl(m.sest), brl(m.patronal)]),
+      colunas: ['Mês', 'INSS', 'ISS', 'IRRF', 'SEST/SENAT', 'Outras', 'Patronal'],
+      linhas: r.meses.map((m) => [m.longo, brl(m.inss), brl(m.iss), brl(m.irrf), brl(m.sest), brl(m.outras ?? 0), brl(m.patronal)]),
     },
     props: { categorias: categoriasDe(r), series: SERIES_RETENCAO.map((s) => ({ ...s })), valores },
   };

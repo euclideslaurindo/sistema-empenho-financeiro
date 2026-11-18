@@ -247,8 +247,11 @@ describe('Integração API Notas de Empenho', () => {
       expect(notas[1].saldo).toEqual({ valor: 50, gasto: 0, restante: 50, percentualGasto: 0, qtdOps: 0 });
       expect(notas[0]).not.toHaveProperty('gasto');
       expect(notas[0]).not.toHaveProperty('qtdOps');
-      // 1 consulta de contagem + 1 da página; o gasto vem do LEFT JOIN agregado já existente
-      expect((query as any).mock.calls).toHaveLength(2);
+      // 1 consulta de contagem + 1 da página (o gasto vem do LEFT JOIN agregado)
+      // + 1 das justificativas de sobra da página inteira (B13) — nunca uma por NE.
+      expect((query as any).mock.calls).toHaveLength(3);
+      expect((query as any).mock.calls[2][0]).toContain('FROM justificativas_saldo WHERE numero_ne IN (?,?)');
+      expect((query as any).mock.calls[2][1]).toEqual(['NE-001', 'NE-002']);
       const sqlPagina = (query as any).mock.calls.map((c: any[]) => c[0] as string).find((s: string) => s.includes('LIMIT ?'));
       expect(sqlPagina).toContain('COALESCE(op_sum.total_pago, 0) as gasto');
       expect(sqlPagina).toContain('COUNT(*) as qtd');

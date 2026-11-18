@@ -49,6 +49,8 @@ interface NotaEmpenho {
   quemAtualizou?: string;
   /** T31: valor, gasto (soma das OPs), restante, % gasto e quantidade de OPs. */
   saldo?: { valor: number; gasto: number; restante: number; percentualGasto: number; qtdOps: number };
+  /** B13: já tem justificativa de sobra salva. */
+  temJustificativa?: boolean;
 }
 
 /** Valores do formulário a partir de uma NE gravada (editar ou "carregar dados da NE"). */
@@ -625,7 +627,7 @@ export default function NotasEmpenho() {
                       <td className="py-5 text-right rounded-r-lg pr-2">
                         <div className="flex items-center justify-end gap-2">
                           {/* B13: sobrou recurso na NE → justificativa de sobra (salvar/imprimir). */}
-                          {!isCancelado && ne.saldo && toCents(ne.saldo.restante) > 0 && (
+                          {(ne.temJustificativa || (!isCancelado && ne.saldo && toCents(ne.saldo.restante) > 0)) && (
                             <Link
                               href={`/notas-empenho/justificativa?ne=${encodeURIComponent(ne.numero)}`}
                               title="Justificativa de sobra de recurso"
