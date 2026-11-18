@@ -1,9 +1,11 @@
+import type { PerfilUsuario } from '@/lib/perfis-usuario';
+
 export interface UsuarioDB {
   id: string;
   nome: string;
   email: string;
   senha_hash: string;
-  perfil: 'ADMIN' | 'USER' | string;
+  perfil: PerfilUsuario;
   ativo: number;
   created_at: Date;
   ultimo_acesso: Date | string | null;

@@ -1,10 +1,11 @@
 import { create } from 'zustand';
+import type { PerfilUsuario } from '@/lib/perfis-usuario';
 
 export interface UserProfile {
   id: string;
   nome: string;
   email: string;
-  perfil: 'ADMIN' | 'USER' | 'CONSULTA';
+  perfil: PerfilUsuario;
 }
 
 interface AppState {
