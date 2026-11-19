@@ -116,6 +116,10 @@ describe('Consulta / Impressão — revisão da aba 5', () => {
     expect(doc).not.toContain('TESTE Ana');
     expect(doc).not.toMatch(/04049\d/);
     expect(doc).toContain('01/02/2026');
+    // recibo: líquido em número e por extenso iguais (antes "R$ 0,00 (CEM REAIS)")
+    const verso = texto(container, '#doc-0-verso');
+    expect(verso).toMatch(/importância líquida de\s*R\$ 100,00\s*\(\s*cem reais\s*\)/i);
+    expect(verso).not.toMatch(/líquida de\s*R\$ 0,00/);
   });
 
   test('gerar sem OP marcada avisa e não gera', async () => {

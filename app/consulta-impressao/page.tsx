@@ -25,6 +25,8 @@ import {
   especificacaoDaVia,
   valoresExtrasDaOp,
   notaDescontosDaOp,
+  valoresDoVersoEmBranco,
+  editarVerso,
 } from "@/lib/impressao-op";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -203,7 +205,7 @@ export default function ConsultaImpressao() {
 
   const handleVersoChange = (index: number, field: string, value: any) => {
     setDocumentList((prev) =>
-      prev.map((doc, i) => (i === index ? { ...doc, verso: { ...doc.verso, [field]: value } } : doc)),
+      prev.map((doc, i) => (i === index ? { ...doc, verso: editarVerso(doc.verso, field, value) } : doc)),
     );
   };
 
@@ -385,7 +387,6 @@ export default function ConsultaImpressao() {
 
     const neDB = await buscarNe(formattedNe);
     const valorFormatado = neDB ? brl(neDB.valor) : frenteData.valorEmpenho;
-    const valorReais = neDB ? toCents(neDB.valor) / 100 : 0;
     const finalHistorico = neDB ? neDB.historico || "" : frenteData.especificacao;
     // Só NEs antigas (antes da rodada 2) ainda têm credor; as novas saem sem.
     const finalNome = neDB?.credorNome || frenteData.credorNome;
@@ -414,9 +415,8 @@ export default function ConsultaImpressao() {
         nomeRecebedor: finalNome,
         cpfCnpj: finalCpf,
         referenteA: finalHistorico,
-        valorBase: valorFormatado,
-        valorExtenso: numeroPorExtenso(valorReais),
-        descontosExtenso: numeroPorExtenso(0),
+        // Sem OP não há desconto: líquido = valor da NE, número e extenso iguais.
+        ...(neDB ? valoresDoVersoEmBranco(neDB.valor) : { valorBase: valorFormatado }),
       },
     }]);
   };
