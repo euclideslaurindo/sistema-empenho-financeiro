@@ -130,6 +130,18 @@ describe('GET /api/analises — montagem (ano civil de 2026, até 27/10)', () =>
     expect(body).toMatchObject({ restos: 100, pagoDasNes: 900.3, pagoAnteriores: 100, qtdOps: 3, qtdCredores: 2, qtdNes: 4, pctTransporte: 60, vazio: false, avisos: [] });
   });
 
+  test('"Retido" soma as outras retenções (ISS-BS, IBS-CBS, taxas criadas); o SQL tira as tarifas', async () => {
+    mockBanco({ meses: [{ ...MESES_2026[0], outras: '30.00' }, MESES_2026[1]] });
+    const { body } = await analises('?periodo=ano&ano=2026');
+    expect(body.kpis.retido).toBe(172.6); // 142,60 + 30,00
+    expect(body.meses.find((m: any) => m.mes === '2026-02').outras).toBe(30);
+    const sqlMeses = sqls().find((x) => x.includes('GROUP BY mes'))!;
+    expect(sqlMeses).toMatch(/AS outras/);
+    expect(sqlMeses).toContain('COALESCE(op.taxa_bancaria, 0) - COALESCE(op.taxa_pix, 0)');
+    const sqlOps = sqls().find((x) => x.includes('AS retido'));
+    if (sqlOps) expect(sqlOps).toMatch(/taxa_pix/);
+  });
+
   test('a ponte fecha no centavo e a situação usa o pago até o fim do período', async () => {
     const { body } = await analises('?ano=2026');
     expect(body.ponte).toEqual({ empenhado: 2000.2, cancelado: 300, liquido: 800.1, retencoes: 100.2, saldo: 799.9 });

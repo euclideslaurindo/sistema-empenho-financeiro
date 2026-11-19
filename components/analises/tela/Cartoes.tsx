@@ -31,7 +31,7 @@ export function CartoesAnalises({ dados }: { dados: RespostaAnalises }) {
       cor: paleta.texto,
     },
     { rotulo: "Saldo a pagar", valor: k.saldo, variacao: k.varSaldo, nota: "das NEs empenhadas no período", cor: paleta.ambarTexto },
-    { rotulo: "Retido dos credores", valor: k.retido, variacao: k.varRetido, nota: "IRRF, ISS, INSS e SEST/SENAT", cor: paleta.texto },
+    { rotulo: "Retido dos credores", valor: k.retido, variacao: k.varRetido, nota: "IRRF, ISS, INSS, SEST/SENAT e outras retenções", cor: paleta.texto },
   ];
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

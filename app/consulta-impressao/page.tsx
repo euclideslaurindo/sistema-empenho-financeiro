@@ -22,6 +22,7 @@ import {
   itensParaImpressao,
   linhasDescontoDaOp,
   pessoaTipoDoDocumento,
+  especificacaoDaVia,
   valoresExtrasDaOp,
   notaDescontosDaOp,
 } from "@/lib/impressao-op";
@@ -294,7 +295,8 @@ export default function ConsultaImpressao() {
         gestaoUE: op.gestao || "",
         unidadeOrcamentaria: op.unidadeOrcamentaria || "",
         elementoSubelemento: [op.elemento, op.subelemento].filter(Boolean).join(' / '),
-        especificacao: itensFormatados.especificacao || op.historico || "",
+        // Sem itens especificados: a Observação da NE (não o texto automático).
+        especificacao: especificacaoDaVia(itensFormatados.especificacao, ne?.historico, op.historico, op.numeroNe ?? formattedNe),
         chequeNo: op.numeroCheque || "",
         numeroCheque: op.numeroCheque || "",
         unidade: itensFormatados.unidade,

@@ -97,7 +97,7 @@ describe('montar-relatorio', () => {
     const x = retidoPorTipo(r.meses);
     expect(x.total).toBe(r.kpis.retido);
     expect(x.patronal).toBe(200);
-    expect(x.tipos.map((t) => t.nome)).toEqual(['INSS', 'ISS', 'IRRF', 'SEST/SENAT']);
+    expect(x.tipos.map((t) => t.nome)).toEqual(['INSS', 'ISS', 'IRRF', 'SEST/SENAT', 'Outras (ISS-BS, IBS-CBS, taxas)']);
   });
 
   test('ponte: % sobre o empenhado; empenhado zero → 0%', () => {

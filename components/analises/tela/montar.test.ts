@@ -118,11 +118,11 @@ describe('tabelas (os valores cheios, os mesmos do gráfico)', () => {
     expect(montarPonte(r).props.etapas.map((e) => e.tipo)).toEqual(['total', 'menos', 'menos', 'menos', 'saldo']);
   });
 
-  test('retenções: 5 séries na ordem fixa, patronal hachurada', () => {
+  test('retenções: 6 séries na ordem fixa (com as outras retenções), patronal hachurada', () => {
     const m = montarRetencoes(r);
-    expect(m.props.series.map((s) => s.chave)).toEqual(['inss', 'iss', 'irrf', 'sest', 'patronal']);
-    expect(m.props.series[4].fundo).toContain('repeating-linear-gradient');
-    expect(m.tabela.linhas[1]).toEqual(['Fevereiro', 'R$ 110,00', 'R$ 20,00', 'R$ 10,00', 'R$ 2,50', 'R$ 200,00']);
+    expect(m.props.series.map((s) => s.chave)).toEqual(['inss', 'iss', 'irrf', 'sest', 'outras', 'patronal']);
+    expect(m.props.series[5].fundo).toContain('repeating-linear-gradient');
+    expect(m.tabela.linhas[1]).toEqual(['Fevereiro', 'R$ 110,00', 'R$ 20,00', 'R$ 10,00', 'R$ 2,50', 'R$ 0,00', 'R$ 200,00']);
   });
 
   test('DARF: legenda com status (ícone + texto)', () => {

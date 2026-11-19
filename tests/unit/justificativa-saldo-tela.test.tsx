@@ -100,3 +100,21 @@ describe('botão na lista de NEs', () => {
     expect(screen.queryByRole('link', { name: /NE NE-CANCELADA/ })).toBeNull();
   });
 });
+
+describe('botão com justificativa já salva', () => {
+  test('NE zerada mas com justificativa salva: o botão continua', async () => {
+    busca = new URLSearchParams();
+    window.scrollTo = vi.fn() as any;
+    global.fetch = vi.fn(async () => ({ json: async () => ({ duplicado: false }) })) as any;
+    (apiClient.get as any).mockResolvedValue({
+      notas: [
+        { id: 'a', numero: 'NE-SALVA', valor: 100, status: 'LIQUIDADO', temJustificativa: true, saldo: { valor: 100, gasto: 100, restante: 0, percentualGasto: 100, qtdOps: 1 } },
+        { id: 'b', numero: 'NE-SEM', valor: 100, status: 'LIQUIDADO', temJustificativa: false, saldo: { valor: 100, gasto: 100, restante: 0, percentualGasto: 100, qtdOps: 1 } },
+      ],
+      pagination: { totalPages: 1 },
+    });
+    render(<NotasEmpenho />);
+    expect(await screen.findByRole('link', { name: /NE NE-SALVA/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /NE NE-SEM/ })).toBeNull();
+  });
+});

@@ -123,6 +123,23 @@ export class NotasEmpenhoService {
 
     const notas = (await query<Partial<NotaEmpenhoDB>[]>(sql, sqlParams)).map(comSaldo);
 
+    // B13: NE com justificativa de sobra salva (o botão continua mesmo sem saldo).
+    // Consulta própria (sem JOIN/collation); sem a migration_26, nenhuma tem.
+    const numeros = notas.map((n: any) => n.numero).filter(Boolean);
+    let comJustificativa = new Set<string>();
+    if (numeros.length > 0) {
+      try {
+        const rows = await query<{ numero_ne: string }[]>(
+          `SELECT numero_ne FROM justificativas_saldo WHERE numero_ne IN (${numeros.map(() => '?').join(',')})`,
+          numeros
+        );
+        comJustificativa = new Set((rows || []).map((r) => r.numero_ne));
+      } catch (e: any) {
+        if (!(e?.code === 'ER_NO_SUCH_TABLE' || e?.errno === 1146)) throw e;
+      }
+    }
+    for (const n of notas as any[]) n.temJustificativa = comJustificativa.has(n.numero);
+
     return {
       success: true as const,
       data: {

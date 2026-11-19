@@ -104,6 +104,26 @@ export function valoresExtrasDaOp(op: { retencoesSnapshot?: unknown }): Record<s
   );
 }
 
+/**
+ * "Especificação ou histórico" da via: os itens da OP; sem itens
+ * especificados, a Observação da NE; sem ela, o histórico da OP — menos o
+ * texto automático "Pagamento referente ao empenho …", que sai em branco.
+ */
+export function especificacaoDaVia(
+  especificacaoItens: string | null | undefined,
+  observacaoNe: string | null | undefined,
+  historicoOp: string | null | undefined,
+  numeroNe: string | null | undefined
+): string {
+  const itens = String(especificacaoItens ?? "").trim();
+  if (itens) return itens;
+  const observacao = String(observacaoNe ?? "").trim();
+  if (observacao) return observacao;
+  const historico = String(historicoOp ?? "").trim();
+  const automatico = `Pagamento referente ao empenho ${String(numeroNe ?? "").trim()}`;
+  return historico && historico !== automatico ? historico : "";
+}
+
 export function formatarValorOp(valor: string | number | null | undefined): string {
   return formatarBRL(toCents(valor));
 }

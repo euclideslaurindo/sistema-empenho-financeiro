@@ -134,3 +134,13 @@ describe('via: CPF x CNPJ', () => {
     expect(linhaDoDoc('138.958.414-39')).toBe('CPF');
   });
 });
+
+describe('via: especificação sem itens', () => {
+  test('itens > Observação da NE > histórico (menos o texto automático)', async () => {
+    const { especificacaoDaVia } = await import('@/lib/impressao-op');
+    expect(especificacaoDaVia('Rota rural', 'Obs NE', 'Hist', 'NE-7')).toBe('Rota rural');
+    expect(especificacaoDaVia('', 'Transporte escolar', 'Pagamento referente ao empenho NE-7', 'NE-7')).toBe('Transporte escolar');
+    expect(especificacaoDaVia('', '', 'Pagamento referente ao empenho NE-7', 'NE-7')).toBe('');
+    expect(especificacaoDaVia('', '  ', 'Serviço antigo', 'NE-7')).toBe('Serviço antigo');
+  });
+});

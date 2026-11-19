@@ -48,6 +48,7 @@ export function retidoPorTipo(meses: RespostaAnalises['meses']) {
     { nome: 'ISS', valor: soma((m) => m.iss) },
     { nome: 'IRRF', valor: soma((m) => m.irrf) },
     { nome: 'SEST/SENAT', valor: soma((m) => m.sest) },
+    { nome: 'Outras (ISS-BS, IBS-CBS, taxas)', valor: soma((m) => m.outras ?? 0) },
   ];
   const total = fromCents(tipos.reduce((t, x) => t + toCents(x.valor), 0));
   return { tipos, total, patronal: soma((m) => m.patronal) };

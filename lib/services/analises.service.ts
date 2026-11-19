@@ -178,6 +178,8 @@ async function opsPorMes(f: Filtro, inicio: string, fim: string) {
               SUM(COALESCE(op.irrf, 0)) AS irrf, SUM(COALESCE(op.iss, 0)) AS iss,
               SUM(COALESCE(op.inss, 0)) AS inss, SUM(COALESCE(op.sest_senat, 0)) AS sest,
               SUM(COALESCE(op.patronal, 0)) AS patronal, SUM(COALESCE(op.valor_liquido, 0)) AS liquido,
+              SUM(GREATEST(COALESCE(op.valor_pagamento, 0) - COALESCE(op.valor_liquido, 0) - COALESCE(op.taxa_bancaria, 0) - COALESCE(op.taxa_pix, 0)
+                       - COALESCE(op.irrf, 0) - COALESCE(op.iss, 0) - COALESCE(op.inss, 0) - COALESCE(op.sest_senat, 0), 0)) AS outras,
               SUM(CASE WHEN ${EXERCICIO_NE} < ? THEN COALESCE(op.valor_pagamento, 0) ELSE 0 END) AS restos,
               SUM(CASE WHEN ${DATA_NE} BETWEEN ? AND ? THEN COALESCE(op.valor_pagamento, 0) ELSE 0 END) AS pagoNesPeriodo
          ${FROM_OP}
@@ -189,6 +191,7 @@ async function opsPorMes(f: Filtro, inicio: string, fim: string) {
   return rows.map((r) => ({
     mes: String(r.mes), ops: Number(r.ops) || 0,
     bruto: c(r.bruto), irrf: c(r.irrf), iss: c(r.iss), inss: c(r.inss), sest: c(r.sest), patronal: c(r.patronal), liquido: c(r.liquido),
+    outras: c(r.outras),
     restos: c(r.restos), pagoNesPeriodo: c(r.pagoNesPeriodo),
   }));
 }
@@ -319,7 +322,13 @@ async function darfPorCompetencia(inicio: string, fim: string) {
 // ---------------------------------------------------------------------------
 
 const soma = <T,>(l: T[], f: (x: T) => number) => l.reduce((t, x) => t + f(x), 0);
-const retidoDe = (x: { irrf: number; iss: number; inss: number; sest: number }) => x.irrf + x.iss + x.inss + x.sest;
+/**
+ * Retido dos credores: IRRF, ISS, INSS, SEST/SENAT e as outras retenções
+ * (ISS-BS, Outros/IBS-CBS e taxas criadas). Tarifas bancária e PIX e a
+ * patronal (informativa) ficam de fora.
+ */
+const retidoDe = (x: { irrf: number; iss: number; inss: number; sest: number; outras?: number }) =>
+  x.irrf + x.iss + x.inss + x.sest + (x.outras ?? 0);
 
 function hojeLocal(agora: Date): string {
   const tz = agora.getTimezoneOffset() * 60000;
@@ -448,6 +457,7 @@ export async function obterAnalises(entrada: unknown, agora: Date = new Date()) 
         empenhado: reais(empenhadoPorMes.get(mes) ?? 0),
         pago: reais(m?.bruto ?? 0), ops: m?.ops ?? 0, nes: nesPorMes.get(mes) ?? 0,
         irrf: reais(m?.irrf ?? 0), iss: reais(m?.iss ?? 0), inss: reais(m?.inss ?? 0), sest: reais(m?.sest ?? 0), patronal: reais(m?.patronal ?? 0),
+        outras: reais(m?.outras ?? 0),
       };
     }),
     elementos: elementos.map((x) => ({ codigo: x.codigo, desc: x.desc, pago: reais(x.pago), pct: x.pct })),
@@ -500,7 +510,7 @@ export async function listarOpsDoRecorte(entrada: unknown) {
       `SELECT op.id, DATE_FORMAT(${DATA_OP}, '%Y-%m-%d') AS data, op.numero_empenho AS numeroOp, op.numero_ne AS numeroNe, op.sub,
               op.credor_nome AS credor, op.elemento,
               COALESCE(op.valor_pagamento, 0) AS bruto,
-              COALESCE(op.irrf, 0) + COALESCE(op.iss, 0) + COALESCE(op.inss, 0) + COALESCE(op.sest_senat, 0) AS retido,
+              GREATEST(COALESCE(op.valor_pagamento, 0) - COALESCE(op.valor_liquido, 0) - COALESCE(op.taxa_bancaria, 0) - COALESCE(op.taxa_pix, 0), 0) AS retido,
               COALESCE(op.valor_liquido, 0) AS liquido,
               ${EXERCICIO_NE} AS exercicioNe
          ${FROM_OP}
