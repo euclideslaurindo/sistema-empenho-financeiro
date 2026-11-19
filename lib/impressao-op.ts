@@ -2,6 +2,7 @@
 // Lê o snapshot gravado na OP (T10) — nunca a config atual —, pra uma
 // reimpressão mostrar exatamente as alíquotas usadas no dia do cálculo.
 import { formatarBRL, toCents, totalItemCents } from "@/lib/money";
+import { numeroPorExtenso } from "@/lib/utils";
 
 export interface LinhaDesconto {
   chave: string; // campo do verso (irrf, iss, ..., taxaBancaria, taxaPix)
@@ -122,6 +123,36 @@ export function especificacaoDaVia(
   const historico = String(historicoOp ?? "").trim();
   const automatico = `Pagamento referente ao empenho ${String(numeroNe ?? "").trim()}`;
   return historico && historico !== automatico ? historico : "";
+}
+
+/**
+ * Valores do verso do documento em branco da NE: sem OP não há desconto, então
+ * o líquido é o próprio valor da NE — o número e o extenso dizem a mesma coisa
+ * (antes saía "R$ 0,00 (DOIS MIL REAIS)").
+ */
+export function valoresDoVersoEmBranco(valorNe: string | number | null | undefined) {
+  const centavos = toCents(valorNe);
+  return {
+    valorBase: formatarBRL(centavos),
+    valorRecibo: formatarBRL(centavos),
+    valorExtenso: numeroPorExtenso(centavos / 100),
+    totalDescontos: formatarBRL(0),
+    descontosExtenso: numeroPorExtenso(0),
+  };
+}
+
+/** Campo de valor do verso -> campo do extenso que tem de acompanhar. */
+const EXTENSO_DO_VALOR: Record<string, string> = { valorRecibo: "valorExtenso", totalDescontos: "descontosExtenso" };
+
+/**
+ * Edição do verso na tela: ao mudar o valor líquido ou o total de descontos,
+ * o extenso correspondente é refeito, para nunca ficarem diferentes.
+ */
+export function editarVerso<T extends Record<string, any>>(verso: T, campo: string, valor: any): T {
+  const novo: Record<string, any> = { ...verso, [campo]: valor };
+  const extenso = EXTENSO_DO_VALOR[campo];
+  if (extenso) novo[extenso] = numeroPorExtenso(toCents(valor) / 100);
+  return novo as T;
 }
 
 export function formatarValorOp(valor: string | number | null | undefined): string {
