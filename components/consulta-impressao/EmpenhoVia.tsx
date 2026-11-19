@@ -10,9 +10,11 @@ export const EmpenhoVia = ({
 }: any) => {
   return (
     <div
-      className={`w-full max-w-[210mm] min-h-[297mm] print:min-h-0 print:h-screen bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 box-border print:font-serif text-black relative mx-auto mb-8 print:mb-0 shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none`}
+      className={`w-full max-w-[210mm] min-h-[297mm] print:min-h-0 print:h-screen bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 box-border print:font-serif text-black relative mx-auto mb-8 print:mb-0 shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none p-[10mm]`}
+      data-testid="via-frente"
     >
-      <div className="w-full flex flex-col font-sans p-[8px]">
+      {/* Margem da folha: 10 mm, igual à do verso */}
+      <div className="w-full flex flex-col font-sans">
         {/* Header */}
         <div className="flex justify-between items-start pt-2 px-2 pb-1 relative">
           <div className="w-[84px] h-[84px] flex items-center justify-center">

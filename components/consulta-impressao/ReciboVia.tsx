@@ -5,10 +5,11 @@ export const ReciboVia = ({ data, frente, isEditing, onChange }: any) => {
   const linhas: LinhaDesconto[] = data.linhasDescontos ?? LINHAS_DOCUMENTO_EM_BRANCO;
   return (
     <div
-      className={`w-full max-w-[210mm] min-h-[297mm] print:min-h-0 print:h-screen bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 box-border font-sans text-black relative mx-auto shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none p-[16mm]`}
+      className={`w-full max-w-[210mm] min-h-[297mm] print:min-h-0 print:h-screen bg-white/70 backdrop-blur-md shadow-sm border border-slate-200/50 box-border font-sans text-black relative mx-auto shadow-[0px_4px_24px_rgba(0,0,0,0.06)] print:shadow-none p-[10mm]`}
+      data-testid="via-verso"
     >
-      {/* Layout do Recibo/Verso */}
-      <div className="border border-black p-6 flex flex-col relative w-full h-[265mm]">
+      {/* Layout do Recibo/Verso — margem da folha: 10 mm, igual à da frente (297 − 2×10 = 277 mm) */}
+      <div className="border border-black p-6 flex flex-col relative w-full h-[277mm]">
         <h1 className="text-xl font-bold tracking-widest border-b border-black pb-2 mb-6 uppercase text-center">
           Descontos e Recibo (Verso)
         </h1>
